@@ -1,0 +1,107 @@
+services:
+  rms-db:
+    image: mariadb:10.5.6
+    container_name: rms-db
+    restart: unless-stopped
+    tty: true
+    ports:
+      - '3308:3306'
+    environment:
+      MYSQL_DATABASE: ${DB_DATABASE:-master}
+      MYSQL_ROOT_PASSWORD: ${DB_ROOT_PASSWORD:-root}
+      MYSQL_PASSWORD: ${DB_PASSWORD:-rms}
+      MYSQL_USER: ${DB_USERNAME:-rms}
+    volumes:
+      - rms-db-data:/var/lib/mysql
+      - ./.dockerfile/mysql/my.cnf:/etc/mysql/my.cnf
+      - ./.dockerfile/mysql/init:/docker-entrypoint-initdb.d
+    networks:
+      - rms-services
+
+  rms-phpmyadmin:
+    image: phpmyadmin/phpmyadmin:latest
+    container_name: rms-phpmyadmin
+    restart: unless-stopped
+    depends_on:
+      - rms-db
+    environment:
+      PMA_HOST: rms-db
+      PMA_PORT: 3306
+      MYSQL_ROOT_PASSWORD: ${DB_ROOT_PASSWORD:-root}
+    ports:
+      - '6161:80'
+    networks:
+      - rms-services
+
+  rms-app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      args:
+        user: rms
+        uid: 1000
+        gid: 1000
+    image: rms-app
+    container_name: rms-app
+    restart: unless-stopped
+    working_dir: /var/www
+    volumes:
+      - .:/var/www
+      - ./.dockerfile/php/local.ini:/usr/local/etc/php/conf.d/local.ini
+    depends_on:
+      - rms-db
+    networks:
+      - rms-services
+
+  rms-queue:
+    image: rms-app
+    container_name: rms-queue
+    restart: unless-stopped
+    working_dir: /var/www
+    command: php artisan queue:work --queue=default --tries=3 --timeout=90 --sleep=3
+    volumes:
+      - .:/var/www
+      - ./.dockerfile/php/local.ini:/usr/local/etc/php/conf.d/local.ini
+    depends_on:
+      - rms-db
+      - rms-app
+    networks:
+      - rms-services
+
+  rms-scheduler:
+    image: rms-app
+    container_name: rms-scheduler
+    restart: unless-stopped
+    working_dir: /var/www
+    command: php artisan schedule:work
+    volumes:
+      - .:/var/www
+      - ./.dockerfile/php/local.ini:/usr/local/etc/php/conf.d/local.ini
+    depends_on:
+      - rms-db
+      - rms-app
+      - rms-queue
+    networks:
+      - rms-services
+
+  rms-webserver:
+    image: nginx:alpine
+    container_name: rms-webserver
+    restart: unless-stopped
+    ports:
+      - '6100:80'
+      - '6143:443'
+    volumes:
+      - ./:/var/www
+      - ./.dockerfile/nginx/conf.d:/etc/nginx/conf.d/
+    depends_on:
+      - rms-app
+    networks:
+      - rms-services
+
+networks:
+  rms-services:
+    driver: bridge
+
+volumes:
+  rms-db-data:
