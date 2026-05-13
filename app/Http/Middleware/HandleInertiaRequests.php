@@ -111,7 +111,22 @@ class HandleInertiaRequests extends Middleware
     {
         $user = $request->user();
 
-        if (! $user || $this->accessControl->isSuperAdmin($user)) {
+        if (! $user) {
+            return null;
+        }
+
+        // Super admin or any global-scope role → unrestricted, show everything.
+        if ($this->accessControl->isSuperAdmin($user)) {
+            return null;
+        }
+
+        $hasGlobalRole = UserRoleAssignment::where('user_id', $user->id)
+            ->where('is_active', true)
+            ->where('scope_type', 'global')
+            ->whereHas('role', fn ($q) => $q->where('is_active', true))
+            ->exists();
+
+        if ($hasGlobalRole) {
             return null;
         }
 
@@ -242,33 +257,16 @@ class HandleInertiaRequests extends Middleware
                 'outlets.name as outlet',
             ]);
 
-        // Get outlets without warehouses, filtered by the user's allowed scopes.
-        $outlets = DB::table('outlets')
-            ->whereNotIn('id', $warehouses->pluck('outlet_id')->filter())
-            ->when($allowed !== null, fn ($q) => $q->whereIn('id', $allowed['outlet']))
-            ->orderBy('name')
-            ->get(['id', 'name']);
-
-        // Build items array with warehouses
+        // nodeSelection items are real warehouses only; outlets come via page.props.outlets.
         $items = $warehouses
             ->map(fn ($warehouse) => [
-                'id' => (string) ($warehouse->id ?? ''),
+                'id'        => (string) ($warehouse->id ?? ''),
                 'outlet_id' => (string) ($warehouse->outlet_id ?? ''),
-                'outlet' => (string) ($warehouse->outlet ?? ''),
-                'node' => (string) ($warehouse->node ?? ''),
+                'outlet'    => (string) ($warehouse->outlet ?? ''),
+                'node'      => (string) ($warehouse->node ?? ''),
             ])
             ->values()
             ->all();
-
-        // Add outlets without warehouses as selectable items
-        foreach ($outlets as $outlet) {
-            $items[] = [
-                'id' => '',
-                'outlet_id' => (string) ($outlet->id ?? ''),
-                'outlet' => (string) ($outlet->name ?? ''),
-                'node' => 'All warehouses',
-            ];
-        }
 
         $currentScopeType = (string) $request->session()->get('current_scope_type', 'warehouse');
         $currentNodeId = (string) $request->session()->get('current_node_id', '');

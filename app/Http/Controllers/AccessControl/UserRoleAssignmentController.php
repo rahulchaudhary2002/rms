@@ -67,9 +67,16 @@ class UserRoleAssignmentController extends Controller
         $users = User::where('is_superadmin', false)->orderBy('name')->get(['id', 'name', 'email']);
         $roles = Role::where('is_active', true)->orderBy('name')->get(['id', 'name', 'slug', 'level']);
 
-        // Super admin sees all scopes; others only see their own assigned scopes.
-        if ($this->accessControl->isSuperAdmin($actor)) {
-            $allowedScopes = null; // null = no restriction
+        // Super admin or global-scope role → no restriction, show all scopes.
+        $hasGlobalRole = $this->accessControl->isSuperAdmin($actor)
+            || UserRoleAssignment::where('user_id', $actor->id)
+                ->where('is_active', true)
+                ->where('scope_type', 'global')
+                ->whereHas('role', fn ($q) => $q->where('is_active', true))
+                ->exists();
+
+        if ($hasGlobalRole) {
+            $allowedScopes = null;
         } else {
             $assignments = UserRoleAssignment::where('user_id', $actor->id)
                 ->where('is_active', true)
@@ -77,8 +84,8 @@ class UserRoleAssignmentController extends Controller
                 ->get(['scope_type', 'scope_id']);
 
             $allowedScopes = [
-                'outlet'    => $assignments->where('scope_type', 'outlet')->pluck('scope_id')->unique()->values(),
-                'warehouse' => $assignments->where('scope_type', 'warehouse')->pluck('scope_id')->unique()->values(),
+                'outlet'    => $assignments->where('scope_type', 'outlet')->pluck('scope_id')->unique()->values()->toArray(),
+                'warehouse' => $assignments->where('scope_type', 'warehouse')->pluck('scope_id')->unique()->values()->toArray(),
             ];
         }
 

@@ -106,6 +106,8 @@ export function OutletNodeSwitcher() {
         }
 
         for (const node of nodeSelection?.items ?? []) {
+            if (!node.id || !node.node) continue;
+
             const outletName = node.outlet || 'Unknown Outlet';
             const outletKey = outletName.toLowerCase();
 
@@ -353,12 +355,14 @@ export function OutletNodeSwitcher() {
     const selectedNode = nodeSelection.items.find(
         (node) => node.id === (nodeSelection.current_node_id ?? ''),
     );
-    const selectedOutletNode = nodeSelection.items.find(
-        (node) => node.outlet_id === (nodeSelection.current_outlet_id ?? ''),
-    );
+    const currentOutletName =
+        nodeSelection.current_scope_type === 'outlet'
+            ? (page.props.outlets ?? []).find((o) => o.id === (nodeSelection.current_outlet_id ?? ''))?.name
+              ?? nodeSelection.items.find((n) => n.outlet_id === (nodeSelection.current_outlet_id ?? ''))?.outlet
+            : null;
     const currentLabel =
-        nodeSelection.current_scope_type === 'outlet' && selectedOutletNode
-            ? `${selectedOutletNode.outlet} / All warehouses`
+        nodeSelection.current_scope_type === 'outlet' && currentOutletName
+            ? currentOutletName
             : selectedNode
               ? `${selectedNode.outlet} / ${selectedNode.node}`
               : null;
@@ -374,6 +378,7 @@ export function OutletNodeSwitcher() {
     };
 
     const selectWarehouse = (node: NodeItem) => {
+        if (!node.id) return;
         setPendingScopeType('warehouse');
         setPendingOutletId(node.outlet_id ?? null);
         setPendingNodeId(node.id);
@@ -443,9 +448,14 @@ export function OutletNodeSwitcher() {
                         </p>
                     ) : (
                         filteredHierarchy.map((outlet, outletIndex) => {
+                            const hasWarehouses = outlet.nodes.length > 0;
                             const outletExpanded =
+                                !hasWarehouses ||
                                 searchQuery.trim() !== '' ||
                                 openOutlet === outlet.key;
+                            const outletSelected =
+                                pendingScopeType === 'outlet' &&
+                                pendingOutletId === outlet.id;
 
                             return (
                                 <div key={outlet.key}>
@@ -453,105 +463,99 @@ export function OutletNodeSwitcher() {
                                         <div className="my-2 h-px bg-border" />
                                     )}
 
-                                    <button
-                                        type="button"
-                                        className={cn(
-                                            'flex w-full items-center gap-2 rounded-lg p-2 text-left transition-colors hover:bg-muted',
-                                            outletExpanded && 'bg-primary/10',
-                                        )}
-                                        aria-expanded={outletExpanded}
-                                        onClick={() =>
-                                            handleOutletToggle(outlet.key)
-                                        }
-                                    >
-                                        <span
+                                    {/* Outlet with no warehouses — show as a direct selectable row */}
+                                    {!hasWarehouses ? (
+                                        <button
+                                            type="button"
                                             className={cn(
-                                                'material-symbols-outlined text-sm',
-                                                outletExpanded
-                                                    ? 'text-primary'
-                                                    : 'text-muted-foreground',
+                                                'flex w-full items-center gap-2 rounded-lg p-2 text-left transition-colors',
+                                                outletSelected
+                                                    ? 'bg-primary text-primary-foreground shadow-sm'
+                                                    : 'hover:bg-muted',
                                             )}
+                                            onClick={() => selectOutlet(outlet)}
                                         >
-                                            storefront
-                                        </span>
-                                        <span className="min-w-0 flex-1 truncate text-sm font-semibold">
-                                            {outlet.name}
-                                        </span>
-                                        <span
-                                            className={cn(
-                                                'material-symbols-outlined text-xs text-muted-foreground transition-transform',
-                                                outletExpanded && 'rotate-90',
+                                            <span className={cn('material-symbols-outlined text-sm', outletSelected ? '' : 'text-muted-foreground')}>
+                                                storefront
+                                            </span>
+                                            <span className="min-w-0 flex-1 truncate text-sm font-semibold">
+                                                {outlet.name}
+                                            </span>
+                                            {outletSelected && (
+                                                <span className="material-symbols-outlined text-sm">check_circle</span>
                                             )}
-                                        >
-                                            chevron_right
-                                        </span>
-                                    </button>
-
-                                    <div
-                                        className={cn(
-                                            'grid transition-[grid-template-rows] duration-200 ease-in-out',
-                                            outletExpanded
-                                                ? 'grid-rows-[1fr]'
-                                                : 'grid-rows-[0fr]',
-                                        )}
-                                    >
-                                        <div className="overflow-hidden">
-                                            <div className="ml-6 space-y-1 border-l-2 border-primary/20">
-                                                <button
-                                                    type="button"
-                                                    className={cn(
-                                                        'ml-2 flex w-[calc(100%-0.5rem)] items-center justify-between gap-2 rounded-lg p-2 text-left transition-colors',
-                                                        pendingScopeType ===
-                                                            'outlet' &&
-                                                            pendingOutletId ===
-                                                                outlet.id
-                                                            ? 'bg-primary text-primary-foreground shadow-sm'
-                                                            : 'text-muted-foreground hover:bg-muted',
-                                                    )}
-                                                    onClick={() =>
-                                                        selectOutlet(outlet)
-                                                    }
-                                                >
-                                                    <span className="flex min-w-0 items-center gap-2">
-                                                        <span className="material-symbols-outlined text-sm">
-                                                            select_all
-                                                        </span>
-                                                        <span className="truncate text-xs font-medium">
-                                                            All warehouses
-                                                        </span>
+                                        </button>
+                                    ) : (
+                                        /* Outlet with warehouses — selectable header + collapsible warehouse list */
+                                        <>
+                                            <button
+                                                type="button"
+                                                className={cn(
+                                                    'flex w-full items-center gap-2 rounded-lg p-2 text-left transition-colors',
+                                                    outletSelected
+                                                        ? 'bg-primary text-primary-foreground shadow-sm'
+                                                        : 'hover:bg-muted',
+                                                    !outletSelected && outletExpanded && 'bg-primary/10',
+                                                )}
+                                                aria-expanded={outletExpanded}
+                                                onClick={() => {
+                                                    selectOutlet(outlet);
+                                                    setOpenOutlet(outlet.key);
+                                                }}
+                                            >
+                                                <span className={cn('material-symbols-outlined text-sm', outletSelected ? '' : outletExpanded ? 'text-primary' : 'text-muted-foreground')}>
+                                                    storefront
+                                                </span>
+                                                <span className="min-w-0 flex-1 truncate text-sm font-semibold">
+                                                    {outlet.name}
+                                                </span>
+                                                {outletSelected ? (
+                                                    <span className="material-symbols-outlined text-sm">check_circle</span>
+                                                ) : (
+                                                    <span className={cn('material-symbols-outlined text-xs text-muted-foreground transition-transform', outletExpanded && 'rotate-90')}>
+                                                        chevron_right
                                                     </span>
-                                                </button>
+                                                )}
+                                            </button>
 
-                                                {outlet.nodes.map((node) => (
-                                                    <button
-                                                        type="button"
-                                                        key={node.id}
-                                                        className={cn(
-                                                            'ml-2 flex w-[calc(100%-0.5rem)] items-center justify-between gap-2 rounded-lg p-2 text-left transition-colors',
-                                                            pendingScopeType ===
-                                                                'warehouse' &&
-                                                                pendingNodeId ===
-                                                                    node.id
-                                                                ? 'bg-primary text-primary-foreground shadow-sm'
-                                                                : 'text-muted-foreground hover:bg-muted',
-                                                        )}
-                                                        onClick={() =>
-                                                            selectWarehouse(node)
-                                                        }
-                                                    >
-                                                        <span className="flex min-w-0 items-center gap-2">
-                                                            <span className="material-symbols-outlined text-sm">
-                                                                inventory_2
-                                                            </span>
-                                                            <span className="truncate text-xs font-medium">
-                                                                {node.node}
-                                                            </span>
-                                                        </span>
-                                                    </button>
-                                                ))}
+                                            <div
+                                                className={cn(
+                                                    'grid transition-[grid-template-rows] duration-200 ease-in-out',
+                                                    outletExpanded ? 'grid-rows-[1fr]' : 'grid-rows-[0fr]',
+                                                )}
+                                            >
+                                                <div className="overflow-hidden">
+                                                    <div className="ml-6 space-y-1 border-l-2 border-primary/20">
+
+                                                        {outlet.nodes.map((node) => {
+                                                            const warehouseSelected = pendingScopeType === 'warehouse' && pendingNodeId === node.id;
+                                                            return (
+                                                                <button
+                                                                    type="button"
+                                                                    key={node.id}
+                                                                    className={cn(
+                                                                        'ml-2 flex w-[calc(100%-0.5rem)] items-center justify-between gap-2 rounded-lg p-2 text-left transition-colors',
+                                                                        warehouseSelected
+                                                                            ? 'bg-primary text-primary-foreground shadow-sm'
+                                                                            : 'text-muted-foreground hover:bg-muted',
+                                                                    )}
+                                                                    onClick={() => selectWarehouse(node)}
+                                                                >
+                                                                    <span className="flex min-w-0 items-center gap-2">
+                                                                        <span className="material-symbols-outlined text-sm">inventory_2</span>
+                                                                        <span className="truncate text-xs font-medium">{node.node}</span>
+                                                                    </span>
+                                                                    {warehouseSelected && (
+                                                                        <span className="material-symbols-outlined text-sm">check_circle</span>
+                                                                    )}
+                                                                </button>
+                                                            );
+                                                        })}
+                                                    </div>
+                                                </div>
                                             </div>
-                                        </div>
-                                    </div>
+                                        </>
+                                    )}
                                 </div>
                             );
                         })

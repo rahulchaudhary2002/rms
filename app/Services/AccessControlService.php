@@ -7,6 +7,7 @@ use App\Models\User;
 use App\Models\UserRoleAssignment;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Facades\DB;
 
 class AccessControlService
 {
@@ -24,13 +25,16 @@ class AccessControlService
             return false;
         }
 
+        // Resolve the parent outlet once so sub-methods don't each hit the DB.
+        $parentOutletId = $scopeType === 'warehouse' ? $this->warehouseOutletId($scopeId) : null;
+
         // Explicit deny override wins everything
-        if ($this->hasDenyOverride($user, $permission->id, $scopeType, $scopeId)) {
+        if ($this->hasDenyOverride($user, $permission->id, $scopeType, $scopeId, $parentOutletId)) {
             return false;
         }
 
         // Explicit allow override grants access
-        if ($this->hasAllowOverride($user, $permission->id, $scopeType, $scopeId)) {
+        if ($this->hasAllowOverride($user, $permission->id, $scopeType, $scopeId, $parentOutletId)) {
             return true;
         }
 
@@ -40,7 +44,7 @@ class AccessControlService
         }
 
         // Role-based permission check
-        return $this->roleGrantsPermission($user, $permission->id, $scopeType, $scopeId);
+        return $this->roleGrantsPermission($user, $permission->id, $scopeType, $scopeId, $parentOutletId);
     }
 
     public function userCanAccessResource(
@@ -91,22 +95,13 @@ class AccessControlService
         string $scopeType = 'global',
         ?int $scopeId = null
     ): Collection {
+        $parentOutletId = $scopeType === 'warehouse' ? $this->warehouseOutletId($scopeId) : null;
+
         $query = UserRoleAssignment::with('role.permissions')
             ->where('user_id', $user->id)
             ->where('is_active', true)
-            ->whereHas('role', fn ($q) => $q->where('is_active', true));
-
-        if ($scopeType === 'global') {
-            $query->where('scope_type', 'global');
-        } else {
-            $query->where(function ($q) use ($scopeType, $scopeId) {
-                $q->where('scope_type', 'global')
-                    ->orWhere(function ($q2) use ($scopeType, $scopeId) {
-                        $q2->where('scope_type', $scopeType)
-                            ->where('scope_id', $scopeId);
-                    });
-            });
-        }
+            ->whereHas('role', fn ($q) => $q->where('is_active', true))
+            ->where(fn ($q) => $this->applyScopeCondition($q, $scopeType, $scopeId, $parentOutletId));
 
         return $query->get()->pluck('role')->filter()->values();
     }
@@ -145,8 +140,9 @@ class AccessControlService
         ?int $scopeId
     ): array {
         $permissions = [];
+        $parentOutletId = $scopeType === 'warehouse' ? $this->warehouseOutletId($scopeId) : null;
 
-        // Collect role-based permissions
+        // Collect role-based permissions (includes inherited outlet-level roles for warehouse scope)
         $roles = $this->getUserRoles($user, $scopeType, $scopeId);
         foreach ($roles as $role) {
             foreach ($role->permissions as $permission) {
@@ -156,20 +152,12 @@ class AccessControlService
             }
         }
 
-        // Apply overrides
+        // Apply overrides — inherits outlet-level overrides when in warehouse scope
         $overrides = $user->permissionOverrides()
             ->with('permission')
             ->where('is_active', true)
             ->whereHas('permission', fn ($q) => $q->where('is_active', true))
-            ->where(function ($q) use ($scopeType, $scopeId) {
-                $q->where('scope_type', 'global');
-                if ($scopeType !== 'global') {
-                    $q->orWhere(function ($q2) use ($scopeType, $scopeId) {
-                        $q2->where('scope_type', $scopeType)
-                            ->where('scope_id', $scopeId);
-                    });
-                }
-            })
+            ->where(fn ($q) => $this->applyScopeCondition($q, $scopeType, $scopeId, $parentOutletId))
             ->get();
 
         // Allow overrides first
@@ -195,60 +183,80 @@ class AccessControlService
         return $permissions;
     }
 
-    private function hasDenyOverride(User $user, int $permissionId, string $scopeType, ?int $scopeId): bool
+    private function hasDenyOverride(User $user, int $permissionId, string $scopeType, ?int $scopeId, ?int $parentOutletId = null): bool
     {
         return $user->permissionOverrides()
             ->where('permission_id', $permissionId)
             ->where('effect', 'deny')
             ->where('is_active', true)
-            ->where(function ($q) use ($scopeType, $scopeId) {
-                $q->where('scope_type', 'global');
-                if ($scopeType !== 'global') {
-                    $q->orWhere(function ($q2) use ($scopeType, $scopeId) {
-                        $q2->where('scope_type', $scopeType)
-                            ->where('scope_id', $scopeId);
-                    });
-                }
-            })
+            ->where(fn ($q) => $this->applyScopeCondition($q, $scopeType, $scopeId, $parentOutletId))
             ->exists();
     }
 
-    private function hasAllowOverride(User $user, int $permissionId, string $scopeType, ?int $scopeId): bool
+    private function hasAllowOverride(User $user, int $permissionId, string $scopeType, ?int $scopeId, ?int $parentOutletId = null): bool
     {
         return $user->permissionOverrides()
             ->where('permission_id', $permissionId)
             ->where('effect', 'allow')
             ->where('is_active', true)
-            ->where(function ($q) use ($scopeType, $scopeId) {
-                $q->where('scope_type', 'global');
-                if ($scopeType !== 'global') {
-                    $q->orWhere(function ($q2) use ($scopeType, $scopeId) {
-                        $q2->where('scope_type', $scopeType)
-                            ->where('scope_id', $scopeId);
-                    });
-                }
-            })
+            ->where(fn ($q) => $this->applyScopeCondition($q, $scopeType, $scopeId, $parentOutletId))
             ->exists();
     }
 
-    private function roleGrantsPermission(User $user, int $permissionId, string $scopeType, ?int $scopeId): bool
+    private function roleGrantsPermission(User $user, int $permissionId, string $scopeType, ?int $scopeId, ?int $parentOutletId = null): bool
     {
         return UserRoleAssignment::where('user_id', $user->id)
             ->where('is_active', true)
-            ->where(function ($q) use ($scopeType, $scopeId) {
-                $q->where('scope_type', 'global');
-                if ($scopeType !== 'global') {
-                    $q->orWhere(function ($q2) use ($scopeType, $scopeId) {
-                        $q2->where('scope_type', $scopeType)
-                            ->where('scope_id', $scopeId);
-                    });
-                }
-            })
+            ->where(fn ($q) => $this->applyScopeCondition($q, $scopeType, $scopeId, $parentOutletId))
             ->whereHas('role', function ($q) use ($permissionId) {
                 $q->where('is_active', true)
                     ->whereHas('permissions', fn ($q2) => $q2->where('permissions.id', $permissionId)->where('is_active', true));
             })
             ->exists();
+    }
+
+    /**
+     * Builds the scope WHERE condition for role assignments and overrides.
+     * For warehouse scope, also includes the parent outlet's assignments/overrides.
+     */
+    private function applyScopeCondition(\Illuminate\Database\Eloquent\Builder|\Illuminate\Database\Query\Builder $query, string $scopeType, ?int $scopeId, ?int $parentOutletId = null): void
+    {
+        if ($scopeType === 'global') {
+            $query->where('scope_type', 'global');
+            return;
+        }
+
+        $query->where(function ($q) use ($scopeType, $scopeId, $parentOutletId) {
+            // Global assignments always apply
+            $q->where('scope_type', 'global');
+
+            // Outlet-level assignments apply to all warehouses in that outlet
+            if ($parentOutletId !== null) {
+                $q->orWhere(function ($q2) use ($parentOutletId) {
+                    $q2->where('scope_type', 'outlet')
+                        ->where('scope_id', $parentOutletId);
+                });
+            }
+
+            // Exact scope match (outlet or warehouse)
+            $q->orWhere(function ($q2) use ($scopeType, $scopeId) {
+                $q2->where('scope_type', $scopeType)
+                    ->where('scope_id', $scopeId);
+            });
+        });
+    }
+
+    private function warehouseOutletId(?int $warehouseId): ?int
+    {
+        if ($warehouseId === null) {
+            return null;
+        }
+
+        $outletId = DB::table('warehouses')
+            ->where('id', $warehouseId)
+            ->value('outlet_id');
+
+        return $outletId !== null ? (int) $outletId : null;
     }
 
     private function findPermission(string $slug): ?Permission
