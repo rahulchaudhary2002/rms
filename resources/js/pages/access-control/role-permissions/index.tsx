@@ -1,20 +1,20 @@
 import { Head, Link, router } from '@inertiajs/react';
-import { Filter } from 'lucide-react';
+import { ChevronDown, ChevronRight, Filter, Minus, Plus } from 'lucide-react';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { PageHeader } from '@/components/page-header';
-import { Can } from '@/components/can';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { SearchableSelect } from '@/components/ui/searchable-select';
 import { TableCard, TableSearchInput } from '@/components/table-card';
-import { ActionDropdown } from '@/components/action-dropdown';
 import { tablePerPageOptions } from '@/hooks/use-client-pagination';
 import { useDebouncedInertiaSearch } from '@/hooks/use-debounced-inertia-search';
 import { cn } from '@/lib/utils';
-import type { Role } from '@/types';
+import type { Permission, Role } from '@/types';
+
+type RoleWithPermissions = Role & { permissions: Permission[]; permissions_count: number };
 
 type PaginatedRoles = {
-    data: Role[];
+    data: RoleWithPermissions[];
     current_page: number;
     last_page: number;
     per_page: number;
@@ -26,26 +26,30 @@ type PaginatedRoles = {
 
 type Props = {
     roles: PaginatedRoles;
-    filters: { search?: string; level?: string; is_active?: string; per_page?: string };
+    permissions: Permission[];
+    filters: { search?: string; level?: string; per_page?: string };
 };
 
 function cleanPaginationLabel(label: string): string {
     return label.replaceAll('&laquo;', '').replaceAll('&raquo;', '').replaceAll('Previous', '').replaceAll('Next', '').trim();
 }
 
-export default function RolesIndex({ roles, filters }: Props) {
+export default function RolePermissionsIndex({ roles, permissions, filters }: Props) {
     const [form, setForm] = useState({
         search: filters.search ?? '',
         level: filters.level ?? '',
-        is_active: filters.is_active ?? '',
         per_page: filters.per_page ?? '10',
     });
-    const [openActionId, setOpenActionId] = useState<number | null>(null);
+    const [expanded, setExpanded] = useState<number | null>(null);
     const filterPopoverRef = useRef<HTMLDetailsElement | null>(null);
 
-    const toggleActionMenu = (id: number | null) => {
-        setOpenActionId((current) => (id === null ? null : current === id ? null : id));
-    };
+    const permsByModule = useMemo(() => {
+        return permissions.reduce<Record<string, Permission[]>>((acc, p) => {
+            if (!acc[p.module]) acc[p.module] = [];
+            acc[p.module].push(p);
+            return acc;
+        }, {});
+    }, [permissions]);
 
     const pagination = useMemo(() => ({
         previous: roles.links.find((l) => l.label.includes('Previous')) ?? null,
@@ -57,24 +61,18 @@ export default function RolesIndex({ roles, filters }: Props) {
         const handlePointerDown = (event: MouseEvent) => {
             const target = event.target as Node;
             const element = event.target instanceof Element ? event.target : null;
-
-            if (
-                element?.closest('[data-searchable-select-root]') ||
-                element?.closest('[data-searchable-select-listbox]')
-            ) return;
-
+            if (element?.closest('[data-searchable-select-root]') || element?.closest('[data-searchable-select-listbox]')) return;
             if (filterPopoverRef.current && !filterPopoverRef.current.contains(target)) {
                 filterPopoverRef.current.removeAttribute('open');
             }
         };
-
         document.addEventListener('mousedown', handlePointerDown);
         return () => document.removeEventListener('mousedown', handlePointerDown);
     }, []);
 
     const applyFilters = () => {
         filterPopoverRef.current?.removeAttribute('open');
-        router.get('/access-control/roles', form, {
+        router.get('/access-control/role-permissions', form, {
             preserveState: true,
             preserveScroll: true,
             replace: true,
@@ -82,10 +80,10 @@ export default function RolesIndex({ roles, filters }: Props) {
     };
 
     const clearFilters = () => {
-        const reset = { search: '', level: '', is_active: '', per_page: '10' };
+        const reset = { search: '', level: '', per_page: '10' };
         setForm(reset);
         filterPopoverRef.current?.removeAttribute('open');
-        router.get('/access-control/roles', {}, {
+        router.get('/access-control/role-permissions', {}, {
             preserveState: true,
             preserveScroll: true,
             replace: true,
@@ -95,7 +93,7 @@ export default function RolesIndex({ roles, filters }: Props) {
     const updatePerPage = (nextValue: string) => {
         const nextFilters = { ...form, per_page: nextValue, page: '1' };
         setForm((current) => ({ ...current, per_page: nextValue }));
-        router.get('/access-control/roles', nextFilters, {
+        router.get('/access-control/role-permissions', nextFilters, {
             preserveState: true,
             preserveScroll: true,
             replace: true,
@@ -106,47 +104,45 @@ export default function RolesIndex({ roles, filters }: Props) {
         value: form.search,
         onSearch: (value, { onCancelToken }) => {
             router.get(
-                '/access-control/roles',
+                '/access-control/role-permissions',
                 { ...form, search: value, page: '1' },
                 { preserveState: true, preserveScroll: true, replace: true, onCancelToken },
             );
         },
     });
 
-    function confirmDelete(role: Role) {
-        if (confirm(`Delete role "${role.name}"? This cannot be undone.`)) {
-            router.delete(`/access-control/roles/${role.id}`);
+    function toggle(permId: number, role: RoleWithPermissions) {
+        const has = role.permissions.some((p) => p.id === permId);
+        if (has) {
+            router.delete('/access-control/role-permissions', {
+                data: { role_id: role.id, permission_id: permId },
+                preserveScroll: true,
+            });
+        } else {
+            router.post('/access-control/role-permissions', {
+                role_id: role.id,
+                permission_ids: [permId],
+            }, { preserveScroll: true });
         }
     }
 
     return (
         <>
-            <Head title="Roles" />
+            <Head title="Role Permissions" />
             <PageHeader
                 breadcrumbs={[
                     { label: 'Home', href: '/dashboard' },
                     { label: 'Access Control', href: '/access-control/roles' },
-                    { label: 'Roles' },
+                    { label: 'Role Permissions' },
                 ]}
-                title="Roles"
-                description="Manage system roles and their access levels."
-                actions={
-                    <Can permission="roles-create">
-                        <Link
-                            href="/access-control/roles/create"
-                            className="inline-flex items-center gap-2 rounded-lg bg-primary px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition-colors hover:bg-primary/90"
-                        >
-                            <span className="material-symbols-outlined text-[18px]">add_circle</span>
-                            New Role
-                        </Link>
-                    </Can>
-                }
+                title="Role Permissions"
+                description="Assign and manage permissions for each role."
             />
 
             <TableCard
                 className="overflow-visible"
-                title="Roles"
-                description="Browse and manage all system roles."
+                title="Role Permissions"
+                description="Click a role to expand and toggle its permissions."
                 toolbar={
                     <>
                         <TableSearchInput
@@ -161,7 +157,7 @@ export default function RolesIndex({ roles, filters }: Props) {
                                 <Filter className="h-4 w-4" />
                                 Filter
                             </summary>
-                            <div className="absolute right-0 z-50 mt-2 w-72 rounded-xl border border-border/20 bg-white p-5 shadow-2xl dark:border-border dark:bg-card">
+                            <div className="absolute right-0 z-50 mt-2 w-64 rounded-xl border border-border/20 bg-white p-5 shadow-2xl dark:border-border dark:bg-card">
                                 <div className="mb-4 flex items-center justify-between">
                                     <h4 className="text-sm font-bold text-foreground dark:text-stone-100">Table Filters</h4>
                                     <button type="button" className="text-[10px] font-bold text-primary uppercase hover:underline" onClick={clearFilters}>
@@ -171,32 +167,14 @@ export default function RolesIndex({ roles, filters }: Props) {
                                 <div className="space-y-4">
                                     <div className="flex flex-col gap-1.5">
                                         <label className="text-[10px] font-bold tracking-wider text-muted-foreground/60 uppercase">Level</label>
-                                        <SearchableSelect
-                                            value={form.level}
-                                            onChange={(e) => setForm((current) => ({ ...current, level: e.target.value }))}
-                                        >
+                                        <SearchableSelect value={form.level} onChange={(e) => setForm((c) => ({ ...c, level: e.target.value }))}>
                                             <option value="">All Levels</option>
                                             <option value="global">Global</option>
                                             <option value="outlet">Outlet</option>
                                             <option value="warehouse">Warehouse</option>
                                         </SearchableSelect>
                                     </div>
-                                    <div className="flex flex-col gap-1.5">
-                                        <label className="text-[10px] font-bold tracking-wider text-muted-foreground/60 uppercase">Status</label>
-                                        <SearchableSelect
-                                            value={form.is_active}
-                                            onChange={(e) => setForm((current) => ({ ...current, is_active: e.target.value }))}
-                                        >
-                                            <option value="">All Status</option>
-                                            <option value="true">Active</option>
-                                            <option value="false">Inactive</option>
-                                        </SearchableSelect>
-                                    </div>
-                                    <Button
-                                        type="button"
-                                        className="w-full rounded-lg bg-primary text-xs font-bold text-white hover:bg-primary"
-                                        onClick={applyFilters}
-                                    >
+                                    <Button type="button" className="w-full rounded-lg bg-primary text-xs font-bold text-white hover:bg-primary" onClick={applyFilters}>
                                         Apply Filters
                                     </Button>
                                 </div>
@@ -224,9 +202,7 @@ export default function RolesIndex({ roles, filters }: Props) {
                                         className="h-9 appearance-none rounded-md border border-border/30 bg-white px-3 pr-8 text-[11px] font-bold text-foreground shadow-sm outline-none focus:border-primary focus:ring-1 focus:ring-primary dark:border-stone-700 dark:bg-stone-900 dark:text-stone-100"
                                     >
                                         {tablePerPageOptions.map((option) => (
-                                            <option key={option} value={option}>
-                                                {option === 'all' ? 'All' : option}
-                                            </option>
+                                            <option key={option} value={option}>{option === 'all' ? 'All' : option}</option>
                                         ))}
                                     </select>
                                     <span className="material-symbols-outlined pointer-events-none absolute top-1/2 right-1.5 -translate-y-1/2 text-[14px] text-primary/60">expand_more</span>
@@ -280,87 +256,83 @@ export default function RolesIndex({ roles, filters }: Props) {
                     </>
                 }
             >
-                <div className="overflow-x-auto">
-                    <table className="w-full min-w-[600px] text-left">
-                        <thead>
-                            <tr className="bg-muted text-[11px] font-bold tracking-[0.1em] text-muted-foreground uppercase dark:bg-stone-900 dark:text-stone-400">
-                                <th className="border-b border-border/10 px-6 py-4">Name</th>
-                                <th className="border-b border-border/10 px-6 py-4">Slug</th>
-                                <th className="border-b border-border/10 px-6 py-4">Level</th>
-                                <th className="border-b border-border/10 px-6 py-4">Permissions</th>
-                                <th className="border-b border-border/10 px-6 py-4">Status</th>
-                                <th className="border-b border-border/10 px-6 py-4" />
-                            </tr>
-                        </thead>
-                        <tbody className="divide-y divide-muted dark:divide-stone-800">
-                            {roles.data.length === 0 && (
-                                <tr>
-                                    <td colSpan={6} className="px-6 py-12 text-center text-sm text-muted-foreground dark:text-stone-400">
-                                        No roles found.
-                                    </td>
-                                </tr>
-                            )}
-                            {roles.data.map((role) => (
-                                <tr key={role.id} className="group transition-colors hover:bg-muted dark:hover:bg-stone-900/50">
-                                    <td className="px-6 py-4">
-                                        <div className="flex items-center gap-3">
-                                            <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary">
-                                                <span className="material-symbols-outlined text-[18px]">shield</span>
-                                            </div>
-                                            <div>
-                                                <Link
-                                                    href={`/access-control/roles/${role.id}/edit`}
-                                                    className="block font-bold text-gray-900 transition-colors hover:text-primary dark:text-gray-100"
-                                                >
-                                                    {role.name}
-                                                </Link>
-                                                {role.is_system && (
-                                                    <Badge variant="secondary" className="mt-0.5 text-[10px]">System</Badge>
-                                                )}
-                                            </div>
-                                        </div>
-                                    </td>
-                                    <td className="px-6 py-4 font-mono text-xs text-gray-500 dark:text-gray-400">{role.slug}</td>
-                                    <td className="px-6 py-4">
-                                        <span className="rounded-full bg-slate-100 px-2.5 py-1 text-[10px] font-bold tracking-wide uppercase text-slate-600 ring-1 ring-slate-200 dark:bg-slate-800 dark:text-slate-300 dark:ring-slate-700">
+                <div className="divide-y divide-muted dark:divide-stone-800">
+                    {roles.data.length === 0 && (
+                        <div className="px-6 py-12 text-center text-sm text-muted-foreground dark:text-stone-400">
+                            No roles found.
+                        </div>
+                    )}
+                    {roles.data.map((role) => (
+                        <div key={role.id}>
+                            <button
+                                className="flex w-full items-center justify-between px-6 py-4 text-left transition-colors hover:bg-muted/50 dark:hover:bg-stone-900/50"
+                                onClick={() => setExpanded(expanded === role.id ? null : role.id)}
+                            >
+                                <div className="flex items-center gap-3">
+                                    <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary">
+                                        <span className="material-symbols-outlined text-[16px]">shield</span>
+                                    </div>
+                                    <div className="flex flex-wrap items-center gap-2">
+                                        <span className="font-semibold text-gray-900 dark:text-gray-100">{role.name}</span>
+                                        <span className="rounded-full bg-slate-100 px-2.5 py-0.5 text-[10px] font-bold tracking-wide uppercase text-slate-600 ring-1 ring-slate-200 dark:bg-slate-800 dark:text-slate-300 dark:ring-slate-700">
                                             {role.level}
                                         </span>
-                                    </td>
-                                    <td className="px-6 py-4 text-sm text-muted-foreground dark:text-stone-400">
-                                        {(role as any).permissions_count ?? 0}
-                                    </td>
-                                    <td className="px-6 py-4">
-                                        <span className={cn(
-                                            'inline-flex rounded-full px-3 py-1 text-[11px] font-bold tracking-wider uppercase',
-                                            role.is_active
-                                                ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400'
-                                                : 'bg-stone-100 text-stone-500 dark:bg-stone-800 dark:text-stone-400',
-                                        )}>
-                                            {role.is_active ? 'Active' : 'Inactive'}
-                                        </span>
-                                    </td>
-                                    <td className="px-6 py-4 text-right">
-                                        <ActionDropdown
-                                            isOpen={openActionId === role.id}
-                                            itemId={role.id}
-                                            itemLabel={role.name}
-                                            onToggle={(id) => toggleActionMenu(id as number | null)}
-                                            actions={[
-                                                { id: `edit-${role.id}`, label: 'Edit role', icon: 'edit', href: `/access-control/roles/${role.id}/edit` },
-                                                ...(!role.is_system ? [{
-                                                    id: `delete-${role.id}`,
-                                                    label: 'Delete role',
-                                                    icon: 'delete',
-                                                    variant: 'danger' as const,
-                                                    onClick: () => confirmDelete(role),
-                                                }] : []),
-                                            ]}
-                                        />
-                                    </td>
-                                </tr>
-                            ))}
-                        </tbody>
-                    </table>
+                                        {role.is_system && <Badge variant="secondary" className="text-[10px]">System</Badge>}
+                                    </div>
+                                </div>
+                                <div className="flex items-center gap-3">
+                                    <span className="text-xs font-medium text-muted-foreground dark:text-stone-400">
+                                        {role.permissions_count} permission{role.permissions_count !== 1 ? 's' : ''}
+                                    </span>
+                                    {expanded === role.id
+                                        ? <ChevronDown className="h-4 w-4 text-muted-foreground" />
+                                        : <ChevronRight className="h-4 w-4 text-muted-foreground" />
+                                    }
+                                </div>
+                            </button>
+
+                            {expanded === role.id && (
+                                <div className="border-t border-border/10 bg-muted/20 px-6 py-5 dark:bg-stone-900/30">
+                                    {Object.keys(permsByModule).length === 0 && (
+                                        <p className="text-sm text-muted-foreground">No permissions available.</p>
+                                    )}
+                                    <div className="space-y-5">
+                                        {Object.entries(permsByModule).map(([module, perms]) => (
+                                            <div key={module}>
+                                                <h4 className="mb-2.5 text-[10px] font-bold tracking-[0.12em] text-muted-foreground/70 uppercase dark:text-stone-500">
+                                                    {module}
+                                                </h4>
+                                                <div className="flex flex-wrap gap-2">
+                                                    {perms.map((perm) => {
+                                                        const has = role.permissions.some((p) => p.id === perm.id);
+                                                        return (
+                                                            <button
+                                                                key={perm.id}
+                                                                onClick={() => toggle(perm.id, role)}
+                                                                title={perm.slug}
+                                                                className={cn(
+                                                                    'flex items-center gap-1.5 rounded-md border px-3 py-1 text-xs font-semibold transition-all',
+                                                                    has
+                                                                        ? 'border-primary bg-primary text-white shadow-sm hover:bg-primary/90'
+                                                                        : 'border-border/50 bg-white text-muted-foreground hover:border-primary/40 hover:text-primary dark:bg-stone-900 dark:hover:border-primary/40',
+                                                                )}
+                                                            >
+                                                                {has
+                                                                    ? <Minus className="h-3 w-3" />
+                                                                    : <Plus className="h-3 w-3" />
+                                                                }
+                                                                {perm.action}
+                                                            </button>
+                                                        );
+                                                    })}
+                                                </div>
+                                            </div>
+                                        ))}
+                                    </div>
+                                </div>
+                            )}
+                        </div>
+                    ))}
                 </div>
             </TableCard>
         </>

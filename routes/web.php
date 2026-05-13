@@ -2,6 +2,7 @@
 
 use App\Http\Controllers\OutletController;
 use App\Http\Controllers\ScopeSelectionController;
+use App\Http\Controllers\UserController;
 use App\Http\Controllers\WarehouseController;
 use Illuminate\Support\Facades\Route;
 use Laravel\Fortify\Features;
@@ -17,6 +18,9 @@ Route::middleware(['auth', 'verified', 'node.selected'])->group(function () {
     Route::post('scope-selection/nodes', [ScopeSelectionController::class, 'storeNode'])->name('scope-selection.nodes.store');
     Route::post('outlets', [OutletController::class, 'store'])->name('outlets.store');
     Route::post('warehouses', [WarehouseController::class, 'store'])->name('warehouses.store');
+
+    Route::resource('users', UserController::class)
+        ->middleware('permission:users-manage');
 });
 
 require __DIR__.'/settings.php';

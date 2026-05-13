@@ -10,6 +10,7 @@ use App\Models\UserRoleAssignment;
 use App\Services\AccessControlService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 use Inertia\Inertia;
 use Inertia\Response;
@@ -20,35 +21,52 @@ class UserRoleAssignmentController extends Controller
 
     public function index(Request $request): Response
     {
+        $filters = [
+            'search'     => $request->string('search')->toString(),
+            'user_id'    => $request->string('user_id')->toString(),
+            'role_id'    => $request->string('role_id')->toString(),
+            'scope_type' => $request->string('scope_type')->toString(),
+            'is_active'  => $request->string('is_active')->toString(),
+            'per_page'   => $request->string('per_page')->toString(),
+        ];
+
         $query = UserRoleAssignment::with(['user', 'role', 'assignedBy'])
+            ->whereHas('user', fn ($q) => $q->where('is_superadmin', false))
+            ->when($filters['search'] !== '', function ($builder) use ($filters) {
+                $search = '%'.$filters['search'].'%';
+                $builder->whereHas('user', fn ($q) => $q->where('name', 'like', $search)->orWhere('email', 'like', $search));
+            })
+            ->when($filters['user_id'] !== '', fn ($builder) => $builder->where('user_id', $filters['user_id']))
+            ->when($filters['role_id'] !== '', fn ($builder) => $builder->where('role_id', $filters['role_id']))
+            ->when($filters['scope_type'] !== '', fn ($builder) => $builder->where('scope_type', $filters['scope_type']))
+            ->when($filters['is_active'] !== '', fn ($builder) => $builder->where('is_active', $filters['is_active'] === 'true'))
             ->orderByDesc('created_at');
 
-        if ($userId = $request->input('user_id')) {
-            $query->where('user_id', $userId);
-        }
+        $perPage = $filters['per_page'] === 'all'
+            ? max((clone $query)->count(), 1)
+            : max((int) ($filters['per_page'] ?: 10), 1);
 
-        if ($roleId = $request->input('role_id')) {
-            $query->where('role_id', $roleId);
-        }
+        $assignments = $query->paginate($perPage)->withQueryString();
 
-        if ($scopeType = $request->input('scope_type')) {
-            $query->where('scope_type', $scopeType);
-        }
-
-        if ($request->has('is_active') && $request->input('is_active') !== '') {
-            $query->where('is_active', filter_var($request->input('is_active'), FILTER_VALIDATE_BOOLEAN));
-        }
-
-        $assignments = $query->paginate(20)->withQueryString();
-
-        $users = User::orderBy('name')->get(['id', 'name', 'email']);
+        $users = User::where('is_superadmin', false)->orderBy('name')->get(['id', 'name', 'email']);
         $roles = Role::where('is_active', true)->orderBy('name')->get(['id', 'name', 'slug', 'level']);
 
-        return Inertia::render('access-control/user-roles', [
+        return Inertia::render('access-control/user-roles/index', [
             'assignments' => $assignments,
             'users'       => $users,
             'roles'       => $roles,
-            'filters'     => $request->only('user_id', 'role_id', 'scope_type', 'is_active'),
+            'filters'     => $filters,
+        ]);
+    }
+
+    public function create(): Response
+    {
+        $users = User::where('is_superadmin', false)->orderBy('name')->get(['id', 'name', 'email']);
+        $roles = Role::where('is_active', true)->orderBy('name')->get(['id', 'name', 'slug', 'level']);
+
+        return Inertia::render('access-control/user-roles/create', [
+            'users' => $users,
+            'roles' => $roles,
         ]);
     }
 
@@ -64,7 +82,7 @@ class UserRoleAssignmentController extends Controller
                 ],
                 [
                     'is_active'   => $request->boolean('is_active', true),
-                    'assigned_by' => auth()->id(),
+                    'assigned_by' => Auth::id(),
                 ]
             );
         });
@@ -72,7 +90,9 @@ class UserRoleAssignmentController extends Controller
         $user = User::findOrFail($request->user_id);
         $this->accessControl->clearUserPermissionCache($user);
 
-        return back()->with('success', 'Role assigned successfully.');
+        $redirect = $request->input('_redirect', route('access-control.user-roles.index'));
+
+        return redirect($redirect)->with('success', 'Role assigned successfully.');
     }
 
     public function update(Request $request, UserRoleAssignment $userRoleAssignment): RedirectResponse

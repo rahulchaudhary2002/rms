@@ -1,6 +1,7 @@
 <?php
 
 use App\Http\Controllers\AccessControl\PermissionController;
+use App\Http\Controllers\AccessControl\ResourceLookupController;
 use App\Http\Controllers\AccessControl\RoleController;
 use App\Http\Controllers\AccessControl\RolePermissionController;
 use App\Http\Controllers\AccessControl\UserPermissionOverrideController;
@@ -9,6 +10,11 @@ use App\Http\Controllers\AccessControl\UserRoleAssignmentController;
 use Illuminate\Support\Facades\Route;
 
 Route::prefix('access-control')->name('access-control.')->middleware(['auth', 'verified', 'node.selected'])->group(function () {
+
+    // Resource Lookup (JSON endpoint for async selects)
+    Route::get('resource-lookup', [ResourceLookupController::class, 'index'])
+        ->middleware('permission:access-control-manage')
+        ->name('resource-lookup');
 
     // Roles
     Route::get('roles', [RoleController::class, 'index'])
@@ -78,6 +84,10 @@ Route::prefix('access-control')->name('access-control.')->middleware(['auth', 'v
         ->middleware('permission:access-control-manage')
         ->name('user-roles.index');
 
+    Route::get('user-roles/create', [UserRoleAssignmentController::class, 'create'])
+        ->middleware('permission:access-control-manage')
+        ->name('user-roles.create');
+
     Route::post('user-roles', [UserRoleAssignmentController::class, 'store'])
         ->middleware('permission:access-control-manage')
         ->name('user-roles.store');
@@ -95,6 +105,10 @@ Route::prefix('access-control')->name('access-control.')->middleware(['auth', 'v
         ->middleware('permission:access-control-manage')
         ->name('user-permission-overrides.index');
 
+    Route::get('user-permission-overrides/create', [UserPermissionOverrideController::class, 'create'])
+        ->middleware('permission:access-control-manage')
+        ->name('user-permission-overrides.create');
+
     Route::post('user-permission-overrides', [UserPermissionOverrideController::class, 'store'])
         ->middleware('permission:access-control-manage')
         ->name('user-permission-overrides.store');
@@ -111,6 +125,10 @@ Route::prefix('access-control')->name('access-control.')->middleware(['auth', 'v
     Route::get('user-resource-permissions', [UserResourcePermissionController::class, 'index'])
         ->middleware('permission:access-control-manage')
         ->name('user-resource-permissions.index');
+
+    Route::get('user-resource-permissions/create', [UserResourcePermissionController::class, 'create'])
+        ->middleware('permission:access-control-manage')
+        ->name('user-resource-permissions.create');
 
     Route::post('user-resource-permissions', [UserResourcePermissionController::class, 'store'])
         ->middleware('permission:access-control-manage')

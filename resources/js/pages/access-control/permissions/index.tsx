@@ -1,41 +1,124 @@
-import { Head, Link, router, useForm } from '@inertiajs/react';
-import { Plus, Pencil, Trash2 } from 'lucide-react';
+import { Head, Link, router } from '@inertiajs/react';
+import { Filter } from 'lucide-react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { PageHeader } from '@/components/page-header';
 import { Can } from '@/components/can';
-import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { Input } from '@/components/ui/input';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Button } from '@/components/ui/button';
+import { SearchableSelect } from '@/components/ui/searchable-select';
+import { TableCard, TableSearchInput } from '@/components/table-card';
+import { ActionDropdown } from '@/components/action-dropdown';
+import { tablePerPageOptions } from '@/hooks/use-client-pagination';
+import { useDebouncedInertiaSearch } from '@/hooks/use-debounced-inertia-search';
+import { cn } from '@/lib/utils';
 import type { Permission } from '@/types';
 
 type PaginatedPermissions = {
     data: Permission[];
-    links: { url: string | null; label: string; active: boolean }[];
+    current_page: number;
     last_page: number;
+    per_page: number;
+    total: number;
+    from: number | null;
+    to: number | null;
+    links: { url: string | null; label: string; active: boolean }[];
 };
 
 type Props = {
     permissions: PaginatedPermissions;
     modules: string[];
     actions: string[];
-    filters: Record<string, string>;
+    filters: { search?: string; module?: string; action?: string; level?: string; is_active?: string; per_page?: string };
 };
 
+function cleanPaginationLabel(label: string): string {
+    return label.replaceAll('&laquo;', '').replaceAll('&raquo;', '').replaceAll('Previous', '').replaceAll('Next', '').trim();
+}
+
 export default function PermissionsIndex({ permissions, modules, actions, filters }: Props) {
-    const { data, setData, get } = useForm({
+    const [form, setForm] = useState({
         search: filters.search ?? '',
         module: filters.module ?? '',
         action: filters.action ?? '',
         level: filters.level ?? '',
         is_active: filters.is_active ?? '',
+        per_page: filters.per_page ?? '10',
+    });
+    const [openActionId, setOpenActionId] = useState<number | null>(null);
+    const filterPopoverRef = useRef<HTMLDetailsElement | null>(null);
+
+    const toggleActionMenu = (id: number | null) => {
+        setOpenActionId((current) => (id === null ? null : current === id ? null : id));
+    };
+
+    const pagination = useMemo(() => ({
+        previous: permissions.links.find((l) => l.label.includes('Previous')) ?? null,
+        next: permissions.links.find((l) => l.label.includes('Next')) ?? null,
+        pages: permissions.links.filter((l) => /^\d+$/.test(cleanPaginationLabel(l.label))),
+    }), [permissions.links]);
+
+    useEffect(() => {
+        const handlePointerDown = (event: MouseEvent) => {
+            const target = event.target as Node;
+            const element = event.target instanceof Element ? event.target : null;
+
+            if (
+                element?.closest('[data-searchable-select-root]') ||
+                element?.closest('[data-searchable-select-listbox]')
+            ) return;
+
+            if (filterPopoverRef.current && !filterPopoverRef.current.contains(target)) {
+                filterPopoverRef.current.removeAttribute('open');
+            }
+        };
+
+        document.addEventListener('mousedown', handlePointerDown);
+        return () => document.removeEventListener('mousedown', handlePointerDown);
+    }, []);
+
+    const applyFilters = () => {
+        filterPopoverRef.current?.removeAttribute('open');
+        router.get('/access-control/permissions', form, {
+            preserveState: true,
+            preserveScroll: true,
+            replace: true,
+        });
+    };
+
+    const clearFilters = () => {
+        const reset = { search: '', module: '', action: '', level: '', is_active: '', per_page: '10' };
+        setForm(reset);
+        filterPopoverRef.current?.removeAttribute('open');
+        router.get('/access-control/permissions', {}, {
+            preserveState: true,
+            preserveScroll: true,
+            replace: true,
+        });
+    };
+
+    const updatePerPage = (nextValue: string) => {
+        const nextFilters = { ...form, per_page: nextValue, page: '1' };
+        setForm((current) => ({ ...current, per_page: nextValue }));
+        router.get('/access-control/permissions', nextFilters, {
+            preserveState: true,
+            preserveScroll: true,
+            replace: true,
+        });
+    };
+
+    useDebouncedInertiaSearch({
+        value: form.search,
+        onSearch: (value, { onCancelToken }) => {
+            router.get(
+                '/access-control/permissions',
+                { ...form, search: value, page: '1' },
+                { preserveState: true, preserveScroll: true, replace: true, onCancelToken },
+            );
+        },
     });
 
-    function applyFilter() {
-        get('/access-control/permissions', { preserveState: true, replace: true });
-    }
-
     function confirmDelete(permission: Permission) {
-        if (confirm(`Delete permission "${permission.slug}"?`)) {
+        if (confirm(`Delete permission "${permission.slug}"? This cannot be undone.`)) {
             router.delete(`/access-control/permissions/${permission.id}`);
         }
     }
@@ -45,6 +128,7 @@ export default function PermissionsIndex({ permissions, modules, actions, filter
             <Head title="Permissions" />
             <PageHeader
                 breadcrumbs={[
+                    { label: 'Home', href: '/dashboard' },
                     { label: 'Access Control', href: '/access-control/roles' },
                     { label: 'Permissions' },
                 ]}
@@ -52,119 +136,249 @@ export default function PermissionsIndex({ permissions, modules, actions, filter
                 description="Manage available system permissions."
                 actions={
                     <Can permission="permissions-create">
-                        <Button asChild size="sm">
-                            <Link href="/access-control/permissions/create">
-                                <Plus className="mr-1 h-4 w-4" />
-                                New Permission
-                            </Link>
-                        </Button>
+                        <Link
+                            href="/access-control/permissions/create"
+                            className="inline-flex items-center gap-2 rounded-lg bg-primary px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition-colors hover:bg-primary/90"
+                        >
+                            <span className="material-symbols-outlined text-[18px]">add_circle</span>
+                            New Permission
+                        </Link>
                     </Can>
                 }
             />
 
-            <div className="mb-6 flex flex-wrap gap-3">
-                <Input
-                    placeholder="Search..."
-                    className="max-w-xs"
-                    value={data.search}
-                    onChange={(e) => setData('search', e.target.value)}
-                    onKeyDown={(e) => e.key === 'Enter' && applyFilter()}
-                />
-                <Select value={data.module} onValueChange={(v) => setData('module', v === 'all' ? '' : v)}>
-                    <SelectTrigger className="w-44">
-                        <SelectValue placeholder="All Modules" />
-                    </SelectTrigger>
-                    <SelectContent>
-                        <SelectItem value="all">All Modules</SelectItem>
-                        {modules.map((m) => <SelectItem key={m} value={m}>{m}</SelectItem>)}
-                    </SelectContent>
-                </Select>
-                <Select value={data.action} onValueChange={(v) => setData('action', v === 'all' ? '' : v)}>
-                    <SelectTrigger className="w-36">
-                        <SelectValue placeholder="All Actions" />
-                    </SelectTrigger>
-                    <SelectContent>
-                        <SelectItem value="all">All Actions</SelectItem>
-                        {actions.map((a) => <SelectItem key={a} value={a}>{a}</SelectItem>)}
-                    </SelectContent>
-                </Select>
-                <Button variant="outline" onClick={applyFilter}>Filter</Button>
-            </div>
-
-            <div className="rounded-xl border border-border overflow-hidden">
-                <table className="w-full text-sm">
-                    <thead className="bg-muted/50">
-                        <tr>
-                            <th className="px-4 py-3 text-left font-semibold">Name</th>
-                            <th className="px-4 py-3 text-left font-semibold">Slug</th>
-                            <th className="px-4 py-3 text-left font-semibold">Module</th>
-                            <th className="px-4 py-3 text-left font-semibold">Action</th>
-                            <th className="px-4 py-3 text-left font-semibold">Level</th>
-                            <th className="px-4 py-3 text-left font-semibold">Status</th>
-                            <th className="px-4 py-3 text-right font-semibold">Actions</th>
-                        </tr>
-                    </thead>
-                    <tbody className="divide-y divide-border">
-                        {permissions.data.length === 0 && (
-                            <tr>
-                                <td colSpan={6} className="px-4 py-8 text-center text-muted-foreground">No permissions found.</td>
-                            </tr>
-                        )}
-                        {permissions.data.map((perm) => (
-                            <tr key={perm.id} className="hover:bg-muted/30">
-                                <td className="px-4 py-3 font-mono text-xs">
-                                    {perm.name}
-                                    {perm.is_system && <Badge variant="secondary" className="ml-2 text-[10px]">System</Badge>}
-                                </td>
-                                <td className="px-4 py-3 font-mono text-xs">{perm.slug}</td>
-                                <td className="px-4 py-3">{perm.module}</td>
-                                <td className="px-4 py-3">{perm.action}</td>
-                                <td className="px-4 py-3">
-                                    <Badge variant="outline" className="capitalize">{perm.level}</Badge>
-                                </td>
-                                <td className="px-4 py-3">
-                                    <Badge variant={perm.is_active ? 'default' : 'secondary'}>
-                                        {perm.is_active ? 'Active' : 'Inactive'}
-                                    </Badge>
-                                </td>
-                                <td className="px-4 py-3 text-right">
-                                    <div className="flex justify-end gap-2">
-                                        <Can permission="permissions-update">
-                                            <Button variant="ghost" size="icon" asChild>
-                                                <Link href={`/access-control/permissions/${perm.id}/edit`}>
-                                                    <Pencil className="h-4 w-4" />
-                                                </Link>
-                                            </Button>
-                                        </Can>
-                                        <Can permission="permissions-delete">
-                                            {!perm.is_system && (
-                                                <Button variant="ghost" size="icon" onClick={() => confirmDelete(perm)}>
-                                                    <Trash2 className="h-4 w-4 text-destructive" />
-                                                </Button>
-                                            )}
-                                        </Can>
-                                    </div>
-                                </td>
-                            </tr>
-                        ))}
-                    </tbody>
-                </table>
-            </div>
-
-            {permissions.last_page > 1 && (
-                <div className="mt-4 flex justify-center gap-1">
-                    {permissions.links.map((link, i) => (
-                        <Button
-                            key={i}
-                            variant={link.active ? 'default' : 'outline'}
-                            size="sm"
-                            disabled={!link.url}
-                            onClick={() => link.url && router.get(link.url)}
-                            dangerouslySetInnerHTML={{ __html: link.label }}
+            <TableCard
+                className="overflow-visible"
+                title="Permissions"
+                description="Browse and manage all system permissions."
+                toolbar={
+                    <>
+                        <TableSearchInput
+                            value={form.search}
+                            onChange={(value) => setForm((current) => ({ ...current, search: value }))}
+                            placeholder="Search permissions..."
+                            className="w-full lg:w-auto"
+                            onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); applyFilters(); } }}
                         />
-                    ))}
+                        <details ref={filterPopoverRef} className="relative">
+                            <summary className="flex h-9 cursor-pointer list-none items-center gap-2 rounded-lg border border-border/30 bg-white px-3 text-sm font-semibold text-foreground shadow-sm transition hover:bg-muted dark:border-border dark:bg-card dark:text-foreground dark:hover:bg-accent">
+                                <Filter className="h-4 w-4" />
+                                Filter
+                            </summary>
+                            <div className="absolute right-0 z-50 mt-2 w-80 rounded-xl border border-border/20 bg-white p-5 shadow-2xl dark:border-border dark:bg-card">
+                                <div className="mb-4 flex items-center justify-between">
+                                    <h4 className="text-sm font-bold text-foreground dark:text-stone-100">Table Filters</h4>
+                                    <button type="button" className="text-[10px] font-bold text-primary uppercase hover:underline" onClick={clearFilters}>
+                                        Clear All
+                                    </button>
+                                </div>
+                                <div className="space-y-4">
+                                    <div className="grid grid-cols-2 gap-3">
+                                        <div className="flex flex-col gap-1.5">
+                                            <label className="text-[10px] font-bold tracking-wider text-muted-foreground/60 uppercase">Module</label>
+                                            <SearchableSelect
+                                                value={form.module}
+                                                onChange={(e) => setForm((current) => ({ ...current, module: e.target.value }))}
+                                            >
+                                                <option value="">All Modules</option>
+                                                {modules.map((m) => <option key={m} value={m}>{m}</option>)}
+                                            </SearchableSelect>
+                                        </div>
+                                        <div className="flex flex-col gap-1.5">
+                                            <label className="text-[10px] font-bold tracking-wider text-muted-foreground/60 uppercase">Action</label>
+                                            <SearchableSelect
+                                                value={form.action}
+                                                onChange={(e) => setForm((current) => ({ ...current, action: e.target.value }))}
+                                            >
+                                                <option value="">All Actions</option>
+                                                {actions.map((a) => <option key={a} value={a}>{a}</option>)}
+                                            </SearchableSelect>
+                                        </div>
+                                    </div>
+                                    <div className="flex flex-col gap-1.5">
+                                        <label className="text-[10px] font-bold tracking-wider text-muted-foreground/60 uppercase">Level</label>
+                                        <SearchableSelect
+                                            value={form.level}
+                                            onChange={(e) => setForm((current) => ({ ...current, level: e.target.value }))}
+                                        >
+                                            <option value="">All Levels</option>
+                                            <option value="global">Global</option>
+                                            <option value="outlet">Outlet</option>
+                                            <option value="warehouse">Warehouse</option>
+                                        </SearchableSelect>
+                                    </div>
+                                    <div className="flex flex-col gap-1.5">
+                                        <label className="text-[10px] font-bold tracking-wider text-muted-foreground/60 uppercase">Status</label>
+                                        <SearchableSelect
+                                            value={form.is_active}
+                                            onChange={(e) => setForm((current) => ({ ...current, is_active: e.target.value }))}
+                                        >
+                                            <option value="">All Status</option>
+                                            <option value="true">Active</option>
+                                            <option value="false">Inactive</option>
+                                        </SearchableSelect>
+                                    </div>
+                                    <Button
+                                        type="button"
+                                        className="w-full rounded-lg bg-primary text-xs font-bold text-white hover:bg-primary"
+                                        onClick={applyFilters}
+                                    >
+                                        Apply Filters
+                                    </Button>
+                                </div>
+                            </div>
+                        </details>
+                    </>
+                }
+                footer={
+                    <>
+                        <div className="flex flex-wrap items-center gap-4">
+                            <p className="text-xs font-medium text-muted-foreground dark:text-stone-400">
+                                Showing{' '}
+                                <span className="font-bold text-foreground dark:text-stone-100">{permissions.from ?? 0} - {permissions.to ?? 0}</span>
+                                {' '}of{' '}
+                                <span className="font-bold text-foreground dark:text-stone-100">{permissions.total}</span>
+                                {' '}results
+                            </p>
+                            <div className="hidden h-4 w-px bg-muted-foreground/30 lg:block" />
+                            <div className="flex items-center gap-2">
+                                <span className="text-[11px] font-bold tracking-wider text-muted-foreground uppercase dark:text-stone-400">Items per page</span>
+                                <div className="relative">
+                                    <select
+                                        value={form.per_page}
+                                        onChange={(e) => updatePerPage(e.target.value)}
+                                        className="h-9 appearance-none rounded-md border border-border/30 bg-white px-3 pr-8 text-[11px] font-bold text-foreground shadow-sm outline-none focus:border-primary focus:ring-1 focus:ring-primary dark:border-stone-700 dark:bg-stone-900 dark:text-stone-100"
+                                    >
+                                        {tablePerPageOptions.map((option) => (
+                                            <option key={option} value={option}>
+                                                {option === 'all' ? 'All' : option}
+                                            </option>
+                                        ))}
+                                    </select>
+                                    <span className="material-symbols-outlined pointer-events-none absolute top-1/2 right-1.5 -translate-y-1/2 text-[14px] text-primary/60">expand_more</span>
+                                </div>
+                            </div>
+                        </div>
+                        <nav className="flex items-center gap-2" aria-label="Pagination">
+                            <Link
+                                href={pagination.previous?.url ?? '#'}
+                                preserveScroll
+                                className={cn(
+                                    'flex h-8 w-8 items-center justify-center rounded border border-border/20 transition-colors',
+                                    pagination.previous?.url
+                                        ? 'text-muted-foreground hover:bg-accent dark:text-stone-200 dark:hover:bg-stone-800'
+                                        : 'pointer-events-none text-muted-foreground/40 dark:text-stone-600',
+                                )}
+                            >
+                                <span className="material-symbols-outlined text-sm">chevron_left</span>
+                            </Link>
+                            <div className="flex items-center gap-1">
+                                {pagination.pages.map((link) => (
+                                    <Link
+                                        key={`${link.label}-${link.url}`}
+                                        href={link.url ?? '#'}
+                                        preserveScroll
+                                        className={cn(
+                                            'flex h-8 w-8 items-center justify-center rounded text-xs font-bold transition-colors',
+                                            link.active
+                                                ? 'bg-primary text-white shadow-sm'
+                                                : 'text-muted-foreground hover:bg-accent dark:text-stone-300 dark:hover:bg-stone-800',
+                                            !link.url && 'pointer-events-none opacity-40',
+                                        )}
+                                    >
+                                        {cleanPaginationLabel(link.label)}
+                                    </Link>
+                                ))}
+                            </div>
+                            <Link
+                                href={pagination.next?.url ?? '#'}
+                                preserveScroll
+                                className={cn(
+                                    'flex h-8 w-8 items-center justify-center rounded border border-border/20 transition-colors',
+                                    pagination.next?.url
+                                        ? 'text-foreground hover:bg-accent dark:text-stone-100 dark:hover:bg-stone-800'
+                                        : 'pointer-events-none text-muted-foreground/40 dark:text-stone-600',
+                                )}
+                            >
+                                <span className="material-symbols-outlined text-sm">chevron_right</span>
+                            </Link>
+                        </nav>
+                    </>
+                }
+            >
+                <div className="overflow-x-auto">
+                    <table className="w-full min-w-[700px] text-left">
+                        <thead>
+                            <tr className="bg-muted text-[11px] font-bold tracking-[0.1em] text-muted-foreground uppercase dark:bg-stone-900 dark:text-stone-400">
+                                <th className="border-b border-border/10 px-6 py-4">Name</th>
+                                <th className="border-b border-border/10 px-6 py-4">Slug</th>
+                                <th className="border-b border-border/10 px-6 py-4">Module</th>
+                                <th className="border-b border-border/10 px-6 py-4">Action</th>
+                                <th className="border-b border-border/10 px-6 py-4">Level</th>
+                                <th className="border-b border-border/10 px-6 py-4">Status</th>
+                                <th className="border-b border-border/10 px-6 py-4" />
+                            </tr>
+                        </thead>
+                        <tbody className="divide-y divide-muted dark:divide-stone-800">
+                            {permissions.data.length === 0 && (
+                                <tr>
+                                    <td colSpan={7} className="px-6 py-12 text-center text-sm text-muted-foreground dark:text-stone-400">
+                                        No permissions found.
+                                    </td>
+                                </tr>
+                            )}
+                            {permissions.data.map((perm) => (
+                                <tr key={perm.id} className="group transition-colors hover:bg-muted dark:hover:bg-stone-900/50">
+                                    <td className="px-6 py-4">
+                                        <div className="flex items-center gap-2">
+                                            <span className="font-medium text-gray-900 dark:text-gray-100">{perm.name}</span>
+                                            {perm.is_system && (
+                                                <Badge variant="secondary" className="text-[10px]">System</Badge>
+                                            )}
+                                        </div>
+                                    </td>
+                                    <td className="px-6 py-4 font-mono text-xs text-gray-500 dark:text-gray-400">{perm.slug}</td>
+                                    <td className="px-6 py-4 text-sm text-gray-700 dark:text-gray-300">{perm.module}</td>
+                                    <td className="px-6 py-4 text-sm text-gray-700 dark:text-gray-300">{perm.action}</td>
+                                    <td className="px-6 py-4">
+                                        <span className="rounded-full bg-slate-100 px-2.5 py-1 text-[10px] font-bold tracking-wide uppercase text-slate-600 ring-1 ring-slate-200 dark:bg-slate-800 dark:text-slate-300 dark:ring-slate-700">
+                                            {perm.level}
+                                        </span>
+                                    </td>
+                                    <td className="px-6 py-4">
+                                        <span className={cn(
+                                            'inline-flex rounded-full px-3 py-1 text-[11px] font-bold tracking-wider uppercase',
+                                            perm.is_active
+                                                ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400'
+                                                : 'bg-stone-100 text-stone-500 dark:bg-stone-800 dark:text-stone-400',
+                                        )}>
+                                            {perm.is_active ? 'Active' : 'Inactive'}
+                                        </span>
+                                    </td>
+                                    <td className="px-6 py-4 text-right">
+                                        <ActionDropdown
+                                            isOpen={openActionId === perm.id}
+                                            itemId={perm.id}
+                                            itemLabel={perm.name}
+                                            onToggle={(id) => toggleActionMenu(id as number | null)}
+                                            actions={[
+                                                { id: `edit-${perm.id}`, label: 'Edit permission', icon: 'edit', href: `/access-control/permissions/${perm.id}/edit` },
+                                                ...(!perm.is_system ? [{
+                                                    id: `delete-${perm.id}`,
+                                                    label: 'Delete permission',
+                                                    icon: 'delete',
+                                                    variant: 'danger' as const,
+                                                    onClick: () => confirmDelete(perm),
+                                                }] : []),
+                                            ]}
+                                        />
+                                    </td>
+                                </tr>
+                            ))}
+                        </tbody>
+                    </table>
                 </div>
-            )}
+            </TableCard>
         </>
     );
 }

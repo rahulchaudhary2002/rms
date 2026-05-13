@@ -19,28 +19,36 @@ class RolePermissionController extends Controller
 
     public function index(Request $request): Response
     {
+        $filters = [
+            'search'   => $request->string('search')->toString(),
+            'level'    => $request->string('level')->toString(),
+            'per_page' => $request->string('per_page')->toString(),
+        ];
+
         $query = Role::with(['permissions' => fn ($q) => $q->orderBy('module')->orderBy('action')])
-            ->withCount('permissions');
+            ->withCount('permissions')
+            ->when($filters['search'] !== '', function ($builder) use ($filters) {
+                $search = '%'.$filters['search'].'%';
+                $builder->where(fn ($q) => $q->where('name', 'like', $search)->orWhere('slug', 'like', $search));
+            })
+            ->when($filters['level'] !== '', fn ($builder) => $builder->where('level', $filters['level']))
+            ->orderBy('name');
 
-        if ($search = $request->input('search')) {
-            $query->where(fn ($q) => $q->where('name', 'like', "%{$search}%")->orWhere('slug', 'like', "%{$search}%"));
-        }
+        $perPage = $filters['per_page'] === 'all'
+            ? max((clone $query)->count(), 1)
+            : max((int) ($filters['per_page'] ?: 10), 1);
 
-        if ($level = $request->input('level')) {
-            $query->where('level', $level);
-        }
-
-        $roles = $query->orderBy('name')->paginate(15)->withQueryString();
+        $roles = $query->paginate($perPage)->withQueryString();
 
         $permissions = Permission::where('is_active', true)
             ->orderBy('module')
             ->orderBy('action')
             ->get(['id', 'name', 'slug', 'module', 'action', 'level']);
 
-        return Inertia::render('access-control/role-permissions', [
+        return Inertia::render('access-control/role-permissions/index', [
             'roles'       => $roles,
             'permissions' => $permissions,
-            'filters'     => $request->only('search', 'level'),
+            'filters'     => $filters,
         ]);
     }
 

@@ -197,6 +197,9 @@ function buildDynamicGroups(auth: Auth): MenuGroup[] {
 
     const acItems: MenuItem[] = [];
 
+    if (can('users-manage')) {
+        acItems.push({ title: 'Users', href: '/users', icon: 'group', activeMatch: ['/users'] });
+    }
     if (can('roles-view')) {
         acItems.push({ title: 'Roles', href: '/access-control/roles', icon: 'shield_person', activeMatch: ['/access-control/roles'] });
     }

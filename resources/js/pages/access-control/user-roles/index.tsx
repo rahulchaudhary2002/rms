@@ -13,8 +13,19 @@ import { useDebouncedInertiaSearch } from '@/hooks/use-debounced-inertia-search'
 import { cn } from '@/lib/utils';
 import type { Role } from '@/types';
 
-type PaginatedRoles = {
-    data: Role[];
+type User = { id: number; name: string; email: string };
+type Assignment = {
+    id: number;
+    user: User;
+    role: Role;
+    scope_type: string;
+    scope_id: number | null;
+    is_active: boolean;
+    assigned_by: User | null;
+    created_at: string;
+};
+type PaginatedAssignments = {
+    data: Assignment[];
     current_page: number;
     last_page: number;
     per_page: number;
@@ -25,18 +36,22 @@ type PaginatedRoles = {
 };
 
 type Props = {
-    roles: PaginatedRoles;
-    filters: { search?: string; level?: string; is_active?: string; per_page?: string };
+    assignments: PaginatedAssignments;
+    users: User[];
+    roles: Role[];
+    filters: { search?: string; user_id?: string; role_id?: string; scope_type?: string; is_active?: string; per_page?: string };
 };
 
 function cleanPaginationLabel(label: string): string {
     return label.replaceAll('&laquo;', '').replaceAll('&raquo;', '').replaceAll('Previous', '').replaceAll('Next', '').trim();
 }
 
-export default function RolesIndex({ roles, filters }: Props) {
+export default function UserRolesIndex({ assignments, users, roles, filters }: Props) {
     const [form, setForm] = useState({
         search: filters.search ?? '',
-        level: filters.level ?? '',
+        user_id: filters.user_id ?? '',
+        role_id: filters.role_id ?? '',
+        scope_type: filters.scope_type ?? '',
         is_active: filters.is_active ?? '',
         per_page: filters.per_page ?? '10',
     });
@@ -48,33 +63,27 @@ export default function RolesIndex({ roles, filters }: Props) {
     };
 
     const pagination = useMemo(() => ({
-        previous: roles.links.find((l) => l.label.includes('Previous')) ?? null,
-        next: roles.links.find((l) => l.label.includes('Next')) ?? null,
-        pages: roles.links.filter((l) => /^\d+$/.test(cleanPaginationLabel(l.label))),
-    }), [roles.links]);
+        previous: assignments.links.find((l) => l.label.includes('Previous')) ?? null,
+        next: assignments.links.find((l) => l.label.includes('Next')) ?? null,
+        pages: assignments.links.filter((l) => /^\d+$/.test(cleanPaginationLabel(l.label))),
+    }), [assignments.links]);
 
     useEffect(() => {
         const handlePointerDown = (event: MouseEvent) => {
             const target = event.target as Node;
             const element = event.target instanceof Element ? event.target : null;
-
-            if (
-                element?.closest('[data-searchable-select-root]') ||
-                element?.closest('[data-searchable-select-listbox]')
-            ) return;
-
+            if (element?.closest('[data-searchable-select-root]') || element?.closest('[data-searchable-select-listbox]')) return;
             if (filterPopoverRef.current && !filterPopoverRef.current.contains(target)) {
                 filterPopoverRef.current.removeAttribute('open');
             }
         };
-
         document.addEventListener('mousedown', handlePointerDown);
         return () => document.removeEventListener('mousedown', handlePointerDown);
     }, []);
 
     const applyFilters = () => {
         filterPopoverRef.current?.removeAttribute('open');
-        router.get('/access-control/roles', form, {
+        router.get('/access-control/user-roles', form, {
             preserveState: true,
             preserveScroll: true,
             replace: true,
@@ -82,10 +91,10 @@ export default function RolesIndex({ roles, filters }: Props) {
     };
 
     const clearFilters = () => {
-        const reset = { search: '', level: '', is_active: '', per_page: '10' };
+        const reset = { search: '', user_id: '', role_id: '', scope_type: '', is_active: '', per_page: '10' };
         setForm(reset);
         filterPopoverRef.current?.removeAttribute('open');
-        router.get('/access-control/roles', {}, {
+        router.get('/access-control/user-roles', {}, {
             preserveState: true,
             preserveScroll: true,
             replace: true,
@@ -95,7 +104,7 @@ export default function RolesIndex({ roles, filters }: Props) {
     const updatePerPage = (nextValue: string) => {
         const nextFilters = { ...form, per_page: nextValue, page: '1' };
         setForm((current) => ({ ...current, per_page: nextValue }));
-        router.get('/access-control/roles', nextFilters, {
+        router.get('/access-control/user-roles', nextFilters, {
             preserveState: true,
             preserveScroll: true,
             replace: true,
@@ -106,38 +115,42 @@ export default function RolesIndex({ roles, filters }: Props) {
         value: form.search,
         onSearch: (value, { onCancelToken }) => {
             router.get(
-                '/access-control/roles',
+                '/access-control/user-roles',
                 { ...form, search: value, page: '1' },
                 { preserveState: true, preserveScroll: true, replace: true, onCancelToken },
             );
         },
     });
 
-    function confirmDelete(role: Role) {
-        if (confirm(`Delete role "${role.name}"? This cannot be undone.`)) {
-            router.delete(`/access-control/roles/${role.id}`);
+    function confirmDelete(assignment: Assignment) {
+        if (confirm(`Remove role "${assignment.role?.name}" from "${assignment.user?.name}"? This cannot be undone.`)) {
+            router.delete(`/access-control/user-roles/${assignment.id}`, { preserveScroll: true });
         }
+    }
+
+    function toggleActive(assignment: Assignment) {
+        router.patch(`/access-control/user-roles/${assignment.id}`, { is_active: !assignment.is_active }, { preserveScroll: true });
     }
 
     return (
         <>
-            <Head title="Roles" />
+            <Head title="User Role Assignments" />
             <PageHeader
                 breadcrumbs={[
                     { label: 'Home', href: '/dashboard' },
                     { label: 'Access Control', href: '/access-control/roles' },
-                    { label: 'Roles' },
+                    { label: 'User Roles' },
                 ]}
-                title="Roles"
-                description="Manage system roles and their access levels."
+                title="User Role Assignments"
+                description="Assign roles to users with optional scope."
                 actions={
-                    <Can permission="roles-create">
+                    <Can permission="access-control-manage">
                         <Link
-                            href="/access-control/roles/create"
+                            href="/access-control/user-roles/create"
                             className="inline-flex items-center gap-2 rounded-lg bg-primary px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition-colors hover:bg-primary/90"
                         >
                             <span className="material-symbols-outlined text-[18px]">add_circle</span>
-                            New Role
+                            Assign Role
                         </Link>
                     </Can>
                 }
@@ -145,14 +158,14 @@ export default function RolesIndex({ roles, filters }: Props) {
 
             <TableCard
                 className="overflow-visible"
-                title="Roles"
-                description="Browse and manage all system roles."
+                title="Role Assignments"
+                description="Browse and manage all user role assignments."
                 toolbar={
                     <>
                         <TableSearchInput
                             value={form.search}
                             onChange={(value) => setForm((current) => ({ ...current, search: value }))}
-                            placeholder="Search roles..."
+                            placeholder="Search by user name or email..."
                             className="w-full lg:w-auto"
                             onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); applyFilters(); } }}
                         />
@@ -170,12 +183,23 @@ export default function RolesIndex({ roles, filters }: Props) {
                                 </div>
                                 <div className="space-y-4">
                                     <div className="flex flex-col gap-1.5">
-                                        <label className="text-[10px] font-bold tracking-wider text-muted-foreground/60 uppercase">Level</label>
-                                        <SearchableSelect
-                                            value={form.level}
-                                            onChange={(e) => setForm((current) => ({ ...current, level: e.target.value }))}
-                                        >
-                                            <option value="">All Levels</option>
+                                        <label className="text-[10px] font-bold tracking-wider text-muted-foreground/60 uppercase">User</label>
+                                        <SearchableSelect value={form.user_id} onChange={(e) => setForm((c) => ({ ...c, user_id: e.target.value }))}>
+                                            <option value="">All Users</option>
+                                            {users.map((u) => <option key={u.id} value={String(u.id)}>{u.name}</option>)}
+                                        </SearchableSelect>
+                                    </div>
+                                    <div className="flex flex-col gap-1.5">
+                                        <label className="text-[10px] font-bold tracking-wider text-muted-foreground/60 uppercase">Role</label>
+                                        <SearchableSelect value={form.role_id} onChange={(e) => setForm((c) => ({ ...c, role_id: e.target.value }))}>
+                                            <option value="">All Roles</option>
+                                            {roles.map((r) => <option key={r.id} value={String(r.id)}>{r.name}</option>)}
+                                        </SearchableSelect>
+                                    </div>
+                                    <div className="flex flex-col gap-1.5">
+                                        <label className="text-[10px] font-bold tracking-wider text-muted-foreground/60 uppercase">Scope</label>
+                                        <SearchableSelect value={form.scope_type} onChange={(e) => setForm((c) => ({ ...c, scope_type: e.target.value }))}>
+                                            <option value="">All Scopes</option>
                                             <option value="global">Global</option>
                                             <option value="outlet">Outlet</option>
                                             <option value="warehouse">Warehouse</option>
@@ -183,20 +207,13 @@ export default function RolesIndex({ roles, filters }: Props) {
                                     </div>
                                     <div className="flex flex-col gap-1.5">
                                         <label className="text-[10px] font-bold tracking-wider text-muted-foreground/60 uppercase">Status</label>
-                                        <SearchableSelect
-                                            value={form.is_active}
-                                            onChange={(e) => setForm((current) => ({ ...current, is_active: e.target.value }))}
-                                        >
+                                        <SearchableSelect value={form.is_active} onChange={(e) => setForm((c) => ({ ...c, is_active: e.target.value }))}>
                                             <option value="">All Status</option>
                                             <option value="true">Active</option>
                                             <option value="false">Inactive</option>
                                         </SearchableSelect>
                                     </div>
-                                    <Button
-                                        type="button"
-                                        className="w-full rounded-lg bg-primary text-xs font-bold text-white hover:bg-primary"
-                                        onClick={applyFilters}
-                                    >
+                                    <Button type="button" className="w-full rounded-lg bg-primary text-xs font-bold text-white hover:bg-primary" onClick={applyFilters}>
                                         Apply Filters
                                     </Button>
                                 </div>
@@ -209,9 +226,9 @@ export default function RolesIndex({ roles, filters }: Props) {
                         <div className="flex flex-wrap items-center gap-4">
                             <p className="text-xs font-medium text-muted-foreground dark:text-stone-400">
                                 Showing{' '}
-                                <span className="font-bold text-foreground dark:text-stone-100">{roles.from ?? 0} - {roles.to ?? 0}</span>
+                                <span className="font-bold text-foreground dark:text-stone-100">{assignments.from ?? 0} - {assignments.to ?? 0}</span>
                                 {' '}of{' '}
-                                <span className="font-bold text-foreground dark:text-stone-100">{roles.total}</span>
+                                <span className="font-bold text-foreground dark:text-stone-100">{assignments.total}</span>
                                 {' '}results
                             </p>
                             <div className="hidden h-4 w-px bg-muted-foreground/30 lg:block" />
@@ -224,9 +241,7 @@ export default function RolesIndex({ roles, filters }: Props) {
                                         className="h-9 appearance-none rounded-md border border-border/30 bg-white px-3 pr-8 text-[11px] font-bold text-foreground shadow-sm outline-none focus:border-primary focus:ring-1 focus:ring-primary dark:border-stone-700 dark:bg-stone-900 dark:text-stone-100"
                                     >
                                         {tablePerPageOptions.map((option) => (
-                                            <option key={option} value={option}>
-                                                {option === 'all' ? 'All' : option}
-                                            </option>
+                                            <option key={option} value={option}>{option === 'all' ? 'All' : option}</option>
                                         ))}
                                     </select>
                                     <span className="material-symbols-outlined pointer-events-none absolute top-1/2 right-1.5 -translate-y-1/2 text-[14px] text-primary/60">expand_more</span>
@@ -281,79 +296,83 @@ export default function RolesIndex({ roles, filters }: Props) {
                 }
             >
                 <div className="overflow-x-auto">
-                    <table className="w-full min-w-[600px] text-left">
+                    <table className="w-full min-w-[700px] text-left">
                         <thead>
                             <tr className="bg-muted text-[11px] font-bold tracking-[0.1em] text-muted-foreground uppercase dark:bg-stone-900 dark:text-stone-400">
-                                <th className="border-b border-border/10 px-6 py-4">Name</th>
-                                <th className="border-b border-border/10 px-6 py-4">Slug</th>
-                                <th className="border-b border-border/10 px-6 py-4">Level</th>
-                                <th className="border-b border-border/10 px-6 py-4">Permissions</th>
+                                <th className="border-b border-border/10 px-6 py-4">User</th>
+                                <th className="border-b border-border/10 px-6 py-4">Role</th>
+                                <th className="border-b border-border/10 px-6 py-4">Scope</th>
+                                <th className="border-b border-border/10 px-6 py-4">Assigned By</th>
                                 <th className="border-b border-border/10 px-6 py-4">Status</th>
                                 <th className="border-b border-border/10 px-6 py-4" />
                             </tr>
                         </thead>
                         <tbody className="divide-y divide-muted dark:divide-stone-800">
-                            {roles.data.length === 0 && (
+                            {assignments.data.length === 0 && (
                                 <tr>
                                     <td colSpan={6} className="px-6 py-12 text-center text-sm text-muted-foreground dark:text-stone-400">
-                                        No roles found.
+                                        No assignments found.
                                     </td>
                                 </tr>
                             )}
-                            {roles.data.map((role) => (
-                                <tr key={role.id} className="group transition-colors hover:bg-muted dark:hover:bg-stone-900/50">
+                            {assignments.data.map((a) => (
+                                <tr key={a.id} className="group transition-colors hover:bg-muted dark:hover:bg-stone-900/50">
                                     <td className="px-6 py-4">
                                         <div className="flex items-center gap-3">
                                             <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary">
-                                                <span className="material-symbols-outlined text-[18px]">shield</span>
+                                                <span className="material-symbols-outlined text-[18px]">person</span>
                                             </div>
                                             <div>
-                                                <Link
-                                                    href={`/access-control/roles/${role.id}/edit`}
-                                                    className="block font-bold text-gray-900 transition-colors hover:text-primary dark:text-gray-100"
-                                                >
-                                                    {role.name}
-                                                </Link>
-                                                {role.is_system && (
-                                                    <Badge variant="secondary" className="mt-0.5 text-[10px]">System</Badge>
-                                                )}
+                                                <div className="font-semibold text-gray-900 dark:text-gray-100">{a.user?.name}</div>
+                                                <div className="text-xs text-muted-foreground dark:text-stone-400">{a.user?.email}</div>
                                             </div>
                                         </div>
                                     </td>
-                                    <td className="px-6 py-4 font-mono text-xs text-gray-500 dark:text-gray-400">{role.slug}</td>
                                     <td className="px-6 py-4">
-                                        <span className="rounded-full bg-slate-100 px-2.5 py-1 text-[10px] font-bold tracking-wide uppercase text-slate-600 ring-1 ring-slate-200 dark:bg-slate-800 dark:text-slate-300 dark:ring-slate-700">
-                                            {role.level}
-                                        </span>
+                                        <div className="flex flex-col gap-1">
+                                            <span className="font-medium text-gray-900 dark:text-gray-100">{a.role?.name}</span>
+                                            <span className="rounded-full bg-slate-100 px-2 py-0.5 text-[10px] font-bold tracking-wide uppercase text-slate-600 ring-1 ring-slate-200 dark:bg-slate-800 dark:text-slate-300 dark:ring-slate-700 w-fit">
+                                                {a.role?.level}
+                                            </span>
+                                        </div>
+                                    </td>
+                                    <td className="px-6 py-4">
+                                        <span className="capitalize text-sm text-gray-700 dark:text-gray-300">{a.scope_type}</span>
+                                        {a.scope_id && <span className="ml-1 text-xs text-muted-foreground">#{a.scope_id}</span>}
                                     </td>
                                     <td className="px-6 py-4 text-sm text-muted-foreground dark:text-stone-400">
-                                        {(role as any).permissions_count ?? 0}
+                                        {a.assigned_by?.name ?? '—'}
                                     </td>
                                     <td className="px-6 py-4">
                                         <span className={cn(
                                             'inline-flex rounded-full px-3 py-1 text-[11px] font-bold tracking-wider uppercase',
-                                            role.is_active
+                                            a.is_active
                                                 ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400'
                                                 : 'bg-stone-100 text-stone-500 dark:bg-stone-800 dark:text-stone-400',
                                         )}>
-                                            {role.is_active ? 'Active' : 'Inactive'}
+                                            {a.is_active ? 'Active' : 'Inactive'}
                                         </span>
                                     </td>
                                     <td className="px-6 py-4 text-right">
                                         <ActionDropdown
-                                            isOpen={openActionId === role.id}
-                                            itemId={role.id}
-                                            itemLabel={role.name}
+                                            isOpen={openActionId === a.id}
+                                            itemId={a.id}
+                                            itemLabel={`${a.user?.name} → ${a.role?.name}`}
                                             onToggle={(id) => toggleActionMenu(id as number | null)}
                                             actions={[
-                                                { id: `edit-${role.id}`, label: 'Edit role', icon: 'edit', href: `/access-control/roles/${role.id}/edit` },
-                                                ...(!role.is_system ? [{
-                                                    id: `delete-${role.id}`,
-                                                    label: 'Delete role',
+                                                {
+                                                    id: `toggle-${a.id}`,
+                                                    label: a.is_active ? 'Deactivate' : 'Activate',
+                                                    icon: a.is_active ? 'toggle_off' : 'toggle_on',
+                                                    onClick: () => toggleActive(a),
+                                                },
+                                                {
+                                                    id: `delete-${a.id}`,
+                                                    label: 'Remove assignment',
                                                     icon: 'delete',
                                                     variant: 'danger' as const,
-                                                    onClick: () => confirmDelete(role),
-                                                }] : []),
+                                                    onClick: () => confirmDelete(a),
+                                                },
                                             ]}
                                         />
                                     </td>

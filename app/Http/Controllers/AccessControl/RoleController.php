@@ -18,26 +18,32 @@ class RoleController extends Controller
 
     public function index(Request $request): Response
     {
+        $filters = [
+            'search'    => $request->string('search')->toString(),
+            'level'     => $request->string('level')->toString(),
+            'is_active' => $request->string('is_active')->toString(),
+            'per_page'  => $request->string('per_page')->toString(),
+        ];
+
         $query = Role::query()
-            ->withCount(['permissions', 'userRoleAssignments']);
+            ->withCount(['permissions', 'userRoleAssignments'])
+            ->when($filters['search'] !== '', function ($builder) use ($filters) {
+                $search = '%'.$filters['search'].'%';
+                $builder->where(fn ($q) => $q->where('name', 'like', $search)->orWhere('slug', 'like', $search));
+            })
+            ->when($filters['level'] !== '', fn ($builder) => $builder->where('level', $filters['level']))
+            ->when($filters['is_active'] !== '', fn ($builder) => $builder->where('is_active', $filters['is_active'] === 'true'))
+            ->orderBy('name');
 
-        if ($search = $request->input('search')) {
-            $query->where(fn ($q) => $q->where('name', 'like', "%{$search}%")->orWhere('slug', 'like', "%{$search}%"));
-        }
+        $perPage = $filters['per_page'] === 'all'
+            ? max((clone $query)->count(), 1)
+            : max((int) ($filters['per_page'] ?: 10), 1);
 
-        if ($level = $request->input('level')) {
-            $query->where('level', $level);
-        }
-
-        if ($request->has('is_active') && $request->input('is_active') !== '') {
-            $query->where('is_active', filter_var($request->input('is_active'), FILTER_VALIDATE_BOOLEAN));
-        }
-
-        $roles = $query->orderBy('name')->paginate(20)->withQueryString();
+        $roles = $query->paginate($perPage)->withQueryString();
 
         return Inertia::render('access-control/roles/index', [
             'roles'   => $roles,
-            'filters' => $request->only('search', 'level', 'is_active'),
+            'filters' => $filters,
         ]);
     }
 

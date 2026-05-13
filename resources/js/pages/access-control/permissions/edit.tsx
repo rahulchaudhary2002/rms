@@ -1,10 +1,9 @@
-import { Head, useForm } from '@inertiajs/react';
+import { Head, Link, useForm } from '@inertiajs/react';
 import { PageHeader } from '@/components/page-header';
-import { Button } from '@/components/ui/button';
+import { FormSection } from '@/components/form-section';
+import { FormField } from '@/components/ui/form-field';
 import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import InputError from '@/components/input-error';
+import { SearchableSelect } from '@/components/ui/searchable-select';
 import type { Permission } from '@/types';
 
 const COMMON_ACTIONS = ['view', 'create', 'update', 'delete', 'approve', 'export', 'manage'];
@@ -32,83 +31,114 @@ export default function PermissionsEdit({ permission }: Props) {
             <Head title={`Edit Permission: ${permission.slug}`} />
             <PageHeader
                 breadcrumbs={[
+                    { label: 'Home', href: '/dashboard' },
                     { label: 'Access Control', href: '/access-control/roles' },
                     { label: 'Permissions', href: '/access-control/permissions' },
                     { label: permission.slug },
                 ]}
                 title={`Edit Permission: ${permission.slug}`}
+                description="Update the permission details below."
             />
 
-            <div className="max-w-lg">
-                <form onSubmit={submit} className="space-y-5">
-                    <div className="space-y-1.5">
-                        <Label htmlFor="name">Display Name</Label>
-                        <Input id="name" value={data.name} disabled={permission.is_system} onChange={(e) => setData('name', e.target.value)} />
-                        <InputError message={errors.name} />
-                    </div>
+            <form onSubmit={submit} className="space-y-8 pb-6">
+                <FormSection
+                    title="Permission Details"
+                    description="Core identity of this permission — name, slug, module, and action."
+                >
+                    <div className="grid grid-cols-1 gap-5 md:grid-cols-2">
+                        <FormField label="Display Name" htmlFor="name" error={errors.name} className="md:col-span-2">
+                            <Input
+                                id="name"
+                                value={data.name}
+                                disabled={permission.is_system}
+                                onChange={(e) => setData('name', e.target.value)}
+                            />
+                        </FormField>
 
-                    <div className="grid grid-cols-2 gap-4">
-                        <div className="space-y-1.5">
-                            <Label htmlFor="module">Module</Label>
-                            <Input id="module" value={data.module} disabled={permission.is_system} onChange={(e) => setData('module', e.target.value)} />
-                            <InputError message={errors.module} />
-                        </div>
-                        <div className="space-y-1.5">
-                            <Label>Action</Label>
-                            <Select value={data.action} onValueChange={(v) => setData('action', v)} disabled={permission.is_system}>
-                                <SelectTrigger><SelectValue /></SelectTrigger>
-                                <SelectContent>
-                                    {COMMON_ACTIONS.map((a) => <SelectItem key={a} value={a}>{a}</SelectItem>)}
-                                </SelectContent>
-                            </Select>
-                            <InputError message={errors.action} />
-                        </div>
-                    </div>
+                        <FormField label="Module" htmlFor="module" error={errors.module}>
+                            <Input
+                                id="module"
+                                value={data.module}
+                                disabled={permission.is_system}
+                                onChange={(e) => setData('module', e.target.value)}
+                            />
+                        </FormField>
 
-                    <div className="space-y-1.5">
-                        <Label htmlFor="slug">Slug</Label>
-                        <Input id="slug" value={data.slug} disabled={permission.is_system} onChange={(e) => setData('slug', e.target.value)} />
-                        <InputError message={errors.slug} />
-                    </div>
+                        <FormField label="Action" error={errors.action}>
+                            <SearchableSelect
+                                value={data.action}
+                                disabled={permission.is_system}
+                                onChange={(e) => setData('action', e.target.value)}
+                            >
+                                <option value="">Select action</option>
+                                {COMMON_ACTIONS.map((a) => <option key={a} value={a}>{a}</option>)}
+                            </SearchableSelect>
+                        </FormField>
 
-                    <div className="space-y-1.5">
-                        <Label>Level</Label>
-                        <Select value={data.level} onValueChange={(v) => setData('level', v)} disabled={permission.is_system}>
-                            <SelectTrigger><SelectValue /></SelectTrigger>
-                            <SelectContent>
-                                <SelectItem value="global">Global</SelectItem>
-                                <SelectItem value="outlet">Outlet</SelectItem>
-                                <SelectItem value="warehouse">Warehouse</SelectItem>
-                            </SelectContent>
-                        </Select>
-                    </div>
+                        <FormField label="Slug" htmlFor="slug" error={errors.slug} className="md:col-span-2">
+                            <Input
+                                id="slug"
+                                value={data.slug}
+                                disabled={permission.is_system}
+                                onChange={(e) => setData('slug', e.target.value)}
+                            />
+                        </FormField>
 
-                    <div className="space-y-1.5">
-                        <Label>Status</Label>
-                        <Select value={data.is_active ? 'true' : 'false'} onValueChange={(v) => setData('is_active', v === 'true')}>
-                            <SelectTrigger><SelectValue /></SelectTrigger>
-                            <SelectContent>
-                                <SelectItem value="true">Active</SelectItem>
-                                <SelectItem value="false">Inactive</SelectItem>
-                            </SelectContent>
-                        </Select>
-                    </div>
+                        <FormField label="Level" error={errors.level}>
+                            <SearchableSelect
+                                value={data.level}
+                                disabled={permission.is_system}
+                                onChange={(e) => setData('level', e.target.value)}
+                            >
+                                <option value="global">Global</option>
+                                <option value="outlet">Outlet</option>
+                                <option value="warehouse">Warehouse</option>
+                            </SearchableSelect>
+                        </FormField>
 
-                    <div className="space-y-1.5">
-                        <Label htmlFor="description">Description</Label>
-                        <Input id="description" value={data.description} onChange={(e) => setData('description', e.target.value)} />
+                        <FormField label="Status">
+                            <SearchableSelect
+                                value={data.is_active ? 'true' : 'false'}
+                                onChange={(e) => setData('is_active', e.target.value === 'true')}
+                            >
+                                <option value="true">Active</option>
+                                <option value="false">Inactive</option>
+                            </SearchableSelect>
+                        </FormField>
+
+                        <FormField label="Description" htmlFor="description" error={errors.description} className="md:col-span-2">
+                            <Input
+                                id="description"
+                                value={data.description}
+                                onChange={(e) => setData('description', e.target.value)}
+                            />
+                        </FormField>
                     </div>
 
                     {permission.is_system && (
-                        <p className="text-sm text-amber-600 dark:text-amber-400">System permissions have limited editing.</p>
+                        <p className="mt-2 text-sm text-amber-600 dark:text-amber-400">
+                            System permissions have limited editing.
+                        </p>
                     )}
+                </FormSection>
 
-                    <div className="flex gap-3">
-                        <Button type="submit" disabled={processing}>Save Changes</Button>
-                        <Button type="button" variant="outline" onClick={() => history.back()}>Cancel</Button>
-                    </div>
-                </form>
-            </div>
+                <div className="flex flex-wrap items-center justify-end gap-4 border-t border-border/70 pt-8 dark:border-stone-700">
+                    <span className="hidden text-sm text-muted-foreground italic sm:inline">Unsaved changes will be lost.</span>
+                    <Link
+                        href="/access-control/permissions"
+                        className="rounded-lg px-6 py-2.5 text-sm font-semibold text-muted-foreground transition-colors hover:bg-secondary"
+                    >
+                        Discard Changes
+                    </Link>
+                    <button
+                        type="submit"
+                        disabled={processing}
+                        className="rounded-lg bg-primary px-10 py-3 text-sm font-bold text-white shadow-lg transition-all hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-60"
+                    >
+                        Save Changes
+                    </button>
+                </div>
+            </form>
         </>
     );
 }
