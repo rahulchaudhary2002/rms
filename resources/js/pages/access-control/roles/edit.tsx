@@ -13,6 +13,8 @@ export default function RolesEdit({ role }: Props) {
         name: role.name,
         slug: role.slug,
         level: role.level,
+        rank: role.rank,
+        is_assignable: role.is_assignable,
         description: role.description ?? '',
         is_active: role.is_active,
     });
@@ -73,6 +75,27 @@ export default function RolesEdit({ role }: Props) {
                                 <option value="global">Global</option>
                                 <option value="outlet">Outlet</option>
                                 <option value="warehouse">Warehouse</option>
+                            </SearchableSelect>
+                        </FormField>
+
+                        <FormField label="Rank" htmlFor="rank" error={errors.rank}>
+                            <Input
+                                id="rank"
+                                type="number"
+                                min={1}
+                                max={999}
+                                value={data.rank}
+                                onChange={(e) => setData('rank', parseInt(e.target.value, 10) || 100)}
+                            />
+                        </FormField>
+
+                        <FormField label="Assignable" error={errors.is_assignable}>
+                            <SearchableSelect
+                                value={data.is_assignable ? 'true' : 'false'}
+                                onChange={(e) => setData('is_assignable', e.target.value === 'true')}
+                            >
+                                <option value="true">Yes</option>
+                                <option value="false">No</option>
                             </SearchableSelect>
                         </FormField>
 

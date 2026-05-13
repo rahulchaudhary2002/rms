@@ -16,8 +16,10 @@ export type Role = {
     name: string;
     slug: string;
     level: 'global' | 'outlet' | 'warehouse';
+    rank: number;
     description: string | null;
     is_system: boolean;
+    is_assignable: boolean;
     is_active: boolean;
     permissions_count?: number;
     created_at: string;

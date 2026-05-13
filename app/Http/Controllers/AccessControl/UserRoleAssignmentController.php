@@ -8,6 +8,7 @@ use App\Models\Role;
 use App\Models\User;
 use App\Models\UserRoleAssignment;
 use App\Services\AccessControlService;
+use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
@@ -72,6 +73,11 @@ class UserRoleAssignmentController extends Controller
 
     public function store(StoreUserRoleAssignmentRequest $request): RedirectResponse
     {
+        $actor = Auth::user();
+        $targetRole = Role::findOrFail($request->role_id);
+
+        $this->authorizeRoleAssignment($actor, $targetRole, $request->scope_type, $request->scope_id);
+
         DB::transaction(function () use ($request) {
             UserRoleAssignment::firstOrCreate(
                 [
@@ -93,6 +99,52 @@ class UserRoleAssignmentController extends Controller
         $redirect = $request->input('_redirect', route('access-control.user-roles.index'));
 
         return redirect($redirect)->with('success', 'Role assigned successfully.');
+    }
+
+    private function authorizeRoleAssignment(User $actor, Role $targetRole, string $targetScopeType, ?int $targetScopeId): void
+    {
+        if (! $targetRole->is_active) {
+            throw new AuthorizationException('Role is inactive.');
+        }
+
+        if (! $targetRole->is_assignable) {
+            throw new AuthorizationException('This role cannot be assigned.');
+        }
+
+        // Super admin bypasses rank restriction
+        if ($this->accessControl->isSuperAdmin($actor)) {
+            return;
+        }
+
+        $actorRoleAssignment = UserRoleAssignment::with('role')
+            ->where('user_id', $actor->id)
+            ->where('is_active', true)
+            ->whereHas('role', fn ($q) => $q->where('is_active', true))
+            ->join('roles', 'roles.id', '=', 'user_role_assignments.role_id')
+            ->orderBy('roles.rank')
+            ->select('user_role_assignments.*')
+            ->first();
+
+        $actorRole = $actorRoleAssignment?->role;
+
+        if (! $actorRole) {
+            throw new AuthorizationException('You do not have a role that allows assigning roles.');
+        }
+
+        if ($targetRole->rank <= $actorRole->rank) {
+            throw new AuthorizationException('You cannot assign equal or higher role.');
+        }
+
+        $actorScopeType = $actorRoleAssignment->scope_type;
+        $actorScopeId   = $actorRoleAssignment->scope_id;
+
+        if ($actorScopeType !== 'global' && $actorScopeType !== $targetScopeType) {
+            throw new AuthorizationException('Invalid role assignment scope.');
+        }
+
+        if (in_array($actorScopeType, ['outlet', 'warehouse']) && $actorScopeId !== $targetScopeId) {
+            throw new AuthorizationException('You cannot assign role outside your scope.');
+        }
     }
 
     public function update(Request $request, UserRoleAssignment $userRoleAssignment): RedirectResponse

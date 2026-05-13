@@ -287,6 +287,8 @@ export default function RolesIndex({ roles, filters }: Props) {
                                 <th className="border-b border-border/10 px-6 py-4">Name</th>
                                 <th className="border-b border-border/10 px-6 py-4">Slug</th>
                                 <th className="border-b border-border/10 px-6 py-4">Level</th>
+                                <th className="border-b border-border/10 px-6 py-4">Rank</th>
+                                <th className="border-b border-border/10 px-6 py-4">Assignable</th>
                                 <th className="border-b border-border/10 px-6 py-4">Permissions</th>
                                 <th className="border-b border-border/10 px-6 py-4">Status</th>
                                 <th className="border-b border-border/10 px-6 py-4" />
@@ -295,7 +297,7 @@ export default function RolesIndex({ roles, filters }: Props) {
                         <tbody className="divide-y divide-muted dark:divide-stone-800">
                             {roles.data.length === 0 && (
                                 <tr>
-                                    <td colSpan={6} className="px-6 py-12 text-center text-sm text-muted-foreground dark:text-stone-400">
+                                    <td colSpan={8} className="px-6 py-12 text-center text-sm text-muted-foreground dark:text-stone-400">
                                         No roles found.
                                     </td>
                                 </tr>
@@ -324,6 +326,19 @@ export default function RolesIndex({ roles, filters }: Props) {
                                     <td className="px-6 py-4">
                                         <span className="rounded-full bg-slate-100 px-2.5 py-1 text-[10px] font-bold tracking-wide uppercase text-slate-600 ring-1 ring-slate-200 dark:bg-slate-800 dark:text-slate-300 dark:ring-slate-700">
                                             {role.level}
+                                        </span>
+                                    </td>
+                                    <td className="px-6 py-4 text-sm font-mono text-muted-foreground dark:text-stone-400">
+                                        {role.rank}
+                                    </td>
+                                    <td className="px-6 py-4">
+                                        <span className={cn(
+                                            'inline-flex rounded-full px-3 py-1 text-[11px] font-bold tracking-wider uppercase',
+                                            role.is_assignable
+                                                ? 'bg-sky-100 text-sky-700 dark:bg-sky-900/30 dark:text-sky-400'
+                                                : 'bg-stone-100 text-stone-500 dark:bg-stone-800 dark:text-stone-400',
+                                        )}>
+                                            {role.is_assignable ? 'Yes' : 'No'}
                                         </span>
                                     </td>
                                     <td className="px-6 py-4 text-sm text-muted-foreground dark:text-stone-400">

@@ -10,6 +10,8 @@ export default function RolesCreate() {
         name: '',
         slug: '',
         level: 'global',
+        rank: 100,
+        is_assignable: true,
         description: '',
         is_active: true,
     });
@@ -69,6 +71,28 @@ export default function RolesCreate() {
                                 <option value="global">Global</option>
                                 <option value="outlet">Outlet</option>
                                 <option value="warehouse">Warehouse</option>
+                            </SearchableSelect>
+                        </FormField>
+
+                        <FormField label="Rank" htmlFor="rank" error={errors.rank}>
+                            <Input
+                                id="rank"
+                                type="number"
+                                min={1}
+                                max={999}
+                                value={data.rank}
+                                onChange={(e) => setData('rank', parseInt(e.target.value, 10) || 100)}
+                                placeholder="e.g. 100"
+                            />
+                        </FormField>
+
+                        <FormField label="Assignable" error={errors.is_assignable}>
+                            <SearchableSelect
+                                value={data.is_assignable ? 'true' : 'false'}
+                                onChange={(e) => setData('is_assignable', e.target.value === 'true')}
+                            >
+                                <option value="true">Yes</option>
+                                <option value="false">No</option>
                             </SearchableSelect>
                         </FormField>
 

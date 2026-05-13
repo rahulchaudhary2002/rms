@@ -5,7 +5,6 @@ namespace Database\Seeders;
 use App\Models\Permission;
 use App\Models\Role;
 use App\Models\User;
-use App\Models\UserRoleAssignment;
 use Illuminate\Database\Seeder;
 use Illuminate\Support\Facades\DB;
 
@@ -37,39 +36,40 @@ class RolesAndPermissionsSeeder extends Seeder
 
     private array $systemRoles = [
         [
-            'name'        => 'Super Admin',
-            'slug'        => 'super-admin',
-            'level'       => 'global',
-            'description' => 'Full access to everything.',
-            'is_system'   => true,
+            'name'          => 'Admin',
+            'slug'          => 'admin',
+            'level'         => 'global',
+            'rank'          => 10,
+            'description'   => 'Administrative access.',
+            'is_system'     => true,
+            'is_assignable' => true,
         ],
         [
-            'name'        => 'Admin',
-            'slug'        => 'admin',
-            'level'       => 'global',
-            'description' => 'Administrative access.',
-            'is_system'   => true,
+            'name'          => 'Outlet Manager',
+            'slug'          => 'outlet-manager',
+            'level'         => 'outlet',
+            'rank'          => 50,
+            'description'   => 'Manages a specific outlet.',
+            'is_system'     => true,
+            'is_assignable' => true,
         ],
         [
-            'name'        => 'Outlet Manager',
-            'slug'        => 'outlet-manager',
-            'level'       => 'outlet',
-            'description' => 'Manages a specific outlet.',
-            'is_system'   => true,
+            'name'          => 'Warehouse Manager',
+            'slug'          => 'warehouse-manager',
+            'level'         => 'warehouse',
+            'rank'          => 50,
+            'description'   => 'Manages a specific warehouse.',
+            'is_system'     => true,
+            'is_assignable' => true,
         ],
         [
-            'name'        => 'Warehouse Manager',
-            'slug'        => 'warehouse-manager',
-            'level'       => 'warehouse',
-            'description' => 'Manages a specific warehouse.',
-            'is_system'   => true,
-        ],
-        [
-            'name'        => 'Staff',
-            'slug'        => 'staff',
-            'level'       => 'outlet',
-            'description' => 'General staff member.',
-            'is_system'   => true,
+            'name'          => 'Staff',
+            'slug'          => 'staff',
+            'level'         => 'outlet',
+            'rank'          => 100,
+            'description'   => 'General staff member.',
+            'is_system'     => true,
+            'is_assignable' => true,
         ],
     ];
 
@@ -78,9 +78,7 @@ class RolesAndPermissionsSeeder extends Seeder
         DB::transaction(function () {
             $this->seedPermissions();
             $this->seedRoles();
-            $this->assignSuperAdminPermissions();
             $this->assignDefaultAdminPermissions();
-            $this->assignFirstUserAsSuperAdmin();
         });
     }
 
@@ -116,18 +114,6 @@ class RolesAndPermissionsSeeder extends Seeder
         }
     }
 
-    private function assignSuperAdminPermissions(): void
-    {
-        $superAdmin = Role::where('slug', 'super-admin')->first();
-
-        if (! $superAdmin) {
-            return;
-        }
-
-        $allPermissionIds = Permission::pluck('id');
-        $superAdmin->permissions()->sync($allPermissionIds);
-    }
-
     private function assignDefaultAdminPermissions(): void
     {
         $admin = Role::where('slug', 'admin')->first();
@@ -142,35 +128,5 @@ class RolesAndPermissionsSeeder extends Seeder
             ->pluck('id');
 
         $admin->permissions()->sync($permissions);
-    }
-
-    private function assignFirstUserAsSuperAdmin(): void
-    {
-        $user = User::orderBy('id')->first();
-
-        if (! $user) {
-            return;
-        }
-
-        $superAdminRole = Role::where('slug', 'super-admin')->first();
-
-        if (! $superAdminRole) {
-            return;
-        }
-
-        $user->update(['is_superadmin' => true]);
-
-        UserRoleAssignment::firstOrCreate(
-            [
-                'user_id'    => $user->id,
-                'role_id'    => $superAdminRole->id,
-                'scope_type' => 'global',
-                'scope_id'   => null,
-            ],
-            [
-                'is_active'   => true,
-                'assigned_by' => null,
-            ]
-        );
     }
 }

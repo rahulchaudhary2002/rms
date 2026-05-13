@@ -12,17 +12,26 @@ class Role extends Model
         'name',
         'slug',
         'level',
+        'rank',
         'description',
         'is_system',
         'is_active',
+        'is_assignable',
     ];
 
     protected function casts(): array
     {
         return [
-            'is_system' => 'boolean',
-            'is_active' => 'boolean',
+            'rank'          => 'integer',
+            'is_system'     => 'boolean',
+            'is_assignable' => 'boolean',
+            'is_active'     => 'boolean',
         ];
+    }
+
+    public function isSuperAdmin(): bool
+    {
+        return $this->slug === 'super-admin';
     }
 
     public function permissions(): BelongsToMany
