@@ -66,7 +66,7 @@ class UserPermissionOverrideController extends Controller
         $users = User::where('is_superadmin', false)->orderBy('name')->get(['id', 'name', 'email']);
         $permissions = Permission::where('is_active', true)->orderBy('module')->orderBy('action')->get(['id', 'name', 'slug', 'module', 'action']);
 
-        $scopeTypes = collect(config('access_control.resource_types', []))
+        $scopeTypes = collect(config('access_control.scope_types', []))
             ->map(fn ($cfg, $key) => ['type' => $key, 'label' => $cfg['label']])
             ->values();
 

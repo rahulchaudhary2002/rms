@@ -70,7 +70,7 @@ class UserResourcePermissionController extends Controller
 
         $resourceTypes = collect(config('access_control.resource_types', []))
             ->map(fn ($cfg, $key) => ['type' => $key, 'label' => $cfg['label']])
-            ->values();
+            ->values(); // all resource types, including user/role/permission
 
         return Inertia::render('access-control/user-resource-permissions/create', [
             'users'         => $users,

@@ -44,6 +44,7 @@ type Props = {
     roles: Role[];
     permissions: Permission[];
     scopeTypes: ScopeType[];
+    resourceTypes: ScopeType[];
 };
 
 type Tab = 'overview' | 'roles' | 'overrides' | 'resources';
@@ -239,9 +240,9 @@ function AddOverrideModal({ open, onClose, userId, permissions, scopeTypes, retu
     );
 }
 
-function AddResourceModal({ open, onClose, userId, permissions, scopeTypes, returnUrl }: {
+function AddResourceModal({ open, onClose, userId, permissions, resourceTypes, returnUrl }: {
     open: boolean; onClose: () => void;
-    userId: number; permissions: Permission[]; scopeTypes: ScopeType[]; returnUrl: string;
+    userId: number; permissions: Permission[]; resourceTypes: ScopeType[]; returnUrl: string;
 }) {
     const { data, setData, post, processing, errors, reset } = useForm({
         user_id: String(userId),
@@ -282,7 +283,7 @@ function AddResourceModal({ open, onClose, userId, permissions, scopeTypes, retu
                             onChange={(e) => { setData('resource_type', e.target.value); setData('resource_id', ''); }}
                         >
                             <option value="">Select a type...</option>
-                            {scopeTypes.map((st) => (
+                            {resourceTypes.map((st) => (
                                 <option key={st.type} value={st.type}>{st.label}</option>
                             ))}
                         </SearchableSelect>
@@ -334,7 +335,7 @@ const tabList: { id: Tab; label: string; icon: string }[] = [
     { id: 'resources',  label: 'Resource Permissions',  icon: 'rule' },
 ];
 
-export default function UserShow({ user, roles, permissions, scopeTypes }: Props) {
+export default function UserShow({ user, roles, permissions, scopeTypes, resourceTypes }: Props) {
     const [activeTab, setActiveTab] = useState<Tab>('overview');
     const [modal, setModal] = useState<'role' | 'override' | 'resource' | null>(null);
     const returnUrl = `/users/${user.id}`;
@@ -618,7 +619,7 @@ export default function UserShow({ user, roles, permissions, scopeTypes }: Props
                 onClose={() => setModal(null)}
                 userId={user.id}
                 permissions={permissions}
-                scopeTypes={scopeTypes}
+                resourceTypes={resourceTypes}
                 returnUrl={returnUrl}
             />
         </>

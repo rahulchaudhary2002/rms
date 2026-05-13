@@ -66,15 +66,19 @@ class UserController extends Controller
 
         $roles = Role::where('is_active', true)->orderBy('name')->get(['id', 'name', 'slug', 'level']);
         $permissions = Permission::where('is_active', true)->orderBy('module')->orderBy('action')->get(['id', 'name', 'slug', 'module', 'action']);
-        $scopeTypes = collect(config('access_control.resource_types', []))
+        $scopeTypes = collect(config('access_control.scope_types', []))
+            ->map(fn ($cfg, $key) => ['type' => $key, 'label' => $cfg['label']])
+            ->values();
+        $resourceTypes = collect(config('access_control.resource_types', []))
             ->map(fn ($cfg, $key) => ['type' => $key, 'label' => $cfg['label']])
             ->values();
 
         return Inertia::render('access-control/users/show', [
-            'user'       => $user,
-            'roles'      => $roles,
-            'permissions' => $permissions,
-            'scopeTypes' => $scopeTypes,
+            'user'          => $user,
+            'roles'         => $roles,
+            'permissions'   => $permissions,
+            'scopeTypes'    => $scopeTypes,
+            'resourceTypes' => $resourceTypes,
         ]);
     }
 

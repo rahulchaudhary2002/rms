@@ -1,5 +1,5 @@
 import { Head, Link, router } from '@inertiajs/react';
-import { ChevronDown, ChevronRight, Filter, Minus, Plus } from 'lucide-react';
+import { ChevronDown, Filter, Minus, Plus } from 'lucide-react';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { PageHeader } from '@/components/page-header';
 import { Badge } from '@/components/ui/badge';
@@ -284,53 +284,58 @@ export default function RolePermissionsIndex({ roles, permissions, filters }: Pr
                                     <span className="text-xs font-medium text-muted-foreground dark:text-stone-400">
                                         {role.permissions_count} permission{role.permissions_count !== 1 ? 's' : ''}
                                     </span>
-                                    {expanded === role.id
-                                        ? <ChevronDown className="h-4 w-4 text-muted-foreground" />
-                                        : <ChevronRight className="h-4 w-4 text-muted-foreground" />
-                                    }
+                                    <ChevronDown className={cn(
+                                        'h-4 w-4 text-muted-foreground transition-transform duration-300',
+                                        expanded === role.id && 'rotate-180',
+                                    )} />
                                 </div>
                             </button>
 
-                            {expanded === role.id && (
-                                <div className="border-t border-border/10 bg-muted/20 px-6 py-5 dark:bg-stone-900/30">
-                                    {Object.keys(permsByModule).length === 0 && (
-                                        <p className="text-sm text-muted-foreground">No permissions available.</p>
-                                    )}
-                                    <div className="space-y-5">
-                                        {Object.entries(permsByModule).map(([module, perms]) => (
-                                            <div key={module}>
-                                                <h4 className="mb-2.5 text-[10px] font-bold tracking-[0.12em] text-muted-foreground/70 uppercase dark:text-stone-500">
-                                                    {module}
-                                                </h4>
-                                                <div className="flex flex-wrap gap-2">
-                                                    {perms.map((perm) => {
-                                                        const has = role.permissions.some((p) => p.id === perm.id);
-                                                        return (
-                                                            <button
-                                                                key={perm.id}
-                                                                onClick={() => toggle(perm.id, role)}
-                                                                title={perm.slug}
-                                                                className={cn(
-                                                                    'flex items-center gap-1.5 rounded-md border px-3 py-1 text-xs font-semibold transition-all',
-                                                                    has
-                                                                        ? 'border-primary bg-primary text-white shadow-sm hover:bg-primary/90'
-                                                                        : 'border-border/50 bg-white text-muted-foreground hover:border-primary/40 hover:text-primary dark:bg-stone-900 dark:hover:border-primary/40',
-                                                                )}
-                                                            >
-                                                                {has
-                                                                    ? <Minus className="h-3 w-3" />
-                                                                    : <Plus className="h-3 w-3" />
-                                                                }
-                                                                {perm.action}
-                                                            </button>
-                                                        );
-                                                    })}
+                            <div className={cn(
+                                'grid transition-all duration-300 ease-in-out',
+                                expanded === role.id ? 'grid-rows-[1fr]' : 'grid-rows-[0fr]',
+                            )}>
+                                <div className="overflow-hidden">
+                                    <div className="border-t border-border/10 bg-muted/20 px-6 py-5 dark:bg-stone-900/30">
+                                        {Object.keys(permsByModule).length === 0 && (
+                                            <p className="text-sm text-muted-foreground">No permissions available.</p>
+                                        )}
+                                        <div className="space-y-5">
+                                            {Object.entries(permsByModule).map(([module, perms]) => (
+                                                <div key={module}>
+                                                    <h4 className="mb-2.5 text-[10px] font-bold tracking-[0.12em] text-muted-foreground/70 uppercase dark:text-stone-500">
+                                                        {module}
+                                                    </h4>
+                                                    <div className="flex flex-wrap gap-2">
+                                                        {perms.map((perm) => {
+                                                            const has = role.permissions.some((p) => p.id === perm.id);
+                                                            return (
+                                                                <button
+                                                                    key={perm.id}
+                                                                    onClick={() => toggle(perm.id, role)}
+                                                                    title={perm.slug}
+                                                                    className={cn(
+                                                                        'flex items-center gap-1.5 rounded-md border px-3 py-1 text-xs font-semibold transition-all',
+                                                                        has
+                                                                            ? 'border-primary bg-primary text-white shadow-sm hover:bg-primary/90'
+                                                                            : 'border-border/50 bg-card text-muted-foreground hover:border-primary/40 hover:text-primary dark:hover:border-primary/40',
+                                                                    )}
+                                                                >
+                                                                    {has
+                                                                        ? <Minus className="h-3 w-3" />
+                                                                        : <Plus className="h-3 w-3" />
+                                                                    }
+                                                                    {perm.action}
+                                                                </button>
+                                                            );
+                                                        })}
+                                                    </div>
                                                 </div>
-                                            </div>
-                                        ))}
+                                            ))}
+                                        </div>
                                     </div>
                                 </div>
-                            )}
+                            </div>
                         </div>
                     ))}
                 </div>

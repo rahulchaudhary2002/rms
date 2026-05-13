@@ -3,17 +3,19 @@ import { PageHeader } from '@/components/page-header';
 import { FormSection } from '@/components/form-section';
 import { FormField } from '@/components/ui/form-field';
 import { SearchableSelect } from '@/components/ui/searchable-select';
-import { Input } from '@/components/ui/input';
+import { AsyncResourceSelect } from '@/components/ui/async-resource-select';
 import type { Role } from '@/types';
 
 type User = { id: number; name: string; email: string };
+type ScopeType = { type: string; label: string };
 
 type Props = {
     users: User[];
     roles: Role[];
+    scopeTypes: ScopeType[];
 };
 
-export default function UserRolesCreate({ users, roles }: Props) {
+export default function UserRolesCreate({ users, roles, scopeTypes }: Props) {
     const { data, setData, post, processing, errors } = useForm({
         user_id: '',
         role_id: '',
@@ -83,19 +85,19 @@ export default function UserRolesCreate({ users, roles }: Props) {
                                 }}
                             >
                                 <option value="global">Global</option>
-                                <option value="outlet">Outlet</option>
-                                <option value="warehouse">Warehouse</option>
+                                {scopeTypes.map((st) => (
+                                    <option key={st.type} value={st.type}>{st.label}</option>
+                                ))}
                             </SearchableSelect>
                         </FormField>
 
                         {data.scope_type !== 'global' && (
-                            <FormField label="Scope ID" error={errors.scope_id}>
-                                <Input
-                                    type="number"
+                            <FormField label="Scope Resource" error={errors.scope_id}>
+                                <AsyncResourceSelect
+                                    resourceType={data.scope_type}
                                     value={data.scope_id}
-                                    onChange={(e) => setData('scope_id', e.target.value)}
-                                    placeholder="Enter resource ID"
-                                    min="1"
+                                    onChange={(val) => setData('scope_id', val)}
+                                    placeholder="Select a resource..."
                                 />
                             </FormField>
                         )}
