@@ -191,6 +191,36 @@ function buildBreadcrumbsFromUrl(currentUrl: string): BreadcrumbItem[] {
     return breadcrumbs;
 }
 
+function buildDynamicGroups(auth: Auth): MenuGroup[] {
+    const isSuperAdmin = auth.user?.is_superadmin === true;
+    const can = (slug: string) => isSuperAdmin || auth.can?.[slug] === true;
+
+    const acItems: MenuItem[] = [];
+
+    if (can('roles-view')) {
+        acItems.push({ title: 'Roles', href: '/access-control/roles', icon: 'shield_person', activeMatch: ['/access-control/roles'] });
+    }
+    if (can('permissions-view')) {
+        acItems.push({ title: 'Permissions', href: '/access-control/permissions', icon: 'key', activeMatch: ['/access-control/permissions'] });
+    }
+    if (can('access-control-manage')) {
+        acItems.push({ title: 'Role Permissions', href: '/access-control/role-permissions', icon: 'lock', activeMatch: ['/access-control/role-permissions'] });
+        acItems.push({ title: 'User Roles', href: '/access-control/user-roles', icon: 'manage_accounts', activeMatch: ['/access-control/user-roles'] });
+        acItems.push({ title: 'Permission Overrides', href: '/access-control/user-permission-overrides', icon: 'tune', activeMatch: ['/access-control/user-permission-overrides'] });
+        acItems.push({ title: 'Resource Permissions', href: '/access-control/user-resource-permissions', icon: 'rule', activeMatch: ['/access-control/user-resource-permissions'] });
+    }
+
+    const groups: MenuGroup[] = [];
+
+    if (acItems.length > 0) {
+        groups.push({ id: 'access-control', title: 'Access Control', icon: 'admin_panel_settings', items: acItems });
+    }
+
+    groups.push(...menuGroups);
+
+    return groups;
+}
+
 const Sidebar = memo(function Sidebar({
     appName,
     auth,
@@ -213,6 +243,7 @@ const Sidebar = memo(function Sidebar({
     const navRef = useRef<HTMLElement>(null);
     const userMenuRef = useRef<HTMLDivElement>(null);
     const user = auth.user;
+    const dynamicGroups = buildDynamicGroups(auth);
     const userInitials =
         user?.name
             ?.split(' ')
@@ -366,7 +397,7 @@ const Sidebar = memo(function Sidebar({
                         );
                     })}
 
-                    {menuGroups.map((group) => {
+                    {dynamicGroups.map((group) => {
                         const groupActive = group.items.some((item) =>
                             isPathActive(
                                 currentUrl,
@@ -613,12 +644,12 @@ export default function AppLayoutShell({
     };
     const initialOpenGroup = useMemo(
         () =>
-            menuGroups.find((group) =>
+            buildDynamicGroups(auth as Auth).find((group) =>
                 group.items.some((item) =>
                     isPathActive(currentUrl, item.href, item.activeMatch),
                 ),
             )?.id ?? '',
-        [currentUrl],
+        [currentUrl, auth],
     );
     const searchItems = useMemo(() => getSearchItems(), []);
     const [viewportMode, setViewportMode] = useState<ViewportMode>('large');

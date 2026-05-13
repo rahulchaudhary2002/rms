@@ -1,5 +1,5 @@
 import { Link } from '@inertiajs/react';
-import type { ReactNode } from 'react';
+import { Fragment, type ReactNode } from 'react';
 import {
     Breadcrumb,
     BreadcrumbItem,
@@ -55,19 +55,21 @@ export function PageHeader({
                             const isLast = index === breadcrumbs.length - 1;
 
                             return (
-                                <BreadcrumbItem key={`${item.label}-${index}`}>
-                                    {isLast || !item.href ? (
-                                        <BreadcrumbPage className="text-primary">
-                                            {item.label}
-                                        </BreadcrumbPage>
-                                    ) : (
-                                        <BreadcrumbLink
-                                            asChild
-                                            className="text-primary"
-                                        >
-                                            <Link href={item.href}>{item.label}</Link>
-                                        </BreadcrumbLink>
-                                    )}
+                                <Fragment key={`${item.label}-${index}`}>
+                                    <BreadcrumbItem>
+                                        {isLast || !item.href ? (
+                                            <BreadcrumbPage className="text-primary">
+                                                {item.label}
+                                            </BreadcrumbPage>
+                                        ) : (
+                                            <BreadcrumbLink
+                                                asChild
+                                                className="text-primary"
+                                            >
+                                                <Link href={item.href}>{item.label}</Link>
+                                            </BreadcrumbLink>
+                                        )}
+                                    </BreadcrumbItem>
 
                                     {!isLast && (
                                         <BreadcrumbSeparator className="[&>svg]:size-3">
@@ -76,7 +78,7 @@ export function PageHeader({
                                             </span>
                                         </BreadcrumbSeparator>
                                     )}
-                                </BreadcrumbItem>
+                                </Fragment>
                             );
                         })}
                     </BreadcrumbList>

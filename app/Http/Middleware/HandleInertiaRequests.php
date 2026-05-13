@@ -2,6 +2,7 @@
 
 namespace App\Http\Middleware;
 
+use App\Services\AccessControlService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
@@ -9,6 +10,7 @@ use Inertia\Middleware;
 
 class HandleInertiaRequests extends Middleware
 {
+    public function __construct(private AccessControlService $accessControl) {}
     /**
      * The root template that's loaded on the first page visit.
      *
@@ -40,14 +42,63 @@ class HandleInertiaRequests extends Middleware
         return [
             ...parent::share($request),
             'name' => config('app.name'),
-            'auth' => [
-                'user' => $request->user(),
-            ],
+            'auth' => fn () => $this->sharedAuth($request),
             'nodeSelection' => fn () => $this->nodeSelection($request),
             'outlets' => fn () => $this->sharedOutlets($request),
             'warehouses' => fn () => $this->sharedWarehouses($request),
             'sidebarOpen' => ! $request->hasCookie('sidebar_state') || $request->cookie('sidebar_state') === 'true',
+            'flash' => fn () => [
+                'success' => $request->session()->get('success'),
+                'error'   => $request->session()->get('error'),
+            ],
         ];
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    private function sharedAuth(Request $request): array
+    {
+        $user = $request->user();
+
+        if (! $user) {
+            return ['user' => null, 'roles' => [], 'permissions' => [], 'can' => []];
+        }
+
+        [$scopeType, $scopeId] = $this->resolveCurrentScope($request);
+
+        $permissions = $this->accessControl->getUserPermissions($user, $scopeType, $scopeId);
+        $roles = $this->accessControl->getUserRoles($user, $scopeType, $scopeId)
+            ->map(fn ($role) => ['id' => $role->id, 'name' => $role->name, 'slug' => $role->slug, 'level' => $role->level])
+            ->values()
+            ->all();
+
+        return [
+            'user'        => $user,
+            'roles'       => $roles,
+            'permissions' => array_keys(array_filter($permissions)),
+            'can'         => $permissions,
+        ];
+    }
+
+    /**
+     * @return array{0: string, 1: int|null}
+     */
+    private function resolveCurrentScope(Request $request): array
+    {
+        $scopeType = (string) $request->session()->get('current_scope_type', 'global');
+        $nodeId = $request->session()->get('current_node_id');
+        $outletId = $request->session()->get('current_outlet_id');
+
+        if ($scopeType === 'warehouse' && $nodeId) {
+            return ['warehouse', (int) $nodeId];
+        }
+
+        if ($scopeType === 'outlet' && $outletId) {
+            return ['outlet', (int) $outletId];
+        }
+
+        return ['global', null];
     }
 
     /**

@@ -18,7 +18,9 @@ return Application::configure(basePath: dirname(__DIR__))
         $middleware->encryptCookies(except: ['appearance', 'sidebar_state']);
 
         $middleware->alias([
-            'node.selected' => CheckNodeSelection::class,
+            'node.selected'      => CheckNodeSelection::class,
+            'permission'         => \App\Http\Middleware\CheckPermission::class,
+            'resource.permission' => \App\Http\Middleware\CheckResourcePermission::class,
         ]);
 
         $middleware->web(append: [
