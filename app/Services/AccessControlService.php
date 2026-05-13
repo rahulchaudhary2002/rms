@@ -117,7 +117,7 @@ class AccessControlService
             Cache::forget($this->permissionCacheKey($user->id, $type, $id));
         }
 
-        // Clear outlet/warehouse scopes — we store a key set for this
+        // Clear outlet/warehouse scopes - we store a key set for this
         $scopeSetKey = "user_permission_scope_keys:{$user->id}";
         $keys = Cache::get($scopeSetKey, []);
         foreach ($keys as $key) {

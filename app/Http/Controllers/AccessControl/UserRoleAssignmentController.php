@@ -63,14 +63,10 @@ class UserRoleAssignmentController extends Controller
     {
         $users = User::where('is_superadmin', false)->orderBy('name')->get(['id', 'name', 'email']);
         $roles = Role::where('is_active', true)->orderBy('name')->get(['id', 'name', 'slug', 'level']);
-        $scopeTypes = collect(config('access_control.scope_types', []))
-            ->map(fn ($cfg, $key) => ['type' => $key, 'label' => $cfg['label']])
-            ->values();
 
         return Inertia::render('access-control/user-roles/create', [
-            'users'      => $users,
-            'roles'      => $roles,
-            'scopeTypes' => $scopeTypes,
+            'users' => $users,
+            'roles' => $roles,
         ]);
     }
 

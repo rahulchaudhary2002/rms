@@ -46,7 +46,7 @@ export default function PermissionsCreate() {
             <form onSubmit={submit} className="space-y-8 pb-6">
                 <FormSection
                     title="Permission Details"
-                    description="Core identity of this permission — name, slug, module, and action."
+                    description="Core identity of this permission - name, slug, module, and action."
                 >
                     <div className="grid grid-cols-1 gap-5 md:grid-cols-2">
                         <FormField label="Display Name" htmlFor="name" error={errors.name} className="md:col-span-2">

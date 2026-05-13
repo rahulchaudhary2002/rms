@@ -341,7 +341,7 @@ export default function UserRolesIndex({ assignments, users, roles, filters }: P
                                         {a.scope_id && <span className="ml-1 text-xs text-muted-foreground">#{a.scope_id}</span>}
                                     </td>
                                     <td className="px-6 py-4 text-sm text-muted-foreground dark:text-stone-400">
-                                        {a.assigned_by?.name ?? '—'}
+                                        {a.assigned_by?.name ?? '-'}
                                     </td>
                                     <td className="px-6 py-4">
                                         <span className={cn(

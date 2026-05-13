@@ -79,9 +79,9 @@ function EmptyRow({ colSpan, label }: { colSpan: number; label: string }) {
 
 // ─── Modals ───────────────────────────────────────────────────────────────────
 
-function AssignRoleModal({ open, onClose, userId, roles, scopeTypes, returnUrl }: {
+function AssignRoleModal({ open, onClose, userId, roles, returnUrl }: {
     open: boolean; onClose: () => void;
-    userId: number; roles: Role[]; scopeTypes: ScopeType[]; returnUrl: string;
+    userId: number; roles: Role[]; returnUrl: string;
 }) {
     const { data, setData, post, processing, errors, reset } = useForm({
         user_id: String(userId),
@@ -91,7 +91,14 @@ function AssignRoleModal({ open, onClose, userId, roles, scopeTypes, returnUrl }
         _redirect: returnUrl,
     });
 
-    function submit(e: React.FormEvent<HTMLFormElement>) {
+    const selectedRole = roles.find((r) => String(r.id) === data.role_id) ?? null;
+
+    function handleRoleChange(roleId: string) {
+        const role = roles.find((r) => String(r.id) === roleId) ?? null;
+        setData({ ...data, role_id: roleId, scope_type: role?.level ?? 'global', scope_id: '' });
+    }
+
+    function submit(e: { preventDefault(): void }) {
         e.preventDefault();
         post('/access-control/user-roles', {
             onSuccess: () => { reset(); onClose(); },
@@ -99,14 +106,14 @@ function AssignRoleModal({ open, onClose, userId, roles, scopeTypes, returnUrl }
     }
 
     return (
-        <Dialog open={open} onOpenChange={(o) => { if (!o) onClose(); }}>
+        <Dialog open={open} onOpenChange={(o) => { if (!o) { reset(); onClose(); } }}>
             <DialogContent className="max-w-md bg-card">
                 <DialogHeader>
                     <DialogTitle>Assign Role</DialogTitle>
                 </DialogHeader>
                 <form onSubmit={submit} className="space-y-4">
                     <FormField label="Role" error={errors.role_id}>
-                        <SearchableSelect value={data.role_id} onChange={(e) => setData('role_id', e.target.value)}>
+                        <SearchableSelect value={data.role_id} onChange={(e) => handleRoleChange(e.target.value)}>
                             <option value="">Select a role...</option>
                             {roles.map((r) => (
                                 <option key={r.id} value={String(r.id)}>{r.name} ({r.level})</option>
@@ -114,31 +121,31 @@ function AssignRoleModal({ open, onClose, userId, roles, scopeTypes, returnUrl }
                         </SearchableSelect>
                     </FormField>
 
-                    <FormField label="Scope Type" error={errors.scope_type}>
-                        <SearchableSelect
-                            value={data.scope_type}
-                            onChange={(e) => { setData('scope_type', e.target.value); setData('scope_id', ''); }}
-                        >
-                            <option value="global">Global</option>
-                            {scopeTypes.map((st) => (
-                                <option key={st.type} value={st.type}>{st.label}</option>
-                            ))}
-                        </SearchableSelect>
+                    <FormField label="Scope" error={errors.scope_type}>
+                        <div className={cn(
+                            'flex h-11 items-center rounded-lg border border-input bg-muted/40 px-3 text-sm',
+                            !selectedRole && 'text-muted-foreground',
+                        )}>
+                            {selectedRole
+                                ? <><span className="font-semibold capitalize text-foreground">{selectedRole.level}</span><span className="ml-1.5 text-muted-foreground">- set by role level</span></>
+                                : 'Select a role first'
+                            }
+                        </div>
                     </FormField>
 
-                    {data.scope_type !== 'global' && (
+                    {data.scope_type !== 'global' && selectedRole && (
                         <FormField label="Scope Resource" error={errors.scope_id}>
                             <AsyncResourceSelect
                                 resourceType={data.scope_type}
                                 value={data.scope_id}
                                 onChange={(val) => setData('scope_id', val)}
-                                placeholder="Select a resource..."
+                                placeholder={`Select a ${data.scope_type}...`}
                             />
                         </FormField>
                     )}
 
                     <DialogFooter>
-                        <button type="button" onClick={onClose}
+                        <button type="button" onClick={() => { reset(); onClose(); }}
                             className="rounded-lg px-4 py-2 text-sm font-semibold text-muted-foreground transition-colors hover:bg-secondary">
                             Cancel
                         </button>
@@ -167,7 +174,7 @@ function AddOverrideModal({ open, onClose, userId, permissions, scopeTypes, retu
         _redirect: returnUrl,
     });
 
-    function submit(e: React.FormEvent<HTMLFormElement>) {
+    function submit(e: { preventDefault(): void }) {
         e.preventDefault();
         post('/access-control/user-permission-overrides', {
             onSuccess: () => { reset(); onClose(); },
@@ -254,7 +261,7 @@ function AddResourceModal({ open, onClose, userId, permissions, resourceTypes, r
         _redirect: returnUrl,
     });
 
-    function submit(e: React.FormEvent<HTMLFormElement>) {
+    function submit(e: { preventDefault(): void }) {
         e.preventDefault();
         post('/access-control/user-resource-permissions', {
             onSuccess: () => { reset(); onClose(); },
@@ -431,7 +438,7 @@ export default function UserShow({ user, roles, permissions, scopeTypes, resourc
                         <dl className="space-y-4">
                             {[
                                 { label: 'Member since', value: new Date(user.created_at).toLocaleDateString() },
-                                { label: 'Email verified', value: user.email_verified_at ? new Date(user.email_verified_at).toLocaleDateString() : '—' },
+                                { label: 'Email verified', value: user.email_verified_at ? new Date(user.email_verified_at).toLocaleDateString() : '-' },
                                 { label: 'Assigned roles', value: user.role_assignments.length },
                                 { label: 'Permission overrides', value: user.permission_overrides.length },
                                 { label: 'Resource permissions', value: user.resource_permissions.length },
@@ -486,7 +493,7 @@ export default function UserShow({ user, roles, permissions, scopeTypes, resourc
                                             {ra.scope_type === 'global' ? 'Global' : `${ra.scope_type} #${ra.scope_id}`}
                                         </td>
                                         <td className="px-6 py-3"><ActiveBadge active={ra.is_active} /></td>
-                                        <td className="px-6 py-3 text-sm text-muted-foreground">{ra.assigned_by?.name ?? '—'}</td>
+                                        <td className="px-6 py-3 text-sm text-muted-foreground">{ra.assigned_by?.name ?? '-'}</td>
                                         <td className="px-6 py-3 text-right">
                                             <button type="button" onClick={() => confirmDeleteRole(ra.id)}
                                                 className="rounded p-1 text-muted-foreground transition-colors hover:bg-destructive/10 hover:text-destructive">
@@ -534,7 +541,7 @@ export default function UserShow({ user, roles, permissions, scopeTypes, resourc
                                             {po.scope_type === 'global' ? 'Global' : `${po.scope_type} #${po.scope_id}`}
                                         </td>
                                         <td className="px-6 py-3"><ActiveBadge active={po.is_active} /></td>
-                                        <td className="px-6 py-3 text-sm text-muted-foreground">{po.reason ?? '—'}</td>
+                                        <td className="px-6 py-3 text-sm text-muted-foreground">{po.reason ?? '-'}</td>
                                         <td className="px-6 py-3 text-right">
                                             <button type="button" onClick={() => confirmDeleteOverride(po.id)}
                                                 className="rounded p-1 text-muted-foreground transition-colors hover:bg-destructive/10 hover:text-destructive">
@@ -582,7 +589,7 @@ export default function UserShow({ user, roles, permissions, scopeTypes, resourc
                                             {rp.resource_type} #{rp.resource_id}
                                         </td>
                                         <td className="px-6 py-3"><ActiveBadge active={rp.is_active} /></td>
-                                        <td className="px-6 py-3 text-sm text-muted-foreground">{rp.reason ?? '—'}</td>
+                                        <td className="px-6 py-3 text-sm text-muted-foreground">{rp.reason ?? '-'}</td>
                                         <td className="px-6 py-3 text-right">
                                             <button type="button" onClick={() => confirmDeleteResource(rp.id)}
                                                 className="rounded p-1 text-muted-foreground transition-colors hover:bg-destructive/10 hover:text-destructive">
@@ -603,7 +610,6 @@ export default function UserShow({ user, roles, permissions, scopeTypes, resourc
                 onClose={() => setModal(null)}
                 userId={user.id}
                 roles={roles}
-                scopeTypes={scopeTypes}
                 returnUrl={returnUrl}
             />
             <AddOverrideModal
