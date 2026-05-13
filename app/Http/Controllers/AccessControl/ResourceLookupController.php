@@ -34,6 +34,9 @@ class ResourceLookupController extends Controller
                     }
                 });
             })
+            ->when($modelClass === \App\Models\User::class, function ($builder) {
+                $builder->where('is_superadmin', false);
+            })
             ->orderBy($labelColumn);
 
         $paginated = $query->paginate(20, ['*'], 'page', $page);

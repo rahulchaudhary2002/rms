@@ -18,5 +18,11 @@ return [
             'label_column'   => 'name',
             'search_columns' => ['name'],
         ],
+        'user' => [
+            'label'          => 'User',
+            'model'          => \App\Models\User::class,
+            'label_column'   => 'name',
+            'search_columns' => ['name', 'email'],
+        ],
     ],
 ];
