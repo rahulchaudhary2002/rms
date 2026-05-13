@@ -36,6 +36,7 @@ type SharedProps = {
     nodeSelection?: NodeSelectionData;
     outlets?: Array<{ id: string; name: string }>;
     warehouses?: Array<{ id: string; outlet_id: string; name: string }>;
+    auth?: { can: Record<string, boolean> };
     errors?: {
         create_outlet_name?: string;
         create_warehouse_name?: string;
@@ -52,6 +53,9 @@ type OutletGroup = {
 export function OutletNodeSwitcher() {
     const page = usePage<SharedProps>();
     const nodeSelection = page.props.nodeSelection;
+    const can = page.props.auth?.can ?? {};
+    const canCreateWarehouse = can['warehouses-create'] ?? false;
+    const canCreateOutlet = can['outlets-create'] ?? false;
 
     const [open, setOpen] = useState(false);
     const [pendingScopeType, setPendingScopeType] =
@@ -555,18 +559,20 @@ export function OutletNodeSwitcher() {
                 </div>
 
                 <div className="border-t border-border bg-muted p-3">
-                    <div className="grid grid-cols-2 gap-2">
-                        <button
-                            type="button"
-                            className="flex min-w-0 items-center justify-center gap-2 rounded-lg bg-card px-3 py-2.5 text-xs font-bold text-primary transition-colors hover:bg-accent"
-                            onClick={handleOpenCreateModal}
-                            disabled={!createNodeUrl}
-                        >
-                            <span className="material-symbols-outlined text-sm">
-                                add_circle
-                            </span>
-                            <span className="truncate">Register Warehouse</span>
-                        </button>
+                    <div className={cn('grid gap-2', canCreateWarehouse ? 'grid-cols-2' : 'grid-cols-1')}>
+                        {canCreateWarehouse && (
+                            <button
+                                type="button"
+                                className="flex min-w-0 items-center justify-center gap-2 rounded-lg bg-card px-3 py-2.5 text-xs font-bold text-primary transition-colors hover:bg-accent"
+                                onClick={handleOpenCreateModal}
+                                disabled={!createNodeUrl}
+                            >
+                                <span className="material-symbols-outlined text-sm">
+                                    add_circle
+                                </span>
+                                <span className="truncate">Register Warehouse</span>
+                            </button>
+                        )}
 
                         <button
                             type="button"
@@ -611,12 +617,12 @@ export function OutletNodeSwitcher() {
                                     id="create_outlet_select"
                                     value={selectedOutletId}
                                     placeholder="Search or select outlet"
-                                    addNewLabel="Add outlet"
-                                    onAddNew={(query) => {
+                                    addNewLabel={canCreateOutlet ? 'Add outlet' : undefined}
+                                    onAddNew={canCreateOutlet ? (query) => {
                                         setAddOutletName(query);
                                         setAddOutletError('');
                                         setAddOutletModalOpen(true);
-                                    }}
+                                    } : undefined}
                                     onChange={(event) => {
                                         setSelectedOutletId(event.target.value);
                                     }}

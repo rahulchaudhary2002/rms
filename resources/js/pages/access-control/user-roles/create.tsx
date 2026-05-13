@@ -9,12 +9,15 @@ import type { Role } from '@/types';
 
 type User = { id: number; name: string; email: string };
 
+type AllowedScopes = { outlet: number[]; warehouse: number[] } | null;
+
 type Props = {
     users: User[];
     roles: Role[];
+    allowedScopes: AllowedScopes;
 };
 
-export default function UserRolesCreate({ users, roles }: Props) {
+export default function UserRolesCreate({ users, roles, allowedScopes }: Props) {
     const { data, setData, post, processing, errors } = useForm({
         user_id: '',
         role_id: '',
@@ -105,6 +108,7 @@ export default function UserRolesCreate({ users, roles }: Props) {
                                     resourceType={data.scope_type}
                                     value={data.scope_id}
                                     onChange={(val) => setData('scope_id', val)}
+                                    allowedIds={allowedScopes ? (allowedScopes[data.scope_type as 'outlet' | 'warehouse'] ?? null) : null}
                                     placeholder={`Select a ${data.scope_type}...`}
                                 />
                             </FormField>

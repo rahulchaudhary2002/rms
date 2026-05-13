@@ -62,12 +62,30 @@ class UserRoleAssignmentController extends Controller
 
     public function create(): Response
     {
+        $actor = Auth::user();
+
         $users = User::where('is_superadmin', false)->orderBy('name')->get(['id', 'name', 'email']);
         $roles = Role::where('is_active', true)->orderBy('name')->get(['id', 'name', 'slug', 'level']);
 
+        // Super admin sees all scopes; others only see their own assigned scopes.
+        if ($this->accessControl->isSuperAdmin($actor)) {
+            $allowedScopes = null; // null = no restriction
+        } else {
+            $assignments = UserRoleAssignment::where('user_id', $actor->id)
+                ->where('is_active', true)
+                ->whereIn('scope_type', ['outlet', 'warehouse'])
+                ->get(['scope_type', 'scope_id']);
+
+            $allowedScopes = [
+                'outlet'    => $assignments->where('scope_type', 'outlet')->pluck('scope_id')->unique()->values(),
+                'warehouse' => $assignments->where('scope_type', 'warehouse')->pluck('scope_id')->unique()->values(),
+            ];
+        }
+
         return Inertia::render('access-control/user-roles/create', [
-            'users' => $users,
-            'roles' => $roles,
+            'users'         => $users,
+            'roles'         => $roles,
+            'allowedScopes' => $allowedScopes,
         ]);
     }
 

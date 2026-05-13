@@ -2,6 +2,7 @@
 
 namespace App\Http\Middleware;
 
+use App\Models\UserRoleAssignment;
 use App\Services\AccessControlService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -102,6 +103,30 @@ class HandleInertiaRequests extends Middleware
     }
 
     /**
+     * Returns allowed outlet/warehouse IDs for the user, or null if unrestricted (super admin).
+     *
+     * @return array{outlet: int[], warehouse: int[]}|null
+     */
+    private function allowedScopeIds(Request $request): ?array
+    {
+        $user = $request->user();
+
+        if (! $user || $this->accessControl->isSuperAdmin($user)) {
+            return null;
+        }
+
+        $assignments = UserRoleAssignment::where('user_id', $user->id)
+            ->where('is_active', true)
+            ->whereIn('scope_type', ['outlet', 'warehouse'])
+            ->get(['scope_type', 'scope_id']);
+
+        return [
+            'outlet'    => $assignments->where('scope_type', 'outlet')->pluck('scope_id')->unique()->filter()->values()->toArray(),
+            'warehouse' => $assignments->where('scope_type', 'warehouse')->pluck('scope_id')->unique()->filter()->values()->toArray(),
+        ];
+    }
+
+    /**
      * @return array<int, array{id: string, name: string}>
      */
     private function sharedOutlets(Request $request): array
@@ -114,11 +139,21 @@ class HandleInertiaRequests extends Middleware
             return [];
         }
 
+        $allowed = $this->allowedScopeIds($request);
+
         return DB::table('outlets')
+            ->when($allowed !== null, function ($q) use ($allowed) {
+                // Show outlets the user is directly assigned to, or that contain their assigned warehouses.
+                $outletIdsFromWarehouses = DB::table('warehouses')
+                    ->whereIn('id', $allowed['warehouse'])
+                    ->pluck('outlet_id');
+
+                $q->whereIn('id', array_merge($allowed['outlet'], $outletIdsFromWarehouses->toArray()));
+            })
             ->orderBy('name')
             ->get(['id', 'name'])
             ->map(fn ($outlet) => [
-                'id' => (string) ($outlet->id ?? ''),
+                'id'   => (string) ($outlet->id ?? ''),
                 'name' => (string) ($outlet->name ?? ''),
             ])
             ->values()
@@ -138,13 +173,22 @@ class HandleInertiaRequests extends Middleware
             return [];
         }
 
+        $allowed = $this->allowedScopeIds($request);
+
         return DB::table('warehouses')
+            ->when($allowed !== null, function ($q) use ($allowed) {
+                // Show warehouses in the user's assigned outlets, or directly assigned warehouses.
+                $q->where(function ($q2) use ($allowed) {
+                    $q2->whereIn('outlet_id', $allowed['outlet'])
+                        ->orWhereIn('id', $allowed['warehouse']);
+                });
+            })
             ->orderBy('name')
             ->get(['id', 'outlet_id', 'name'])
             ->map(fn ($warehouse) => [
-                'id' => (string) ($warehouse->id ?? ''),
+                'id'        => (string) ($warehouse->id ?? ''),
                 'outlet_id' => (string) ($warehouse->outlet_id ?? ''),
-                'name' => (string) ($warehouse->name ?? ''),
+                'name'      => (string) ($warehouse->name ?? ''),
             ])
             ->values()
             ->all();
@@ -178,9 +222,17 @@ class HandleInertiaRequests extends Middleware
             ];
         }
 
-        // Get all warehouses with their outlets
+        $allowed = $this->allowedScopeIds($request);
+
+        // Get warehouses with their outlets, filtered by the user's allowed scopes.
         $warehouses = DB::table('warehouses')
             ->leftJoin('outlets', 'outlets.id', '=', 'warehouses.outlet_id')
+            ->when($allowed !== null, function ($q) use ($allowed) {
+                $q->where(function ($q2) use ($allowed) {
+                    $q2->whereIn('warehouses.outlet_id', $allowed['outlet'])
+                        ->orWhereIn('warehouses.id', $allowed['warehouse']);
+                });
+            })
             ->orderBy('outlets.name')
             ->orderBy('warehouses.name')
             ->get([
@@ -190,9 +242,10 @@ class HandleInertiaRequests extends Middleware
                 'outlets.name as outlet',
             ]);
 
-        // Get all outlets (including those without warehouses)
+        // Get outlets without warehouses, filtered by the user's allowed scopes.
         $outlets = DB::table('outlets')
             ->whereNotIn('id', $warehouses->pluck('outlet_id')->filter())
+            ->when($allowed !== null, fn ($q) => $q->whereIn('id', $allowed['outlet']))
             ->orderBy('name')
             ->get(['id', 'name']);
 

@@ -11,6 +11,7 @@ type AsyncResourceSelectProps = {
     resourceType: string;
     value: string;
     onChange: (value: string) => void;
+    allowedIds?: number[] | null;
     placeholder?: string;
     disabled?: boolean;
     className?: string;
@@ -30,6 +31,7 @@ export function AsyncResourceSelect({
     resourceType,
     value,
     onChange,
+    allowedIds,
     placeholder = 'Select...',
     disabled,
     className,
@@ -47,6 +49,8 @@ export function AsyncResourceSelect({
     const debounceRef = React.useRef<number | null>(null);
     const listboxId = React.useId();
     const abortRef = React.useRef<AbortController | null>(null);
+    const allowedIdsRef = React.useRef(allowedIds);
+    allowedIdsRef.current = allowedIds;
 
     const isDisabled = disabled || !resourceType;
 
@@ -64,6 +68,11 @@ export function AsyncResourceSelect({
         try {
             const params = new URLSearchParams({ type, page: String(page) });
             if (search) params.set('search', search);
+            const ids = allowedIdsRef.current;
+            if (ids !== null && ids !== undefined) {
+                // Empty array means actor has no assignments → send 0 so backend returns nothing.
+                params.set('allowed_ids', ids.length > 0 ? ids.join(',') : '0');
+            }
 
             const res = await fetch(`/access-control/resource-lookup?${params}`, {
                 signal: controller.signal,

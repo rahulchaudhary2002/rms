@@ -35,6 +35,9 @@ type SharedProps = {
         warehouse_id?: string;
     };
     nodeSelection?: NodeSelectionData;
+    auth?: {
+        can: Record<string, boolean>;
+    };
 };
 
 type OutletGroup = {
@@ -48,6 +51,9 @@ export default function ScopeSelection() {
     const page = usePage<SharedProps>();
     const { errors } = page.props;
     const nodeSelection = page.props.nodeSelection;
+    const can = page.props.auth?.can ?? {};
+    const canCreateOutlet = can['outlets-create'] ?? false;
+    const canCreateWarehouse = can['warehouses-create'] ?? false;
     const nodes = nodeSelection?.items ?? [];
 
     const initialNode =
@@ -93,6 +99,7 @@ export default function ScopeSelection() {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
+                    'Accept': 'application/json',
                     'X-CSRF-Token': (document.querySelector('meta[name="csrf-token"]') as HTMLMetaElement)
                         ?.content || '',
                 },
@@ -124,6 +131,7 @@ export default function ScopeSelection() {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
+                    'Accept': 'application/json',
                     'X-CSRF-Token': (document.querySelector('meta[name="csrf-token"]') as HTMLMetaElement)
                         ?.content || '',
                 },
@@ -395,26 +403,30 @@ export default function ScopeSelection() {
                             {processing ? 'Applying...' : 'Continue'}
                         </Button>
 
-                        <Button
-                            type="button"
-                            variant="outline"
-                            onClick={() => setShowCreateOutletModal(true)}
-                            className="rounded-lg"
-                        >
-                            <span className="material-symbols-outlined text-base mr-2">add</span>
-                            Outlet
-                        </Button>
+                        {canCreateOutlet && (
+                            <Button
+                                type="button"
+                                variant="outline"
+                                onClick={() => setShowCreateOutletModal(true)}
+                                className="rounded-lg"
+                            >
+                                <span className="material-symbols-outlined text-base mr-2">add</span>
+                                Outlet
+                            </Button>
+                        )}
 
-                        <Button
-                            type="button"
-                            variant="outline"
-                            onClick={() => setShowCreateWarehouseModal(true)}
-                            disabled={selectedOutletId === ''}
-                            className="rounded-lg"
-                        >
-                            <span className="material-symbols-outlined text-base mr-2">add</span>
-                            Warehouse
-                        </Button>
+                        {canCreateWarehouse && (
+                            <Button
+                                type="button"
+                                variant="outline"
+                                onClick={() => setShowCreateWarehouseModal(true)}
+                                disabled={selectedOutletId === ''}
+                                className="rounded-lg"
+                            >
+                                <span className="material-symbols-outlined text-base mr-2">add</span>
+                                Warehouse
+                            </Button>
+                        )}
                     </div>
                 </form>
 

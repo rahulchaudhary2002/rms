@@ -25,8 +25,13 @@ class ResourceLookupController extends Controller
         $labelColumn   = $config['label_column'];
         $searchColumns = $config['search_columns'];
 
+        $allowedIds = $request->filled('allowed_ids')
+            ? array_map('intval', explode(',', $request->string('allowed_ids')->toString()))
+            : null;
+
         $query = $modelClass::query()
             ->select(['id', $labelColumn])
+            ->when($allowedIds !== null, fn ($builder) => $builder->whereIn('id', $allowedIds))
             ->when($search !== '', function ($builder) use ($search, $searchColumns) {
                 $builder->where(function ($q) use ($search, $searchColumns) {
                     foreach ($searchColumns as $column) {

@@ -3,7 +3,9 @@
 namespace App\Http\Controllers;
 
 use App\Models\Outlet;
+use App\Models\UserRoleAssignment;
 use App\Models\Warehouse;
+use App\Services\AccessControlService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Schema;
@@ -11,6 +13,8 @@ use Illuminate\Validation\ValidationException;
 
 class ScopeSelectionController extends Controller
 {
+    public function __construct(private AccessControlService $accessControl) {}
+
     public function store(Request $request): RedirectResponse
     {
         $validated = $request->validate([
@@ -21,6 +25,36 @@ class ScopeSelectionController extends Controller
         ]);
 
         $redirectTo = (string) ($validated['redirect_to'] ?? '/dashboard');
+
+        $user = $request->user();
+
+        if (! $this->accessControl->isSuperAdmin($user)) {
+            $assignments = UserRoleAssignment::where('user_id', $user->id)
+                ->where('is_active', true)
+                ->whereIn('scope_type', ['outlet', 'warehouse'])
+                ->get(['scope_type', 'scope_id']);
+
+            $allowedOutletIds    = $assignments->where('scope_type', 'outlet')->pluck('scope_id')->toArray();
+            $allowedWarehouseIds = $assignments->where('scope_type', 'warehouse')->pluck('scope_id')->toArray();
+
+            if ($validated['scope_type'] === 'outlet') {
+                if (! in_array((int) ($validated['outlet_id'] ?? 0), $allowedOutletIds, true)) {
+                    throw ValidationException::withMessages([
+                        'outlet_id' => 'You do not have access to the selected outlet.',
+                    ]);
+                }
+            } else {
+                $warehouse = Warehouse::query()->select(['id', 'outlet_id'])->find($validated['warehouse_id'] ?? null);
+                $inDirectWarehouse = in_array((int) ($validated['warehouse_id'] ?? 0), $allowedWarehouseIds, true);
+                $inOutletWarehouse = $warehouse && in_array((int) $warehouse->outlet_id, $allowedOutletIds, true);
+
+                if (! $inDirectWarehouse && ! $inOutletWarehouse) {
+                    throw ValidationException::withMessages([
+                        'warehouse_id' => 'You do not have access to the selected warehouse.',
+                    ]);
+                }
+            }
+        }
 
         if ($validated['scope_type'] === 'outlet') {
             $outletId = (string) ($validated['outlet_id'] ?? '');
@@ -86,6 +120,12 @@ class ScopeSelectionController extends Controller
 
     public function storeNode(Request $request): RedirectResponse
     {
+        $user = $request->user();
+
+        if (! $this->accessControl->isSuperAdmin($user) && ! $this->accessControl->userHasPermission($user, 'warehouses-create')) {
+            abort(403, 'You do not have permission to register warehouses.');
+        }
+
         if (! Schema::hasTable('outlets') || ! Schema::hasTable('warehouses')) {
             throw ValidationException::withMessages([
                 'create_warehouse_name' => 'Outlet and warehouse tables are not available yet. Please run migrations first.',
@@ -106,6 +146,12 @@ class ScopeSelectionController extends Controller
         }
 
         if ($outlet === null) {
+            if (! $this->accessControl->isSuperAdmin($user) && ! $this->accessControl->userHasPermission($user, 'outlets-create')) {
+                throw ValidationException::withMessages([
+                    'create_outlet_name' => 'You do not have permission to create outlets.',
+                ]);
+            }
+
             $outletName = trim((string) ($validated['create_outlet_name'] ?? ''));
 
             if ($outletName === '') {
