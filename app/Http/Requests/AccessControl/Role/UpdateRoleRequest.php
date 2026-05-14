@@ -1,10 +1,11 @@
 <?php
 
-namespace App\Http\Requests\AccessControl;
+namespace App\Http\Requests\AccessControl\Role;
 
 use Illuminate\Foundation\Http\FormRequest;
+use Illuminate\Validation\Rule;
 
-class StoreRoleRequest extends FormRequest
+class UpdateRoleRequest extends FormRequest
 {
     public function authorize(): bool
     {
@@ -13,9 +14,11 @@ class StoreRoleRequest extends FormRequest
 
     public function rules(): array
     {
+        $roleId = $this->route('role')?->id ?? $this->route('role');
+
         return [
             'name'          => ['required', 'string', 'max:255'],
-            'slug'          => ['required', 'string', 'max:255', 'unique:roles,slug', 'regex:/^[a-z0-9\-]+$/'],
+            'slug'          => ['required', 'string', 'max:255', Rule::unique('roles', 'slug')->ignore($roleId), 'regex:/^[a-z0-9\-]+$/'],
             'level'         => ['required', 'in:global,outlet,warehouse'],
             'rank'          => ['required', 'integer', 'min:1', 'max:999'],
             'is_assignable' => ['boolean'],

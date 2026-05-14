@@ -2,242 +2,62 @@
 
 namespace App\Http\Controllers\AccessControl;
 
+use App\Http\Concerns\ExtractsFilters;
 use App\Http\Controllers\Controller;
-use App\Http\Requests\AccessControl\StoreUserRoleAssignmentRequest;
-use App\Models\Role;
-use App\Models\User;
+use App\Http\Requests\AccessControl\ToggleActiveRequest;
+use App\Http\Requests\AccessControl\UserRoleAssignment\StoreUserRoleAssignmentRequest;
 use App\Models\UserRoleAssignment;
 use App\Services\AccessControlService;
-use Illuminate\Auth\Access\AuthorizationException;
+use App\Services\UserRoleAssignmentService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\Auth;
-use Illuminate\Support\Facades\DB;
 use Inertia\Inertia;
 use Inertia\Response;
 
 class UserRoleAssignmentController extends Controller
 {
-    public function __construct(private AccessControlService $accessControl) {}
+    use ExtractsFilters;
+
+    public function __construct(
+        private AccessControlService $accessControl,
+        private UserRoleAssignmentService $service,
+    ) {}
 
     public function index(Request $request): Response
     {
-        $filters = [
-            'search'     => $request->string('search')->toString(),
-            'user_id'    => $request->string('user_id')->toString(),
-            'role_id'    => $request->string('role_id')->toString(),
-            'scope_type' => $request->string('scope_type')->toString(),
-            'is_active'  => $request->string('is_active')->toString(),
-            'per_page'   => $request->string('per_page')->toString(),
-        ];
+        $filters = $this->extractFilters($request, ['search', 'user_id', 'role_id', 'scope_type', 'is_active', 'per_page']);
+        $scope   = $this->accessControl->resolveSessionScope($request);
 
-        $actorMinRank = $this->accessControl->getActorMinRank($request->user());
-        $actorId      = $request->user()->id;
-        $scope        = $this->accessControl->resolveSessionScope($request);
-
-        $query = UserRoleAssignment::with(['user', 'role', 'assignedBy'])
-            ->where('user_id', '!=', $actorId)
-            ->whereHas('user', fn ($q) => $q->where('is_superadmin', false))
-            ->when($actorMinRank !== null, fn ($builder) => $builder->whereHas('role', fn ($q) => $q->where('rank', '>', $actorMinRank)));
-
-        $this->accessControl->applyScopeFilter($query, $scope);
-
-        $query->when($filters['search'] !== '', function ($builder) use ($filters) {
-                $search = '%'.$filters['search'].'%';
-                $builder->whereHas('user', fn ($q) => $q->where('name', 'like', $search)->orWhere('email', 'like', $search));
-            })
-            ->when($filters['user_id'] !== '', fn ($builder) => $builder->where('user_id', $filters['user_id']))
-            ->when($filters['role_id'] !== '', fn ($builder) => $builder->where('role_id', $filters['role_id']))
-            ->when($filters['scope_type'] !== '', fn ($builder) => $builder->where('scope_type', $filters['scope_type']))
-            ->when($filters['is_active'] !== '', fn ($builder) => $builder->where('is_active', $filters['is_active'] === 'true'))
-            ->orderByDesc('created_at');
-
-        $perPage = $filters['per_page'] === 'all'
-            ? max((clone $query)->count(), 1)
-            : max((int) ($filters['per_page'] ?: 10), 1);
-
-        $assignments = $query->paginate($perPage)->withQueryString();
-
-        $users = User::where('is_superadmin', false)->where('id', '!=', $actorId)->orderBy('name')->get(['id', 'name', 'email']);
-        $roles = Role::where('is_active', true)
-            ->when($actorMinRank !== null, fn ($q) => $q->where('rank', '>', $actorMinRank))
-            ->orderBy('name')->get(['id', 'name', 'slug', 'level']);
-
-        return Inertia::render('access-control/user-roles/index', [
-            'assignments' => $assignments,
-            'users'       => $users,
-            'roles'       => $roles,
-            'filters'     => $filters,
-        ]);
+        return Inertia::render('access-control/user-roles/index',
+            $this->service->getIndexData($request->user(), $filters, $scope));
     }
 
     public function create(Request $request): Response
     {
-        $actor              = Auth::user();
-        $actorMinRank       = $this->accessControl->getActorMinRank($actor);
-        $actorMaxScopeLevel = $this->accessControl->getActorMaxScopeLevel($actor);
-        $scope              = $this->accessControl->resolveSessionScope($request);
+        $scope = $this->accessControl->resolveSessionScope($request);
 
-        $users = User::where('is_superadmin', false)
-            ->where('id', '!=', $actor->id)
-            ->when($scope['type'] !== 'global', function ($builder) use ($scope) {
-                $builder->where(function ($q) use ($scope) {
-                    $q->whereDoesntHave('roleAssignments', fn ($q2) => $q2->where('is_active', true));
-
-                    $q->orWhereHas('roleAssignments', function ($q2) use ($scope) {
-                        $q2->where('is_active', true)
-                            ->where(function ($q3) use ($scope) {
-                                $q3->where('scope_type', 'global');
-
-                                if ($scope['type'] === 'outlet') {
-                                    $q3->orWhere(fn ($q4) => $q4->where('scope_type', 'outlet')->where('scope_id', $scope['scope_id']));
-                                } elseif ($scope['type'] === 'warehouse') {
-                                    if ($scope['outlet_id'] !== null) {
-                                        $q3->orWhere(fn ($q4) => $q4->where('scope_type', 'outlet')->where('scope_id', $scope['outlet_id']));
-                                    }
-                                    $q3->orWhere(fn ($q4) => $q4->where('scope_type', 'warehouse')->where('scope_id', $scope['scope_id']));
-                                }
-                            });
-                    });
-                });
-            })
-            ->orderBy('name')->get(['id', 'name', 'email']);
-        $roles = Role::where('is_active', true)
-            ->when($actorMinRank !== null, fn ($q) => $q->where('rank', '>', $actorMinRank))
-            ->orderBy('name')->get(['id', 'name', 'slug', 'level']);
-
-        // Super admin or global-scope role → no restriction, show all scopes.
-        $hasGlobalRole = $this->accessControl->isSuperAdmin($actor)
-            || UserRoleAssignment::where('user_id', $actor->id)
-                ->where('is_active', true)
-                ->where('scope_type', 'global')
-                ->whereHas('role', fn ($q) => $q->where('is_active', true))
-                ->exists();
-
-        if ($hasGlobalRole) {
-            $allowedScopes = null;
-        } else {
-            $assignments = UserRoleAssignment::where('user_id', $actor->id)
-                ->where('is_active', true)
-                ->whereIn('scope_type', ['outlet', 'warehouse'])
-                ->get(['scope_type', 'scope_id']);
-
-            $allowedScopes = [
-                'outlet'    => $assignments->where('scope_type', 'outlet')->pluck('scope_id')->unique()->values()->toArray(),
-                'warehouse' => $assignments->where('scope_type', 'warehouse')->pluck('scope_id')->unique()->values()->toArray(),
-            ];
-        }
-
-        $scopeTypes = collect(config('access_control.scope_types', []))
-            ->map(fn ($cfg, $key) => ['type' => $key, 'label' => $cfg['label']])
-            ->values();
-
-        $allowedScopeTypes = match ($actorMaxScopeLevel) {
-            'global' => ['global', 'outlet', 'warehouse'],
-            'outlet' => ['outlet', 'warehouse'],
-            default  => ['warehouse'],
-        };
-
-        return Inertia::render('access-control/user-roles/create', [
-            'users'             => $users,
-            'roles'             => $roles,
-            'allowedScopes'     => $allowedScopes,
-            'scopeTypes'        => $scopeTypes,
-            'allowedScopeTypes' => $allowedScopeTypes,
-        ]);
+        return Inertia::render('access-control/user-roles/create',
+            $this->service->getCreateData($request->user(), $scope));
     }
 
     public function store(StoreUserRoleAssignmentRequest $request): RedirectResponse
     {
-        $actor = Auth::user();
-        $targetRole = Role::findOrFail($request->role_id);
+        $this->service->assign($request->user(), $request->validated() + ['is_active' => $request->boolean('is_active', true)]);
 
-        $this->authorizeRoleAssignment($actor, $targetRole, $request->scope_type, $request->scope_id);
-
-        DB::transaction(function () use ($request) {
-            UserRoleAssignment::firstOrCreate(
-                [
-                    'user_id'    => $request->user_id,
-                    'role_id'    => $request->role_id,
-                    'scope_type' => $request->scope_type,
-                    'scope_id'   => $request->scope_type === 'global' ? null : $request->scope_id,
-                ],
-                [
-                    'is_active'   => $request->boolean('is_active', true),
-                    'assigned_by' => Auth::id(),
-                ]
-            );
-        });
-
-        $user = User::findOrFail($request->user_id);
-        $this->accessControl->clearUserPermissionCache($user);
-
-        $redirect = $request->input('_redirect', route('access-control.user-roles.index'));
-
-        return redirect($redirect)->with('success', 'Role assigned successfully.');
+        return redirect($request->input('_redirect', route('access-control.user-roles.index')))
+            ->with('success', 'Role assigned successfully.');
     }
 
-    private function authorizeRoleAssignment(User $actor, Role $targetRole, string $targetScopeType, ?int $targetScopeId): void
+    public function update(ToggleActiveRequest $request, UserRoleAssignment $userRoleAssignment): RedirectResponse
     {
-        if (! $targetRole->is_active) {
-            throw new AuthorizationException('Role is inactive.');
-        }
-
-        if (! $targetRole->is_assignable) {
-            throw new AuthorizationException('This role cannot be assigned.');
-        }
-
-        // Super admin bypasses rank restriction
-        if ($this->accessControl->isSuperAdmin($actor)) {
-            return;
-        }
-
-        $actorRoleAssignment = UserRoleAssignment::with('role')
-            ->where('user_role_assignments.user_id', $actor->id)
-            ->where('user_role_assignments.is_active', true)
-            ->whereHas('role', fn ($q) => $q->where('is_active', true))
-            ->join('roles', 'roles.id', '=', 'user_role_assignments.role_id')
-            ->orderBy('roles.rank')
-            ->select('user_role_assignments.*')
-            ->first();
-
-        $actorRole = $actorRoleAssignment?->role;
-
-        if (! $actorRole) {
-            throw new AuthorizationException('You do not have a role that allows assigning roles.');
-        }
-
-        if ($targetRole->rank <= $actorRole->rank) {
-            throw new AuthorizationException('You cannot assign equal or higher role.');
-        }
-
-        $actorScopeType = $actorRoleAssignment->scope_type;
-        $actorScopeId   = $actorRoleAssignment->scope_id;
-
-        if ($actorScopeType !== 'global' && $actorScopeType !== $targetScopeType) {
-            throw new AuthorizationException('Invalid role assignment scope.');
-        }
-
-        if (in_array($actorScopeType, ['outlet', 'warehouse']) && $actorScopeId !== $targetScopeId) {
-            throw new AuthorizationException('You cannot assign role outside your scope.');
-        }
-    }
-
-    public function update(Request $request, UserRoleAssignment $userRoleAssignment): RedirectResponse
-    {
-        $request->validate(['is_active' => ['required', 'boolean']]);
-
-        $userRoleAssignment->update(['is_active' => $request->boolean('is_active')]);
-        $this->accessControl->clearUserPermissionCache($userRoleAssignment->user);
+        $this->service->toggleActive($userRoleAssignment, $request->boolean('is_active'));
 
         return back()->with('success', 'Assignment updated.');
     }
 
     public function destroy(UserRoleAssignment $userRoleAssignment): RedirectResponse
     {
-        $user = $userRoleAssignment->user;
-        $userRoleAssignment->delete();
-        $this->accessControl->clearUserPermissionCache($user);
+        $this->service->remove($userRoleAssignment);
 
         return back()->with('success', 'Role assignment removed.');
     }

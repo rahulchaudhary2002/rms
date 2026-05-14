@@ -2,12 +2,13 @@
 
 namespace App\Http\Controllers\AccessControl;
 
+use App\Http\Concerns\ExtractsFilters;
 use App\Http\Controllers\Controller;
-use App\Http\Requests\AccessControl\StoreRoleRequest;
-use App\Http\Requests\AccessControl\UpdateRoleRequest;
-use App\Models\Permission;
+use App\Http\Requests\AccessControl\Role\StoreRoleRequest;
+use App\Http\Requests\AccessControl\Role\UpdateRoleRequest;
 use App\Models\Role;
 use App\Services\AccessControlService;
+use App\Services\RoleService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
@@ -15,64 +16,25 @@ use Inertia\Response;
 
 class RoleController extends Controller
 {
-    public function __construct(private AccessControlService $accessControl) {}
+    use ExtractsFilters;
+
+    public function __construct(
+        private AccessControlService $accessControl,
+        private RoleService $roleService,
+    ) {}
 
     public function index(Request $request): Response
     {
-        $filters = [
-            'search'    => $request->string('search')->toString(),
-            'level'     => $request->string('level')->toString(),
-            'is_active' => $request->string('is_active')->toString(),
-            'per_page'  => $request->string('per_page')->toString(),
-        ];
+        $filters = $this->extractFilters($request, ['search', 'level', 'is_active', 'per_page']);
 
-        $actorMinRank = $this->accessControl->getActorMinRank($request->user());
-
-        $query = Role::query()
-            ->withCount(['permissions', 'userRoleAssignments'])
-            ->when($actorMinRank !== null, fn ($builder) => $builder->where('rank', '>', $actorMinRank))
-            ->when($filters['search'] !== '', function ($builder) use ($filters) {
-                $search = '%'.$filters['search'].'%';
-                $builder->where(fn ($q) => $q->where('name', 'like', $search)->orWhere('slug', 'like', $search));
-            })
-            ->when($filters['level'] !== '', fn ($builder) => $builder->where('level', $filters['level']))
-            ->when($filters['is_active'] !== '', fn ($builder) => $builder->where('is_active', $filters['is_active'] === 'true'))
-            ->orderBy('name');
-
-        $perPage = $filters['per_page'] === 'all'
-            ? max((clone $query)->count(), 1)
-            : max((int) ($filters['per_page'] ?: 10), 1);
-
-        $roles = $query->paginate($perPage)->withQueryString();
-
-        return Inertia::render('access-control/roles/index', [
-            'roles'   => $roles,
-            'filters' => $filters,
-        ]);
+        return Inertia::render('access-control/roles/index',
+            $this->roleService->getRolesIndexData($request->user(), $filters));
     }
 
     public function show(Request $request, Role $role): Response
     {
-        $actorMinRank = $this->accessControl->getActorMinRank($request->user());
-
-        if ($actorMinRank !== null && $role->rank <= $actorMinRank) {
-            abort(403, 'You cannot view this role.');
-        }
-
-        $role->load('permissions');
-
-        $actorPermissionIds = $this->accessControl->getActorPermissionIds($request->user());
-
-        $permissions = Permission::where('is_active', true)
-            ->when($actorPermissionIds !== null, fn ($q) => $q->whereIn('id', $actorPermissionIds))
-            ->orderBy('module')
-            ->orderBy('action')
-            ->get(['id', 'name', 'slug', 'module', 'action', 'level']);
-
-        return Inertia::render('access-control/roles/show', [
-            'role'        => $role,
-            'permissions' => $permissions,
-        ]);
+        return Inertia::render('access-control/roles/show',
+            $this->roleService->getRoleShowData($request->user(), $role));
     }
 
     public function create(): Response
@@ -90,20 +52,12 @@ class RoleController extends Controller
 
     public function edit(Role $role): Response
     {
-        return Inertia::render('access-control/roles/edit', [
-            'role' => $role,
-        ]);
+        return Inertia::render('access-control/roles/edit', ['role' => $role]);
     }
 
     public function update(UpdateRoleRequest $request, Role $role): RedirectResponse
     {
-        if ($role->is_system) {
-            abort(403, 'System roles cannot be modified.');
-        }
-
-        $role->update($request->validated());
-
-        $this->clearAffectedUsersCache($role);
+        $this->roleService->updateRole($role, $request->validated());
 
         return redirect()->route('access-control.roles.index')
             ->with('success', 'Role updated successfully.');
@@ -111,20 +65,9 @@ class RoleController extends Controller
 
     public function destroy(Role $role): RedirectResponse
     {
-        if ($role->is_system) {
-            abort(403, 'System roles cannot be deleted.');
-        }
-
-        $this->clearAffectedUsersCache($role);
-        $role->delete();
+        $this->roleService->deleteRole($role);
 
         return redirect()->route('access-control.roles.index')
             ->with('success', 'Role deleted successfully.');
-    }
-
-    private function clearAffectedUsersCache(Role $role): void
-    {
-        $role->userRoleAssignments()->with('user')->get()
-            ->each(fn ($assignment) => $this->accessControl->clearUserPermissionCache($assignment->user));
     }
 }

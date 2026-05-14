@@ -3,8 +3,11 @@
 namespace App\Services;
 
 use App\Models\Permission;
+use App\Models\Role;
 use App\Models\User;
 use App\Models\UserRoleAssignment;
+use Illuminate\Auth\Access\AuthorizationException;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\Request;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Cache;
@@ -269,6 +272,188 @@ class AccessControlService
             ->unique()
             ->values()
             ->all();
+    }
+
+    /**
+     * Returns the outlet/warehouse IDs the actor may assign roles/permissions in.
+     * Returns null if the actor has a global-scope role (no restriction).
+     *
+     * @return array{outlet: int[], warehouse: int[]}|null
+     */
+    public function resolveAllowedScopes(User $actor): ?array
+    {
+        $hasGlobalRole = $this->isSuperAdmin($actor)
+            || UserRoleAssignment::where('user_id', $actor->id)
+                ->where('is_active', true)
+                ->where('scope_type', 'global')
+                ->whereHas('role', fn ($q) => $q->where('is_active', true))
+                ->exists();
+
+        if ($hasGlobalRole) {
+            return null;
+        }
+
+        $assignments = UserRoleAssignment::where('user_id', $actor->id)
+            ->where('is_active', true)
+            ->whereIn('scope_type', ['outlet', 'warehouse'])
+            ->get(['scope_type', 'scope_id']);
+
+        return [
+            'outlet'    => $assignments->where('scope_type', 'outlet')->pluck('scope_id')->unique()->values()->toArray(),
+            'warehouse' => $assignments->where('scope_type', 'warehouse')->pluck('scope_id')->unique()->values()->toArray(),
+        ];
+    }
+
+    /**
+     * Returns the scope types the actor is permitted to assign roles/overrides in.
+     * global actor → ['global', 'outlet', 'warehouse']
+     * outlet actor → ['outlet', 'warehouse']
+     * warehouse actor → ['warehouse']
+     *
+     * @return string[]
+     */
+    public function resolveAllowedScopeTypes(User $actor): array
+    {
+        return match ($this->getActorMaxScopeLevel($actor)) {
+            'global' => ['global', 'outlet', 'warehouse'],
+            'outlet' => ['outlet', 'warehouse'],
+            default  => ['warehouse'],
+        };
+    }
+
+    /**
+     * Filters a User query to only include users whose active role assignments
+     * fall within the given scope (plus users with no active assignments at all).
+     * When scope is global the query is returned unchanged.
+     */
+    public function applyUserScopeFilter(Builder $query, array $scope): Builder
+    {
+        if ($scope['type'] === 'global') {
+            return $query;
+        }
+
+        return $query->where(function ($q) use ($scope) {
+            $q->whereDoesntHave('roleAssignments', fn ($q2) => $q2->where('is_active', true));
+
+            $q->orWhereHas('roleAssignments', function ($q2) use ($scope) {
+                $q2->where('is_active', true)->where(function ($q3) use ($scope) {
+                    $q3->where('scope_type', 'global');
+
+                    if ($scope['type'] === 'outlet') {
+                        $q3->orWhere(fn ($q4) => $q4->where('scope_type', 'outlet')->where('scope_id', $scope['scope_id']));
+                    } elseif ($scope['type'] === 'warehouse') {
+                        if ($scope['outlet_id'] !== null) {
+                            $q3->orWhere(fn ($q4) => $q4->where('scope_type', 'outlet')->where('scope_id', $scope['outlet_id']));
+                        }
+                        $q3->orWhere(fn ($q4) => $q4->where('scope_type', 'warehouse')->where('scope_id', $scope['scope_id']));
+                    }
+                });
+            });
+        });
+    }
+
+    /**
+     * Clears the permission cache for every user currently assigned to the given role.
+     */
+    public function clearRoleUsersCache(Role $role): void
+    {
+        $role->userRoleAssignments()->with('user')->get()
+            ->each(fn ($assignment) => $this->clearUserPermissionCache($assignment->user));
+    }
+
+    /**
+     * Validates that the actor is allowed to assign the given role in the target scope.
+     * Throws AuthorizationException on any violation.
+     */
+    public function authorizeRoleAssignment(User $actor, Role $targetRole, string $targetScopeType, ?int $targetScopeId): void
+    {
+        if (! $targetRole->is_active) {
+            throw new AuthorizationException('Role is inactive.');
+        }
+
+        if (! $targetRole->is_assignable) {
+            throw new AuthorizationException('This role cannot be assigned.');
+        }
+
+        if ($this->isSuperAdmin($actor)) {
+            return;
+        }
+
+        $actorAssignment = UserRoleAssignment::with('role')
+            ->where('user_role_assignments.user_id', $actor->id)
+            ->where('user_role_assignments.is_active', true)
+            ->whereHas('role', fn ($q) => $q->where('is_active', true))
+            ->join('roles', 'roles.id', '=', 'user_role_assignments.role_id')
+            ->orderBy('roles.rank')
+            ->select('user_role_assignments.*')
+            ->first();
+
+        $actorRole = $actorAssignment?->role;
+
+        if (! $actorRole) {
+            throw new AuthorizationException('You do not have a role that allows assigning roles.');
+        }
+
+        if ($targetRole->rank <= $actorRole->rank) {
+            throw new AuthorizationException('You cannot assign an equal or higher-ranked role.');
+        }
+
+        if ($actorAssignment->scope_type !== 'global' && $actorAssignment->scope_type !== $targetScopeType) {
+            throw new AuthorizationException('Invalid role assignment scope.');
+        }
+
+        if (in_array($actorAssignment->scope_type, ['outlet', 'warehouse']) && $actorAssignment->scope_id !== $targetScopeId) {
+            throw new AuthorizationException('You cannot assign a role outside your scope.');
+        }
+    }
+
+    /**
+     * Aborts with 403 if the actor is not allowed to manage the given role
+     * (i.e. the role's rank is not strictly greater than the actor's minimum rank).
+     */
+    public function assertActorCanManageRole(User $actor, Role $role): void
+    {
+        $actorMinRank = $this->getActorMinRank($actor);
+
+        if ($actorMinRank !== null && $role->rank <= $actorMinRank) {
+            abort(403, 'You cannot manage this role.');
+        }
+    }
+
+    /**
+     * Aborts with 403 if the actor does not have the given permission assigned to any of their roles.
+     */
+    public function assertActorCanManagePermission(User $actor, int $permissionId): void
+    {
+        $actorPermissionIds = $this->getActorPermissionIds($actor);
+
+        if ($actorPermissionIds !== null && ! in_array($permissionId, $actorPermissionIds)) {
+            abort(403, 'You can only manage permissions assigned to your own roles.');
+        }
+    }
+
+    /**
+     * Returns the scope_types config formatted for frontend selects.
+     *
+     * @return array[]
+     */
+    public function getScopeTypesConfig(): array
+    {
+        return collect(config('access_control.scope_types', []))
+            ->map(fn ($cfg, $key) => ['type' => $key, 'label' => $cfg['label']])
+            ->values()->all();
+    }
+
+    /**
+     * Returns the resource_types config formatted for frontend selects.
+     *
+     * @return array[]
+     */
+    public function getResourceTypesConfig(): array
+    {
+        return collect(config('access_control.resource_types', []))
+            ->map(fn ($cfg, $key) => ['type' => $key, 'label' => $cfg['label']])
+            ->values()->all();
     }
 
     public function isSuperAdmin(User $user): bool
