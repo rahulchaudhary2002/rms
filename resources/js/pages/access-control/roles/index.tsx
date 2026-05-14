@@ -311,7 +311,7 @@ export default function RolesIndex({ roles, filters }: Props) {
                                             </div>
                                             <div>
                                                 <Link
-                                                    href={`/access-control/roles/${role.id}/edit`}
+                                                    href={`/access-control/roles/${role.id}`}
                                                     className="block font-bold text-gray-900 transition-colors hover:text-primary dark:text-gray-100"
                                                 >
                                                     {role.name}
@@ -361,6 +361,7 @@ export default function RolesIndex({ roles, filters }: Props) {
                                             itemLabel={role.name}
                                             onToggle={(id) => toggleActionMenu(id as number | null)}
                                             actions={[
+                                                { id: `view-${role.id}`, label: 'View role', icon: 'visibility', href: `/access-control/roles/${role.id}` },
                                                 { id: `edit-${role.id}`, label: 'Edit role', icon: 'edit', href: `/access-control/roles/${role.id}/edit` },
                                                 ...(!role.is_system ? [{
                                                     id: `delete-${role.id}`,

@@ -29,6 +29,10 @@ Route::prefix('access-control')->name('access-control.')->middleware(['auth', 'v
         ->middleware('permission:roles-create')
         ->name('roles.store');
 
+    Route::get('roles/{role}', [RoleController::class, 'show'])
+        ->middleware('permission:roles-view')
+        ->name('roles.show');
+
     Route::get('roles/{role}/edit', [RoleController::class, 'edit'])
         ->middleware('permission:roles-update')
         ->name('roles.edit');

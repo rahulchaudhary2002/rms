@@ -5,6 +5,7 @@ namespace App\Http\Controllers\AccessControl;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\AccessControl\StoreRoleRequest;
 use App\Http\Requests\AccessControl\UpdateRoleRequest;
+use App\Models\Permission;
 use App\Models\Role;
 use App\Services\AccessControlService;
 use Illuminate\Http\RedirectResponse;
@@ -44,6 +45,21 @@ class RoleController extends Controller
         return Inertia::render('access-control/roles/index', [
             'roles'   => $roles,
             'filters' => $filters,
+        ]);
+    }
+
+    public function show(Role $role): Response
+    {
+        $role->load('permissions');
+
+        $permissions = Permission::where('is_active', true)
+            ->orderBy('module')
+            ->orderBy('action')
+            ->get(['id', 'name', 'slug', 'module', 'action', 'level']);
+
+        return Inertia::render('access-control/roles/show', [
+            'role'        => $role,
+            'permissions' => $permissions,
         ]);
     }
 
