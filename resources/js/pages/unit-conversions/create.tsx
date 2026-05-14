@@ -18,8 +18,20 @@ export default function UnitConversionsCreate({ units }: Props) {
         is_active:    true,
     });
 
-    const fromUnit = units.find((u) => String(u.id) === String(data.from_unit_id));
-    const toUnit   = units.find((u) => String(u.id) === String(data.to_unit_id));
+    const fromUnit     = units.find((u) => String(u.id) === String(data.from_unit_id));
+    const toUnit       = units.find((u) => String(u.id) === String(data.to_unit_id));
+    const sameTypeUnits = fromUnit ? units.filter((u) => u.type === fromUnit.type) : units;
+
+    function handleFromUnitChange(value: string) {
+        const selected = units.find((u) => String(u.id) === value);
+        const currentTo = units.find((u) => String(u.id) === String(data.to_unit_id));
+
+        setData((prev) => ({
+            ...prev,
+            from_unit_id: value,
+            to_unit_id: selected && currentTo && currentTo.type !== selected.type ? '' : prev.to_unit_id,
+        }));
+    }
 
     function submit(e: React.FormEvent) {
         e.preventDefault();
@@ -48,28 +60,45 @@ export default function UnitConversionsCreate({ units }: Props) {
                         <FormField label="From Unit" error={errors.from_unit_id}>
                             <SearchableSelect
                                 value={String(data.from_unit_id)}
-                                onChange={(e) => setData('from_unit_id', e.target.value)}
+                                onChange={(e) => handleFromUnitChange(e.target.value)}
                             >
                                 <option value="">Select unit…</option>
-                                {units.map((unit) => (
-                                    <option key={unit.id} value={unit.id} disabled={String(unit.id) === String(data.to_unit_id)}>
-                                        {unit.name} ({unit.short_name})
-                                    </option>
-                                ))}
+                                {(['weight', 'volume', 'quantity', 'custom'] as const).map((type) => {
+                                    const typeUnits = units.filter((u) => u.type === type);
+                                    if (typeUnits.length === 0) return null;
+                                    return (
+                                        <optgroup key={type} label={type.charAt(0).toUpperCase() + type.slice(1)}>
+                                            {typeUnits.map((unit) => (
+                                                <option key={unit.id} value={unit.id}>
+                                                    {unit.name} ({unit.short_name})
+                                                </option>
+                                            ))}
+                                        </optgroup>
+                                    );
+                                })}
                             </SearchableSelect>
                         </FormField>
 
-                        <FormField label="To Unit" error={errors.to_unit_id}>
+                        <FormField
+                            label="To Unit"
+                            error={errors.to_unit_id}
+                            description={fromUnit ? `Only ${fromUnit.type} units shown` : undefined}
+                        >
                             <SearchableSelect
                                 value={String(data.to_unit_id)}
                                 onChange={(e) => setData('to_unit_id', e.target.value)}
+                                disabled={!data.from_unit_id}
                             >
-                                <option value="">Select unit…</option>
-                                {units.map((unit) => (
-                                    <option key={unit.id} value={unit.id} disabled={String(unit.id) === String(data.from_unit_id)}>
-                                        {unit.name} ({unit.short_name})
-                                    </option>
-                                ))}
+                                <option value="">
+                                    {data.from_unit_id ? 'Select unit…' : 'Select a From Unit first'}
+                                </option>
+                                {sameTypeUnits
+                                    .filter((u) => String(u.id) !== String(data.from_unit_id))
+                                    .map((unit) => (
+                                        <option key={unit.id} value={unit.id}>
+                                            {unit.name} ({unit.short_name})
+                                        </option>
+                                    ))}
                             </SearchableSelect>
                         </FormField>
 

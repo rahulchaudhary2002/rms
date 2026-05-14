@@ -1,9 +1,11 @@
 <?php
 
-namespace App\Http\Requests\Inventory\UnitConversion;
+namespace App\Http\Requests\Units\UnitConversion;
 
+use App\Models\Unit;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rule;
+use Illuminate\Validation\Validator;
 
 class StoreUnitConversionRequest extends FormRequest
 {
@@ -24,6 +26,27 @@ class StoreUnitConversionRequest extends FormRequest
             'to_unit_id' => ['required', 'exists:units,id', 'different:from_unit_id'],
             'multiplier' => ['required', 'numeric', 'gt:0'],
             'is_active'  => ['boolean'],
+        ];
+    }
+
+    public function after(): array
+    {
+        return [
+            function (Validator $validator) {
+                if ($validator->errors()->hasAny(['from_unit_id', 'to_unit_id'])) {
+                    return;
+                }
+
+                $from = Unit::find($this->input('from_unit_id'));
+                $to   = Unit::find($this->input('to_unit_id'));
+
+                if ($from && $to && $from->type !== $to->type) {
+                    $validator->errors()->add(
+                        'to_unit_id',
+                        "Both units must be of the same type. '{$from->name}' is {$from->type} but '{$to->name}' is {$to->type}."
+                    );
+                }
+            },
         ];
     }
 

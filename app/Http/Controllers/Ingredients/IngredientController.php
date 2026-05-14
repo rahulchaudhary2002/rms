@@ -4,9 +4,9 @@ namespace App\Http\Controllers\Ingredients;
 
 use App\Http\Concerns\ExtractsFilters;
 use App\Http\Controllers\Controller;
-use App\Http\Requests\Inventory\Ingredient\StoreIngredientRequest;
-use App\Http\Requests\Inventory\Ingredient\UpdateIngredientRequest;
-use App\Http\Requests\Inventory\ToggleActiveRequest;
+use App\Http\Requests\Ingredients\Ingredient\StoreIngredientRequest;
+use App\Http\Requests\Ingredients\Ingredient\UpdateIngredientRequest;
+use App\Http\Requests\Ingredients\ToggleActiveRequest;
 use App\Models\Ingredient;
 use App\Services\IngredientService;
 use Illuminate\Http\RedirectResponse;

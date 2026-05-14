@@ -6,6 +6,7 @@ type FormFieldProps = {
     label: string;
     htmlFor?: string;
     error?: string;
+    description?: string;
     className?: string;
     children: React.ReactNode;
 };
@@ -14,17 +15,23 @@ function FormField({
     label,
     htmlFor,
     error,
+    description,
     className,
     children,
 }: FormFieldProps) {
     return (
         <div className={cn('space-y-1.5', className)}>
-            <label
-                htmlFor={htmlFor}
-                className="text-xs font-bold tracking-wider text-foreground/80 uppercase dark:text-foreground/70"
-            >
-                {label}
-            </label>
+            <div className="flex items-baseline justify-between gap-2">
+                <label
+                    htmlFor={htmlFor}
+                    className="text-xs font-bold tracking-wider text-foreground/80 uppercase dark:text-foreground/70"
+                >
+                    {label}
+                </label>
+                {description && (
+                    <span className="text-xs text-muted-foreground">{description}</span>
+                )}
+            </div>
             {children}
             {error && <InputError message={error} />}
         </div>

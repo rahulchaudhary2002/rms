@@ -4,9 +4,9 @@ namespace App\Http\Controllers\Units;
 
 use App\Http\Concerns\ExtractsFilters;
 use App\Http\Controllers\Controller;
-use App\Http\Requests\Inventory\ToggleActiveRequest;
-use App\Http\Requests\Inventory\Unit\StoreUnitRequest;
-use App\Http\Requests\Inventory\Unit\UpdateUnitRequest;
+use App\Http\Requests\Units\ToggleActiveRequest;
+use App\Http\Requests\Units\Unit\StoreUnitRequest;
+use App\Http\Requests\Units\Unit\UpdateUnitRequest;
 use App\Models\Unit;
 use App\Services\UnitService;
 use Illuminate\Http\RedirectResponse;
