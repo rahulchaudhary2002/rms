@@ -25,9 +25,34 @@ class UserController extends Controller
             'per_page' => $request->string('per_page')->toString(),
         ];
 
+        $scope = $this->accessControl->resolveSessionScope($request);
+
         $query = User::query()
             ->where('is_superadmin', false)
             ->where('id', '!=', $request->user()->id)
+            ->when($scope['type'] !== 'global', function ($builder) use ($scope) {
+                $builder->where(function ($q) use ($scope) {
+                    // Users with no active role assignments anywhere
+                    $q->whereDoesntHave('roleAssignments', fn ($q2) => $q2->where('is_active', true));
+
+                    // Users assigned to the current scope (including global roles)
+                    $q->orWhereHas('roleAssignments', function ($q2) use ($scope) {
+                        $q2->where('is_active', true)
+                            ->where(function ($q3) use ($scope) {
+                                $q3->where('scope_type', 'global');
+
+                                if ($scope['type'] === 'outlet') {
+                                    $q3->orWhere(fn ($q4) => $q4->where('scope_type', 'outlet')->where('scope_id', $scope['scope_id']));
+                                } elseif ($scope['type'] === 'warehouse') {
+                                    if ($scope['outlet_id'] !== null) {
+                                        $q3->orWhere(fn ($q4) => $q4->where('scope_type', 'outlet')->where('scope_id', $scope['outlet_id']));
+                                    }
+                                    $q3->orWhere(fn ($q4) => $q4->where('scope_type', 'warehouse')->where('scope_id', $scope['scope_id']));
+                                }
+                            });
+                    });
+                });
+            })
             ->withCount(['roleAssignments', 'permissionOverrides'])
             ->when($filters['search'] !== '', function ($builder) use ($filters) {
                 $search = '%'.$filters['search'].'%';
