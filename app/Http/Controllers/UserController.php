@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Models\Permission;
 use App\Models\Role;
 use App\Models\User;
+use App\Services\AccessControlService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
@@ -15,6 +16,7 @@ use Inertia\Response;
 
 class UserController extends Controller
 {
+    public function __construct(private AccessControlService $accessControl) {}
     public function index(Request $request): Response
     {
         $filters = [
@@ -25,6 +27,7 @@ class UserController extends Controller
 
         $query = User::query()
             ->where('is_superadmin', false)
+            ->where('id', '!=', $request->user()->id)
             ->withCount(['roleAssignments', 'permissionOverrides'])
             ->when($filters['search'] !== '', function ($builder) use ($filters) {
                 $search = '%'.$filters['search'].'%';
@@ -51,9 +54,13 @@ class UserController extends Controller
         return Inertia::render('access-control/users/create');
     }
 
-    public function show(User $user): Response
+    public function show(Request $request, User $user): Response
     {
         abort_if($user->is_superadmin, 404);
+        abort_if($user->id === $request->user()->id, 403);
+
+        $actorMinRank       = $this->accessControl->getActorMinRank($request->user());
+        $actorPermissionIds = $this->accessControl->getActorPermissionIds($request->user());
 
         $user->load([
             'roleAssignments.role',
@@ -64,8 +71,12 @@ class UserController extends Controller
             'resourcePermissions.assignedBy',
         ]);
 
-        $roles = Role::where('is_active', true)->orderBy('name')->get(['id', 'name', 'slug', 'level']);
-        $permissions = Permission::where('is_active', true)->orderBy('module')->orderBy('action')->get(['id', 'name', 'slug', 'module', 'action']);
+        $roles = Role::where('is_active', true)
+            ->when($actorMinRank !== null, fn ($q) => $q->where('rank', '>', $actorMinRank))
+            ->orderBy('name')->get(['id', 'name', 'slug', 'level']);
+        $permissions = Permission::where('is_active', true)
+            ->when($actorPermissionIds !== null, fn ($q) => $q->whereIn('id', $actorPermissionIds))
+            ->orderBy('module')->orderBy('action')->get(['id', 'name', 'slug', 'module', 'action']);
         $scopeTypes = collect(config('access_control.scope_types', []))
             ->map(fn ($cfg, $key) => ['type' => $key, 'label' => $cfg['label']])
             ->values();

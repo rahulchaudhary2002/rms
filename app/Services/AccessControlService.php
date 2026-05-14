@@ -5,6 +5,7 @@ namespace App\Services;
 use App\Models\Permission;
 use App\Models\User;
 use App\Models\UserRoleAssignment;
+use Illuminate\Http\Request;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
@@ -119,6 +120,58 @@ class AccessControlService
             Cache::forget($key);
         }
         Cache::forget($scopeSetKey);
+    }
+
+    /**
+     * Resolves the currently selected scope from the session.
+     * Returns ['type' => 'outlet'|'warehouse'|'global', 'scope_id' => int|null, 'outlet_id' => int|null]
+     * where outlet_id is the parent outlet when type === 'warehouse'.
+     *
+     * @return array{type: string, scope_id: int|null, outlet_id: int|null}
+     */
+    public function resolveSessionScope(Request $request): array
+    {
+        $scopeType = (string) $request->session()->get('current_scope_type', 'global');
+        $nodeId    = $request->session()->get('current_node_id');
+        $outletId  = $request->session()->get('current_outlet_id');
+
+        if ($scopeType === 'warehouse' && $nodeId) {
+            return [
+                'type'      => 'warehouse',
+                'scope_id'  => (int) $nodeId,
+                'outlet_id' => $outletId ? (int) $outletId : null,
+            ];
+        }
+
+        if ($scopeType === 'outlet' && $outletId) {
+            return [
+                'type'      => 'outlet',
+                'scope_id'  => (int) $outletId,
+                'outlet_id' => null,
+            ];
+        }
+
+        return ['type' => 'global', 'scope_id' => null, 'outlet_id' => null];
+    }
+
+    /**
+     * Applies a WHERE condition to a query so only records relevant to the
+     * given scope are returned (mirrors applyScopeCondition for public use).
+     */
+    public function applyScopeFilter(\Illuminate\Database\Eloquent\Builder $query, array $scope): \Illuminate\Database\Eloquent\Builder
+    {
+        return $query->where(function ($q) use ($scope) {
+            $q->where('scope_type', 'global');
+
+            if ($scope['type'] === 'outlet') {
+                $q->orWhere(fn ($q2) => $q2->where('scope_type', 'outlet')->where('scope_id', $scope['scope_id']));
+            } elseif ($scope['type'] === 'warehouse') {
+                if ($scope['outlet_id'] !== null) {
+                    $q->orWhere(fn ($q2) => $q2->where('scope_type', 'outlet')->where('scope_id', $scope['outlet_id']));
+                }
+                $q->orWhere(fn ($q2) => $q2->where('scope_type', 'warehouse')->where('scope_id', $scope['scope_id']));
+            }
+        });
     }
 
     /**

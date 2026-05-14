@@ -32,14 +32,17 @@ class UserRoleAssignmentController extends Controller
         ];
 
         $actorMinRank = $this->accessControl->getActorMinRank($request->user());
-
-        $actorId = $request->user()->id;
+        $actorId      = $request->user()->id;
+        $scope        = $this->accessControl->resolveSessionScope($request);
 
         $query = UserRoleAssignment::with(['user', 'role', 'assignedBy'])
             ->where('user_id', '!=', $actorId)
             ->whereHas('user', fn ($q) => $q->where('is_superadmin', false))
-            ->when($actorMinRank !== null, fn ($builder) => $builder->whereHas('role', fn ($q) => $q->where('rank', '>', $actorMinRank)))
-            ->when($filters['search'] !== '', function ($builder) use ($filters) {
+            ->when($actorMinRank !== null, fn ($builder) => $builder->whereHas('role', fn ($q) => $q->where('rank', '>', $actorMinRank)));
+
+        $this->accessControl->applyScopeFilter($query, $scope);
+
+        $query->when($filters['search'] !== '', function ($builder) use ($filters) {
                 $search = '%'.$filters['search'].'%';
                 $builder->whereHas('user', fn ($q) => $q->where('name', 'like', $search)->orWhere('email', 'like', $search));
             })

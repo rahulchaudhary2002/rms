@@ -33,12 +33,16 @@ class UserPermissionOverrideController extends Controller
 
         $actorPermissionIds = $this->accessControl->getActorPermissionIds($request->user());
         $actorId            = $request->user()->id;
+        $scope              = $this->accessControl->resolveSessionScope($request);
 
         $query = UserPermissionOverride::with(['user', 'permission', 'assignedBy'])
             ->where('user_id', '!=', $actorId)
             ->whereHas('user', fn ($q) => $q->where('is_superadmin', false))
-            ->when($actorPermissionIds !== null, fn ($builder) => $builder->whereIn('permission_id', $actorPermissionIds))
-            ->when($filters['search'] !== '', function ($builder) use ($filters) {
+            ->when($actorPermissionIds !== null, fn ($builder) => $builder->whereIn('permission_id', $actorPermissionIds));
+
+        $this->accessControl->applyScopeFilter($query, $scope);
+
+        $query->when($filters['search'] !== '', function ($builder) use ($filters) {
                 $search = '%'.$filters['search'].'%';
                 $builder->whereHas('user', fn ($q) => $q->where('name', 'like', $search)->orWhere('email', 'like', $search));
             })

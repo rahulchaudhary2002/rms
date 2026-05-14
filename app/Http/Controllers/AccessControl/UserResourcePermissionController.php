@@ -33,11 +33,24 @@ class UserResourcePermissionController extends Controller
 
         $actorPermissionIds = $this->accessControl->getActorPermissionIds($request->user());
         $actorId            = $request->user()->id;
+        $scope              = $this->accessControl->resolveSessionScope($request);
 
         $query = UserResourcePermission::with(['user', 'permission', 'assignedBy'])
             ->where('user_id', '!=', $actorId)
             ->whereHas('user', fn ($q) => $q->where('is_superadmin', false))
             ->when($actorPermissionIds !== null, fn ($builder) => $builder->whereIn('permission_id', $actorPermissionIds))
+            ->when($scope['type'] !== 'global', function ($builder) use ($scope) {
+                $builder->where(function ($q) use ($scope) {
+                    if ($scope['type'] === 'outlet') {
+                        $q->where(fn ($q2) => $q2->where('resource_type', 'outlet')->where('resource_id', $scope['scope_id']));
+                    } elseif ($scope['type'] === 'warehouse') {
+                        $q->where(fn ($q2) => $q2->where('resource_type', 'warehouse')->where('resource_id', $scope['scope_id']));
+                        if ($scope['outlet_id'] !== null) {
+                            $q->orWhere(fn ($q2) => $q2->where('resource_type', 'outlet')->where('resource_id', $scope['outlet_id']));
+                        }
+                    }
+                });
+            })
             ->when($filters['search'] !== '', function ($builder) use ($filters) {
                 $search = '%'.$filters['search'].'%';
                 $builder->whereHas('user', fn ($q) => $q->where('name', 'like', $search)->orWhere('email', 'like', $search));
