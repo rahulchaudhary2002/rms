@@ -20,6 +20,7 @@ import { index as ingredientsIndex } from '@/routes/ingredients';
 import { index as countriesIndex } from '@/routes/countries';
 import { index as statesIndex } from '@/routes/states';
 import { index as citiesIndex } from '@/routes/cities';
+import { index as customersIndex } from '@/routes/customers';
 import type { Auth } from '@/types';
 
 type ViewportMode = 'mobile' | 'medium' | 'large';
@@ -40,6 +41,11 @@ type MenuGroup = {
     id: string;
     title: string;
     icon: string;
+    label?: string;
+    items: MenuItem[];
+};
+
+type MenuItemGroup = {
     label?: string;
     items: MenuItem[];
 };
@@ -95,25 +101,28 @@ function isPathActive(currentUrl: string, href: string, activeMatch?: string[]) 
     );
 }
 
+function buildDynamicItemGroups(auth: Auth): MenuItemGroup[] {
+    const isSuperAdmin = auth.user?.is_superadmin === true;
+    const can = (slug: string) => isSuperAdmin || auth.can?.[slug] === true;
+    const groups: MenuItemGroup[] = [];
+
+    if (can('customers-view')) {
+        groups.push({
+            label: 'CRM',
+            items: [
+                { title: 'Customers', href: customersIndex.url(), icon: 'groups', activeMatch: [customersIndex.url()] },
+            ],
+        });
+    }
+
+    return groups;
+}
+
 function buildDynamicGroups(auth: Auth): MenuGroup[] {
     const isSuperAdmin = auth.user?.is_superadmin === true;
     const can = (slug: string) => isSuperAdmin || auth.can?.[slug] === true;
     const canAny = (slugs: string[]) => slugs.some((slug) => can(slug));
     const groups: MenuGroup[] = [];
-
-    if (canAny(['users-manage', 'roles-view', 'permissions-view', 'access-control-manage'])) {
-        const items: MenuItem[] = [];
-        if (can('users-manage')) items.push({ title: 'Users', href: usersIndex.url(), icon: 'group', activeMatch: [usersIndex.url()] });
-        if (can('roles-view')) items.push({ title: 'Roles', href: rolesIndex.url(), icon: 'shield_person', activeMatch: [rolesIndex.url()] });
-        if (can('permissions-view')) items.push({ title: 'Permissions', href: permissionsIndex.url(), icon: 'key', activeMatch: [permissionsIndex.url()] });
-        if (can('access-control-manage')) {
-            items.push({ title: 'Role Permissions', href: rpIndex.url(), icon: 'lock', activeMatch: [rpIndex.url()] });
-            items.push({ title: 'User Roles', href: urIndex.url(), icon: 'manage_accounts', activeMatch: [urIndex.url()] });
-            items.push({ title: 'Permission Overrides', href: upoIndex.url(), icon: 'tune', activeMatch: [upoIndex.url()] });
-            items.push({ title: 'Resource Permissions', href: urpIndex.url(), icon: 'rule', activeMatch: [urpIndex.url()] });
-        }
-        groups.push({ id: 'access-control', label: 'Administration', title: 'Access Control', icon: 'admin_panel_settings', items });
-    }
 
     if (canAny(['units-view', 'unit-conversions-view'])) {
         const items: MenuItem[] = [];
@@ -134,7 +143,21 @@ function buildDynamicGroups(auth: Auth): MenuGroup[] {
         const items: MenuItem[] = [];
         if (can('ingredient-categories-view')) items.push({ title: 'Ingredient Categories', href: ingredientCategoriesIndex.url(), icon: 'category', activeMatch: [ingredientCategoriesIndex.url()] });
         if (can('ingredients-view')) items.push({ title: 'Ingredients', href: ingredientsIndex.url(), icon: 'nutrition', activeMatch: [ingredientsIndex.url()] });
-        groups.push({ id: 'ingredients', title: 'Ingredients', icon: 'nutrition', items });
+        groups.push({ id: 'ingredients', label: 'Master Data', title: 'Ingredients', icon: 'nutrition', items });
+    }
+
+    if (canAny(['users-manage', 'roles-view', 'permissions-view', 'access-control-manage'])) {
+        const items: MenuItem[] = [];
+        if (can('users-manage')) items.push({ title: 'Users', href: usersIndex.url(), icon: 'group', activeMatch: [usersIndex.url()] });
+        if (can('roles-view')) items.push({ title: 'Roles', href: rolesIndex.url(), icon: 'shield_person', activeMatch: [rolesIndex.url()] });
+        if (can('permissions-view')) items.push({ title: 'Permissions', href: permissionsIndex.url(), icon: 'key', activeMatch: [permissionsIndex.url()] });
+        if (can('access-control-manage')) {
+            items.push({ title: 'Role Permissions', href: rpIndex.url(), icon: 'lock', activeMatch: [rpIndex.url()] });
+            items.push({ title: 'User Roles', href: urIndex.url(), icon: 'manage_accounts', activeMatch: [urIndex.url()] });
+            items.push({ title: 'Permission Overrides', href: upoIndex.url(), icon: 'tune', activeMatch: [upoIndex.url()] });
+            items.push({ title: 'Resource Permissions', href: urpIndex.url(), icon: 'rule', activeMatch: [urpIndex.url()] });
+        }
+        groups.push({ id: 'access-control', label: 'Administration', title: 'Access Control', icon: 'admin_panel_settings', items });
     }
 
     groups.push(settingsGroup);
@@ -148,6 +171,11 @@ export function getSearchItems(auth: Auth): SearchItem[] {
         group: 'Quick Access',
         groupIcon: item.icon,
     }));
+    for (const itemGroup of buildDynamicItemGroups(auth)) {
+        for (const item of itemGroup.items) {
+            items.push({ title: item.title, href: item.href, group: itemGroup.label ?? 'Quick Access', groupIcon: item.icon });
+        }
+    }
     for (const group of buildDynamicGroups(auth)) {
         for (const item of group.items) {
             items.push({ title: item.title, href: item.href, group: group.title, groupIcon: group.icon });
@@ -168,7 +196,9 @@ export function AppSidebar() {
     const currentUrl = page.url;
     const appName = String(page.props.name ?? appLogoName);
     const user = auth.user;
+    const dynamicItemGroups = buildDynamicItemGroups(auth);
     const dynamicGroups = buildDynamicGroups(auth);
+    const hasAdministration = dynamicGroups.some((group) => group.label === 'Administration');
     const userInitials =
         user?.name
             ?.split(' ')
@@ -358,9 +388,46 @@ export function AppSidebar() {
                         const isDropRightOpen = openDropRight === group.id;
                         const prevGroup = index > 0 ? dynamicGroups[index - 1] : null;
                         const showLabel = !!group.label && group.label !== prevGroup?.label;
+                        const showDynamicItemsBeforeGroup =
+                            dynamicItemGroups.length > 0 &&
+                            (group.label === 'Administration' || (group.id === 'settings' && !hasAdministration));
 
                         return (
-                            <div key={group.id} className="group relative">
+                            <div key={group.id}>
+                                {showDynamicItemsBeforeGroup && dynamicItemGroups.map((itemGroup, groupIndex) => (
+                                    <div key={itemGroup.label ?? groupIndex}>
+                                        {itemGroup.label && !compactMode && (
+                                            <p className="mt-4 mb-1 px-3 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground/50">
+                                                {itemGroup.label}
+                                            </p>
+                                        )}
+                                        {itemGroup.label && compactMode && (
+                                            <div className="mx-3 mt-4 mb-1 border-t border-border" />
+                                        )}
+                                        {itemGroup.items.map((item) => {
+                                            const active = isPathActive(currentUrl, item.href, item.activeMatch);
+                                            return (
+                                                <Link
+                                                    key={item.title}
+                                                    href={item.href}
+                                                    className={cn(
+                                                        'mb-2 flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-sm transition-colors',
+                                                        active
+                                                            ? 'bg-primary/10 font-semibold text-primary'
+                                                            : 'font-medium text-muted-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground',
+                                                    )}
+                                                >
+                                                    <span className={cn('material-symbols-outlined shrink-0', active ? 'text-primary' : 'text-muted-foreground')}>
+                                                        {item.icon}
+                                                    </span>
+                                                    {!compactMode && <span>{item.title}</span>}
+                                                </Link>
+                                            );
+                                        })}
+                                    </div>
+                                ))}
+
+                                <div className="group relative">
                                 {showLabel && !compactMode && (
                                     <p className="mt-4 mb-1 px-3 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground/50">
                                         {group.label}
@@ -455,6 +522,7 @@ export function AppSidebar() {
                                         })}
                                     </div>
                                 )}
+                                </div>
                             </div>
                         );
                     })}

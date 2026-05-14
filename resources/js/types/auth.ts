@@ -136,6 +136,37 @@ export type City = {
     updated_at: string;
 };
 
+export type Outlet = {
+    id: number;
+    name: string;
+};
+
+export type CustomerOutlet = {
+    id: number;
+    customer_id: number;
+    outlet_id: number;
+    first_visited_at: string | null;
+    last_visited_at: string | null;
+    visit_count: number;
+    is_favorite_outlet: boolean;
+    outlet?: Outlet;
+    created_at: string;
+    updated_at: string;
+};
+
+export type Customer = {
+    id: number;
+    name: string;
+    phone: string | null;
+    email: string | null;
+    address: string | null;
+    is_active: boolean;
+    customer_outlets_count?: number;
+    customer_outlets?: CustomerOutlet[];
+    created_at: string;
+    updated_at: string;
+};
+
 export type TwoFactorSetupData = {
     svg: string;
     url: string;

@@ -24,6 +24,7 @@ class RolesAndPermissionsSeeder extends Seeder
         'countries',
         'states',
         'cities',
+        'customers',
         'inventory',
         'purchases',
         'sales',
@@ -129,15 +130,11 @@ class RolesAndPermissionsSeeder extends Seeder
             return;
         }
 
-        if ($admin->permissions()->exists()) {
-            return;
-        }
-
         // Admin gets everything except super-admin-only operations
         $permissions = Permission::whereNotIn('module', ['settings'])
             ->orWhere(fn ($q) => $q->where('module', 'settings')->where('action', 'view'))
             ->pluck('id');
 
-        $admin->permissions()->sync($permissions);
+        $admin->permissions()->syncWithoutDetaching($permissions);
     }
 }
