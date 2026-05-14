@@ -126,7 +126,7 @@ const notificationToneClasses: Record<string, string> = {
     warning: 'bg-chart-4/10 text-chart-4',
 };
 
-function getSearchItems(): SearchItem[] {
+function getSearchItems(auth: Auth): SearchItem[] {
     const items = primaryItems.map((item) => ({
         title: item.title,
         href: item.href,
@@ -134,7 +134,7 @@ function getSearchItems(): SearchItem[] {
         groupIcon: item.icon,
     }));
 
-    for (const group of menuGroups) {
+    for (const group of buildDynamicGroups(auth)) {
         for (const item of group.items) {
             items.push({
                 title: item.title,
@@ -662,7 +662,7 @@ export default function AppLayoutShell({
             )?.id ?? '',
         [currentUrl, auth],
     );
-    const searchItems = useMemo(() => getSearchItems(), []);
+    const searchItems = useMemo(() => getSearchItems(auth as Auth), [auth]);
     const [viewportMode, setViewportMode] = useState<ViewportMode>('large');
     const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false);
     const [isMini, setIsMiniState] = useState<boolean>(() => {
