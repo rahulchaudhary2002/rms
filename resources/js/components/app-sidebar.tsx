@@ -17,6 +17,9 @@ import { index as unitsIndex } from '@/routes/units';
 import { index as unitConversionsIndex } from '@/routes/unit-conversions';
 import { index as ingredientCategoriesIndex } from '@/routes/ingredient-categories';
 import { index as ingredientsIndex } from '@/routes/ingredients';
+import { index as countriesIndex } from '@/routes/countries';
+import { index as statesIndex } from '@/routes/states';
+import { index as citiesIndex } from '@/routes/cities';
 import type { Auth } from '@/types';
 
 type ViewportMode = 'mobile' | 'medium' | 'large';
@@ -117,6 +120,14 @@ function buildDynamicGroups(auth: Auth): MenuGroup[] {
         if (can('units-view')) items.push({ title: 'Units', href: unitsIndex.url(), icon: 'straighten', activeMatch: [unitsIndex.url()] });
         if (can('unit-conversions-view')) items.push({ title: 'Unit Conversions', href: unitConversionsIndex.url(), icon: 'swap_horiz', activeMatch: [unitConversionsIndex.url()] });
         groups.push({ id: 'units', label: 'Master Data', title: 'Units', icon: 'straighten', items });
+    }
+
+    if (canAny(['countries-view', 'states-view', 'cities-view'])) {
+        const items: MenuItem[] = [];
+        if (can('countries-view')) items.push({ title: 'Countries', href: countriesIndex.url(), icon: 'flag', activeMatch: [countriesIndex.url()] });
+        if (can('states-view')) items.push({ title: 'States', href: statesIndex.url(), icon: 'map', activeMatch: [statesIndex.url()] });
+        if (can('cities-view')) items.push({ title: 'Cities', href: citiesIndex.url(), icon: 'location_city', activeMatch: [citiesIndex.url()] });
+        groups.push({ id: 'locations', label: 'Master Data', title: 'Locations', icon: 'public', items });
     }
 
     if (canAny(['ingredient-categories-view', 'ingredients-view'])) {

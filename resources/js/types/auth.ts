@@ -104,6 +104,38 @@ export type Ingredient = {
     updated_at: string;
 };
 
+export type Country = {
+    id: number;
+    name: string;
+    code: string | null;
+    is_active: boolean;
+    created_at: string;
+    updated_at: string;
+};
+
+export type State = {
+    id: number;
+    country_id: number;
+    name: string;
+    code: string | null;
+    is_active: boolean;
+    country?: Country;
+    created_at: string;
+    updated_at: string;
+};
+
+export type City = {
+    id: number;
+    country_id: number;
+    state_id: number | null;
+    name: string;
+    is_active: boolean;
+    country?: Country;
+    state?: State | null;
+    created_at: string;
+    updated_at: string;
+};
+
 export type TwoFactorSetupData = {
     svg: string;
     url: string;
