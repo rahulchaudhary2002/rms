@@ -18,6 +18,10 @@ import { index as rpIndex } from '@/routes/access-control/role-permissions';
 import { index as urIndex } from '@/routes/access-control/user-roles';
 import { index as upoIndex } from '@/routes/access-control/user-permission-overrides';
 import { index as urpIndex } from '@/routes/access-control/user-resource-permissions';
+import { index as unitsIndex } from '@/routes/units';
+import { index as unitConversionsIndex } from '@/routes/unit-conversions';
+import { index as ingredientCategoriesIndex } from '@/routes/ingredient-categories';
+import { index as ingredientsIndex } from '@/routes/ingredients';
 import type { AppLayoutProps, Auth, BreadcrumbItem } from '@/types';
 
 type ViewportMode = 'mobile' | 'medium' | 'large';
@@ -33,6 +37,7 @@ type MenuGroup = {
     id: string;
     title: string;
     icon: string;
+    label?: string;
     items: MenuItem[];
 };
 
@@ -202,29 +207,58 @@ function buildBreadcrumbsFromUrl(currentUrl: string): BreadcrumbItem[] {
 function buildDynamicGroups(auth: Auth): MenuGroup[] {
     const isSuperAdmin = auth.user?.is_superadmin === true;
     const can = (slug: string) => isSuperAdmin || auth.can?.[slug] === true;
-
-    const acItems: MenuItem[] = [];
-
-    if (can('users-manage')) {
-        acItems.push({ title: 'Users', href: usersIndex.url(), icon: 'group', activeMatch: [usersIndex.url()] });
-    }
-    if (can('roles-view')) {
-        acItems.push({ title: 'Roles', href: rolesIndex.url(), icon: 'shield_person', activeMatch: [rolesIndex.url()] });
-    }
-    if (can('permissions-view')) {
-        acItems.push({ title: 'Permissions', href: permissionsIndex.url(), icon: 'key', activeMatch: [permissionsIndex.url()] });
-    }
-    if (can('access-control-manage')) {
-        acItems.push({ title: 'Role Permissions', href: rpIndex.url(), icon: 'lock', activeMatch: [rpIndex.url()] });
-        acItems.push({ title: 'User Roles', href: urIndex.url(), icon: 'manage_accounts', activeMatch: [urIndex.url()] });
-        acItems.push({ title: 'Permission Overrides', href: upoIndex.url(), icon: 'tune', activeMatch: [upoIndex.url()] });
-        acItems.push({ title: 'Resource Permissions', href: urpIndex.url(), icon: 'rule', activeMatch: [urpIndex.url()] });
-    }
+    const canAny = (slugs: string[]) => slugs.some((slug) => can(slug));
 
     const groups: MenuGroup[] = [];
 
-    if (acItems.length > 0) {
-        groups.push({ id: 'access-control', title: 'Access Control', icon: 'admin_panel_settings', items: acItems });
+    // Administration
+    if (canAny(['users-manage', 'roles-view', 'permissions-view', 'access-control-manage'])) {
+        const acItems: MenuItem[] = [];
+
+        if (can('users-manage')) {
+            acItems.push({ title: 'Users', href: usersIndex.url(), icon: 'group', activeMatch: [usersIndex.url()] });
+        }
+        if (can('roles-view')) {
+            acItems.push({ title: 'Roles', href: rolesIndex.url(), icon: 'shield_person', activeMatch: [rolesIndex.url()] });
+        }
+        if (can('permissions-view')) {
+            acItems.push({ title: 'Permissions', href: permissionsIndex.url(), icon: 'key', activeMatch: [permissionsIndex.url()] });
+        }
+        if (can('access-control-manage')) {
+            acItems.push({ title: 'Role Permissions', href: rpIndex.url(), icon: 'lock', activeMatch: [rpIndex.url()] });
+            acItems.push({ title: 'User Roles', href: urIndex.url(), icon: 'manage_accounts', activeMatch: [urIndex.url()] });
+            acItems.push({ title: 'Permission Overrides', href: upoIndex.url(), icon: 'tune', activeMatch: [upoIndex.url()] });
+            acItems.push({ title: 'Resource Permissions', href: urpIndex.url(), icon: 'rule', activeMatch: [urpIndex.url()] });
+        }
+
+        groups.push({ id: 'access-control', label: 'Administration', title: 'Access Control', icon: 'admin_panel_settings', items: acItems });
+    }
+
+    // Master Data
+    if (canAny(['units-view', 'unit-conversions-view'])) {
+        const unitItems: MenuItem[] = [];
+
+        if (can('units-view')) {
+            unitItems.push({ title: 'Units', href: unitsIndex.url(), icon: 'straighten', activeMatch: [unitsIndex.url()] });
+        }
+        if (can('unit-conversions-view')) {
+            unitItems.push({ title: 'Unit Conversions', href: unitConversionsIndex.url(), icon: 'swap_horiz', activeMatch: [unitConversionsIndex.url()] });
+        }
+
+        groups.push({ id: 'units', label: 'Master Data', title: 'Units', icon: 'straighten', items: unitItems });
+    }
+
+    if (canAny(['ingredient-categories-view', 'ingredients-view'])) {
+        const ingredientItems: MenuItem[] = [];
+
+        if (can('ingredient-categories-view')) {
+            ingredientItems.push({ title: 'Ingredient Categories', href: ingredientCategoriesIndex.url(), icon: 'category', activeMatch: [ingredientCategoriesIndex.url()] });
+        }
+        if (can('ingredients-view')) {
+            ingredientItems.push({ title: 'Ingredients', href: ingredientsIndex.url(), icon: 'nutrition', activeMatch: [ingredientsIndex.url()] });
+        }
+
+        groups.push({ id: 'ingredients', title: 'Ingredients', icon: 'nutrition', items: ingredientItems });
     }
 
     groups.push(...menuGroups);
@@ -408,7 +442,7 @@ const Sidebar = memo(function Sidebar({
                         );
                     })}
 
-                    {dynamicGroups.map((group) => {
+                    {dynamicGroups.map((group, index) => {
                         const groupActive = group.items.some((item) =>
                             isPathActive(
                                 currentUrl,
@@ -418,9 +452,19 @@ const Sidebar = memo(function Sidebar({
                         );
                         const isAccordionOpen = openGroup === group.id;
                         const isDropRightOpen = openDropRight === group.id;
+                        const prevGroup = index > 0 ? dynamicGroups[index - 1] : null;
+                        const showLabel = !!group.label && group.label !== prevGroup?.label;
 
                         return (
                             <div key={group.id} className="group relative">
+                                {showLabel && !compactMode && (
+                                    <p className="mt-4 mb-1 px-3 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground/50">
+                                        {group.label}
+                                    </p>
+                                )}
+                                {showLabel && compactMode && (
+                                    <div className="mx-3 mt-4 mb-1 border-t border-border" />
+                                )}
                                 <button
                                     type="button"
                                     className={cn(

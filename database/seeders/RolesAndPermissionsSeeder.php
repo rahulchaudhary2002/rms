@@ -17,6 +17,10 @@ class RolesAndPermissionsSeeder extends Seeder
         'permissions',
         'outlets',
         'warehouses',
+        'units',
+        'unit-conversions',
+        'ingredient-categories',
+        'ingredients',
         'inventory',
         'purchases',
         'sales',
@@ -119,6 +123,10 @@ class RolesAndPermissionsSeeder extends Seeder
         $admin = Role::where('slug', 'admin')->first();
 
         if (! $admin) {
+            return;
+        }
+
+        if ($admin->permissions()->exists()) {
             return;
         }
 

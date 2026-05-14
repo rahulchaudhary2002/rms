@@ -25,3 +25,5 @@ Route::middleware(['auth', 'verified', 'node.selected'])->group(function () {
 
 require __DIR__.'/settings.php';
 require __DIR__.'/access-control.php';
+require __DIR__.'/units.php';
+require __DIR__.'/ingredients.php';
