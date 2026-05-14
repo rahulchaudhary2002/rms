@@ -31,8 +31,14 @@ class UserRoleAssignmentController extends Controller
             'per_page'   => $request->string('per_page')->toString(),
         ];
 
+        $actorMinRank = $this->accessControl->getActorMinRank($request->user());
+
+        $actorId = $request->user()->id;
+
         $query = UserRoleAssignment::with(['user', 'role', 'assignedBy'])
+            ->where('user_id', '!=', $actorId)
             ->whereHas('user', fn ($q) => $q->where('is_superadmin', false))
+            ->when($actorMinRank !== null, fn ($builder) => $builder->whereHas('role', fn ($q) => $q->where('rank', '>', $actorMinRank)))
             ->when($filters['search'] !== '', function ($builder) use ($filters) {
                 $search = '%'.$filters['search'].'%';
                 $builder->whereHas('user', fn ($q) => $q->where('name', 'like', $search)->orWhere('email', 'like', $search));
@@ -49,8 +55,10 @@ class UserRoleAssignmentController extends Controller
 
         $assignments = $query->paginate($perPage)->withQueryString();
 
-        $users = User::where('is_superadmin', false)->orderBy('name')->get(['id', 'name', 'email']);
-        $roles = Role::where('is_active', true)->orderBy('name')->get(['id', 'name', 'slug', 'level']);
+        $users = User::where('is_superadmin', false)->where('id', '!=', $actorId)->orderBy('name')->get(['id', 'name', 'email']);
+        $roles = Role::where('is_active', true)
+            ->when($actorMinRank !== null, fn ($q) => $q->where('rank', '>', $actorMinRank))
+            ->orderBy('name')->get(['id', 'name', 'slug', 'level']);
 
         return Inertia::render('access-control/user-roles/index', [
             'assignments' => $assignments,
@@ -63,9 +71,12 @@ class UserRoleAssignmentController extends Controller
     public function create(): Response
     {
         $actor = Auth::user();
+        $actorMinRank = $this->accessControl->getActorMinRank($actor);
 
-        $users = User::where('is_superadmin', false)->orderBy('name')->get(['id', 'name', 'email']);
-        $roles = Role::where('is_active', true)->orderBy('name')->get(['id', 'name', 'slug', 'level']);
+        $users = User::where('is_superadmin', false)->where('id', '!=', $actor->id)->orderBy('name')->get(['id', 'name', 'email']);
+        $roles = Role::where('is_active', true)
+            ->when($actorMinRank !== null, fn ($q) => $q->where('rank', '>', $actorMinRank))
+            ->orderBy('name')->get(['id', 'name', 'slug', 'level']);
 
         // Super admin or global-scope role → no restriction, show all scopes.
         $hasGlobalRole = $this->accessControl->isSuperAdmin($actor)

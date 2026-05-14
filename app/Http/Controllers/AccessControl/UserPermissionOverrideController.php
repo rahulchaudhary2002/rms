@@ -31,8 +31,13 @@ class UserPermissionOverrideController extends Controller
             'per_page'      => $request->string('per_page')->toString(),
         ];
 
+        $actorPermissionIds = $this->accessControl->getActorPermissionIds($request->user());
+        $actorId            = $request->user()->id;
+
         $query = UserPermissionOverride::with(['user', 'permission', 'assignedBy'])
+            ->where('user_id', '!=', $actorId)
             ->whereHas('user', fn ($q) => $q->where('is_superadmin', false))
+            ->when($actorPermissionIds !== null, fn ($builder) => $builder->whereIn('permission_id', $actorPermissionIds))
             ->when($filters['search'] !== '', function ($builder) use ($filters) {
                 $search = '%'.$filters['search'].'%';
                 $builder->whereHas('user', fn ($q) => $q->where('name', 'like', $search)->orWhere('email', 'like', $search));
@@ -50,8 +55,10 @@ class UserPermissionOverrideController extends Controller
 
         $overrides = $query->paginate($perPage)->withQueryString();
 
-        $users = User::where('is_superadmin', false)->orderBy('name')->get(['id', 'name', 'email']);
-        $permissions = Permission::where('is_active', true)->orderBy('module')->orderBy('action')->get(['id', 'name', 'slug', 'module', 'action']);
+        $users = User::where('is_superadmin', false)->where('id', '!=', $actorId)->orderBy('name')->get(['id', 'name', 'email']);
+        $permissions = Permission::where('is_active', true)
+            ->when($actorPermissionIds !== null, fn ($q) => $q->whereIn('id', $actorPermissionIds))
+            ->orderBy('module')->orderBy('action')->get(['id', 'name', 'slug', 'module', 'action']);
 
         return Inertia::render('access-control/user-permission-overrides/index', [
             'overrides'   => $overrides,
@@ -63,8 +70,12 @@ class UserPermissionOverrideController extends Controller
 
     public function create(): Response
     {
-        $users = User::where('is_superadmin', false)->orderBy('name')->get(['id', 'name', 'email']);
-        $permissions = Permission::where('is_active', true)->orderBy('module')->orderBy('action')->get(['id', 'name', 'slug', 'module', 'action']);
+        $actorPermissionIds = $this->accessControl->getActorPermissionIds(Auth::user());
+
+        $users = User::where('is_superadmin', false)->where('id', '!=', Auth::id())->orderBy('name')->get(['id', 'name', 'email']);
+        $permissions = Permission::where('is_active', true)
+            ->when($actorPermissionIds !== null, fn ($q) => $q->whereIn('id', $actorPermissionIds))
+            ->orderBy('module')->orderBy('action')->get(['id', 'name', 'slug', 'module', 'action']);
 
         $scopeTypes = collect(config('access_control.scope_types', []))
             ->map(fn ($cfg, $key) => ['type' => $key, 'label' => $cfg['label']])
@@ -79,6 +90,12 @@ class UserPermissionOverrideController extends Controller
 
     public function store(StoreUserPermissionOverrideRequest $request): RedirectResponse
     {
+        $actorPermissionIds = $this->accessControl->getActorPermissionIds(Auth::user());
+
+        if ($actorPermissionIds !== null && ! in_array((int) $request->permission_id, $actorPermissionIds)) {
+            abort(403, 'You can only override permissions assigned to your roles.');
+        }
+
         DB::transaction(function () use ($request) {
             UserPermissionOverride::updateOrCreate(
                 [

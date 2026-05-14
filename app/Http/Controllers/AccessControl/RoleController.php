@@ -26,8 +26,11 @@ class RoleController extends Controller
             'per_page'  => $request->string('per_page')->toString(),
         ];
 
+        $actorMinRank = $this->accessControl->getActorMinRank($request->user());
+
         $query = Role::query()
             ->withCount(['permissions', 'userRoleAssignments'])
+            ->when($actorMinRank !== null, fn ($builder) => $builder->where('rank', '>', $actorMinRank))
             ->when($filters['search'] !== '', function ($builder) use ($filters) {
                 $search = '%'.$filters['search'].'%';
                 $builder->where(fn ($q) => $q->where('name', 'like', $search)->orWhere('slug', 'like', $search));
@@ -48,11 +51,20 @@ class RoleController extends Controller
         ]);
     }
 
-    public function show(Role $role): Response
+    public function show(Request $request, Role $role): Response
     {
+        $actorMinRank = $this->accessControl->getActorMinRank($request->user());
+
+        if ($actorMinRank !== null && $role->rank <= $actorMinRank) {
+            abort(403, 'You cannot view this role.');
+        }
+
         $role->load('permissions');
 
+        $actorPermissionIds = $this->accessControl->getActorPermissionIds($request->user());
+
         $permissions = Permission::where('is_active', true)
+            ->when($actorPermissionIds !== null, fn ($q) => $q->whereIn('id', $actorPermissionIds))
             ->orderBy('module')
             ->orderBy('action')
             ->get(['id', 'name', 'slug', 'module', 'action', 'level']);

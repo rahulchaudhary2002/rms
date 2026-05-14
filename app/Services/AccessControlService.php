@@ -121,6 +121,48 @@ class AccessControlService
         Cache::forget($scopeSetKey);
     }
 
+    /**
+     * Returns the lowest rank value (highest privilege) across the actor's active roles.
+     * Returns null for superadmin (no restriction applies).
+     */
+    public function getActorMinRank(User $actor): ?int
+    {
+        if ($this->isSuperAdmin($actor)) {
+            return null;
+        }
+
+        $rank = UserRoleAssignment::where('user_role_assignments.user_id', $actor->id)
+            ->where('user_role_assignments.is_active', true)
+            ->whereHas('role', fn ($q) => $q->where('is_active', true))
+            ->join('roles', 'roles.id', '=', 'user_role_assignments.role_id')
+            ->min('roles.rank');
+
+        return $rank !== null ? (int) $rank : null;
+    }
+
+    /**
+     * Returns permission IDs that are assigned to the actor via their roles.
+     * Returns null for superadmin (no restriction — all permissions visible).
+     */
+    public function getActorPermissionIds(User $actor): ?array
+    {
+        if ($this->isSuperAdmin($actor)) {
+            return null;
+        }
+
+        $roleIds = UserRoleAssignment::where('user_role_assignments.user_id', $actor->id)
+            ->where('user_role_assignments.is_active', true)
+            ->whereHas('role', fn ($q) => $q->where('is_active', true))
+            ->pluck('user_role_assignments.role_id');
+
+        return DB::table('role_permissions')
+            ->whereIn('role_id', $roleIds)
+            ->pluck('permission_id')
+            ->unique()
+            ->values()
+            ->all();
+    }
+
     public function isSuperAdmin(User $user): bool
     {
         if ($user->is_superadmin) {
