@@ -103,7 +103,6 @@ export default function IngredientsIndex({ ingredients, categories, filters }: P
             <PageHeader
                 breadcrumbs={[
                     { label: 'Home', href: dashboard.url() },
-                    { label: 'Inventory', href: ingredientsIndex.url() },
                     { label: 'Ingredients' },
                 ]}
                 title="Ingredients"

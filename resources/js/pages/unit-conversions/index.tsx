@@ -95,7 +95,6 @@ export default function UnitConversionsIndex({ conversions, filters }: Props) {
             <PageHeader
                 breadcrumbs={[
                     { label: 'Home', href: dashboard.url() },
-                    { label: 'Inventory', href: conversionsIndex.url() },
                     { label: 'Unit Conversions' },
                 ]}
                 title="Unit Conversions"

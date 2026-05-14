@@ -30,7 +30,6 @@ export default function UnitsEdit({ unit }: Props) {
             <PageHeader
                 breadcrumbs={[
                     { label: 'Home', href: dashboard.url() },
-                    { label: 'Inventory', href: unitsIndex.url() },
                     { label: 'Units', href: unitsIndex.url() },
                     { label: unit.name },
                 ]}

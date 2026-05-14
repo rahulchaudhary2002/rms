@@ -27,7 +27,6 @@ export default function UnitsCreate() {
             <PageHeader
                 breadcrumbs={[
                     { label: 'Home', href: dashboard.url() },
-                    { label: 'Inventory', href: unitsIndex.url() },
                     { label: 'Units', href: unitsIndex.url() },
                     { label: 'Create' },
                 ]}

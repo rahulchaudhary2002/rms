@@ -32,7 +32,6 @@ export default function UnitConversionsEdit({ conversion, units }: Props) {
             <PageHeader
                 breadcrumbs={[
                     { label: 'Home', href: dashboard.url() },
-                    { label: 'Inventory', href: conversionsIndex.url() },
                     { label: 'Unit Conversions', href: conversionsIndex.url() },
                     { label: `${conversion.from_unit?.name} → ${conversion.to_unit?.name}` },
                 ]}

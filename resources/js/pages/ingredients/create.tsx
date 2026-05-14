@@ -54,7 +54,6 @@ export default function IngredientsCreate({ categories, units }: Props) {
             <PageHeader
                 breadcrumbs={[
                     { label: 'Home', href: dashboard.url() },
-                    { label: 'Inventory', href: ingredientsIndex.url() },
                     { label: 'Ingredients', href: ingredientsIndex.url() },
                     { label: 'Create' },
                 ]}

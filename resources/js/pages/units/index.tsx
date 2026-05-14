@@ -109,7 +109,6 @@ export default function UnitsIndex({ units, filters }: Props) {
             <PageHeader
                 breadcrumbs={[
                     { label: 'Home', href: dashboard.url() },
-                    { label: 'Inventory', href: unitsIndex.url() },
                     { label: 'Units' },
                 ]}
                 title="Units"
