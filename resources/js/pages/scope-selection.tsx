@@ -2,7 +2,7 @@ import { Head, router, usePage } from '@inertiajs/react';
 import { useMemo, useState } from 'react';
 import type { FormEvent } from 'react';
 import { PageHeader } from '@/components/page-header';
-import { dashboard } from '@/routes';
+import { dashboard, logout } from '@/routes';
 import { store as scopeSelectionStore } from '@/routes/scope-selection';
 import { store as outletsStore } from '@/routes/outlets';
 import { store as warehousesStore } from '@/routes/warehouses';
@@ -445,6 +445,17 @@ export default function ScopeSelection() {
                         )}
                     </div>
                 </form>
+
+                <div className="flex justify-center">
+                    <button
+                        type="button"
+                        onClick={() => router.post(logout.url())}
+                        className="flex items-center gap-1.5 text-sm text-muted-foreground transition-colors hover:text-destructive"
+                    >
+                        <span className="material-symbols-outlined text-base">logout</span>
+                        Sign out
+                    </button>
+                </div>
 
                 {/* Create Outlet Modal */}
                 <Dialog open={showCreateOutletModal} onOpenChange={setShowCreateOutletModal}>
