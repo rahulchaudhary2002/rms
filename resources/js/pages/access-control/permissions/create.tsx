@@ -1,4 +1,7 @@
 import { Head, Link, useForm } from '@inertiajs/react';
+import { dashboard } from '@/routes';
+import { index as rolesIndex } from '@/routes/access-control/roles';
+import { index as permissionsIndex, store as permissionsStore } from '@/routes/access-control/permissions';
 import { PageHeader } from '@/components/page-header';
 import { FormSection } from '@/components/form-section';
 import { FormField } from '@/components/ui/form-field';
@@ -26,7 +29,7 @@ export default function PermissionsCreate() {
 
     function submit(e: React.FormEvent) {
         e.preventDefault();
-        post('/access-control/permissions');
+        post(permissionsStore.url());
     }
 
     return (
@@ -34,9 +37,9 @@ export default function PermissionsCreate() {
             <Head title="Create Permission" />
             <PageHeader
                 breadcrumbs={[
-                    { label: 'Home', href: '/dashboard' },
-                    { label: 'Access Control', href: '/access-control/roles' },
-                    { label: 'Permissions', href: '/access-control/permissions' },
+                    { label: 'Home', href: dashboard.url() },
+                    { label: 'Access Control', href: rolesIndex.url() },
+                    { label: 'Permissions', href: permissionsIndex.url() },
                     { label: 'Create' },
                 ]}
                 title="Create Permission"
@@ -124,7 +127,7 @@ export default function PermissionsCreate() {
                 <div className="flex flex-wrap items-center justify-end gap-4 border-t border-border/70 pt-8 dark:border-stone-700">
                     <span className="hidden text-sm text-muted-foreground italic sm:inline">Unsaved changes will be lost.</span>
                     <Link
-                        href="/access-control/permissions"
+                        href={permissionsIndex.url()}
                         className="rounded-lg px-6 py-2.5 text-sm font-semibold text-muted-foreground transition-colors hover:bg-secondary"
                     >
                         Discard Draft

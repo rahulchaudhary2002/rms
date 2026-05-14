@@ -1,4 +1,11 @@
 import { Head, Link, useForm, router } from '@inertiajs/react';
+import { dashboard } from '@/routes';
+import { index as rolesIndex } from '@/routes/access-control/roles';
+import { index as usersIndex, show as usersShow, edit as usersEdit } from '@/routes/users';
+import { store as urStore } from '@/routes/access-control/user-roles';
+import { destroy as urDestroy } from '@/routes/access-control/user-roles';
+import { store as upoStore, destroy as upoDestroy } from '@/routes/access-control/user-permission-overrides';
+import { store as urpStore, destroy as urpDestroy } from '@/routes/access-control/user-resource-permissions';
 import { useState } from 'react';
 import { PageHeader } from '@/components/page-header';
 import { FormField } from '@/components/ui/form-field';
@@ -100,7 +107,7 @@ function AssignRoleModal({ open, onClose, userId, roles, returnUrl }: {
 
     function submit(e: { preventDefault(): void }) {
         e.preventDefault();
-        post('/access-control/user-roles', {
+        post(urStore.url(), {
             onSuccess: () => { reset(); onClose(); },
         });
     }
@@ -176,7 +183,7 @@ function AddOverrideModal({ open, onClose, userId, permissions, scopeTypes, retu
 
     function submit(e: { preventDefault(): void }) {
         e.preventDefault();
-        post('/access-control/user-permission-overrides', {
+        post(upoStore.url(), {
             onSuccess: () => { reset(); onClose(); },
         });
     }
@@ -263,7 +270,7 @@ function AddResourceModal({ open, onClose, userId, permissions, resourceTypes, r
 
     function submit(e: { preventDefault(): void }) {
         e.preventDefault();
-        post('/access-control/user-resource-permissions', {
+        post(urpStore.url(), {
             onSuccess: () => { reset(); onClose(); },
         });
     }
@@ -345,16 +352,16 @@ const tabList: { id: Tab; label: string; icon: string }[] = [
 export default function UserShow({ user, roles, permissions, scopeTypes, resourceTypes }: Props) {
     const [activeTab, setActiveTab] = useState<Tab>('overview');
     const [modal, setModal] = useState<'role' | 'override' | 'resource' | null>(null);
-    const returnUrl = `/users/${user.id}`;
+    const returnUrl = usersShow.url(user.id);
 
     function confirmDeleteRole(id: number) {
-        if (confirm('Remove this role assignment?')) router.delete(`/access-control/user-roles/${id}`);
+        if (confirm('Remove this role assignment?')) router.delete(urDestroy.url(id));
     }
     function confirmDeleteOverride(id: number) {
-        if (confirm('Remove this permission override?')) router.delete(`/access-control/user-permission-overrides/${id}`);
+        if (confirm('Remove this permission override?')) router.delete(upoDestroy.url(id));
     }
     function confirmDeleteResource(id: number) {
-        if (confirm('Remove this resource permission?')) router.delete(`/access-control/user-resource-permissions/${id}`);
+        if (confirm('Remove this resource permission?')) router.delete(urpDestroy.url(id));
     }
 
     return (
@@ -363,15 +370,15 @@ export default function UserShow({ user, roles, permissions, scopeTypes, resourc
 
             <PageHeader
                 breadcrumbs={[
-                    { label: 'Home', href: '/dashboard' },
-                    { label: 'Access Control', href: '/access-control/roles' },
-                    { label: 'Users', href: '/users' },
+                    { label: 'Home', href: dashboard.url() },
+                    { label: 'Access Control', href: rolesIndex.url() },
+                    { label: 'Users', href: usersIndex.url() },
                     { label: user.name },
                 ]}
                 title={user.name}
                 description={user.email}
                 actions={
-                    <Link href={`/users/${user.id}/edit`}
+                    <Link href={usersEdit.url(user.id)}
                         className="inline-flex items-center gap-2 rounded-lg border border-border bg-card px-4 py-2.5 text-sm font-semibold text-foreground shadow-sm transition-colors hover:bg-muted">
                         <span className="material-symbols-outlined text-[18px]">edit</span>
                         Edit User

@@ -9,7 +9,7 @@ export default function Dashboard() {
             <Head title="Dashboard" />
             <PageHeader
                 breadcrumbs={[
-                    { label: 'Home', href: '/dashboard' },
+                    { label: 'Home', href: dashboard.url() },
                     { label: 'Dashboard' },
                 ]}
                 title="Dashboard"

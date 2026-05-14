@@ -1,5 +1,8 @@
 import { Head, Link, router } from '@inertiajs/react';
 import { Filter } from 'lucide-react';
+import { dashboard } from '@/routes';
+import { index as rolesIndex } from '@/routes/access-control/roles';
+import { index as urpIndex, create as urpCreate, destroy as urpDestroy, update as urpUpdate } from '@/routes/access-control/user-resource-permissions';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { PageHeader } from '@/components/page-header';
 import { Can } from '@/components/can';
@@ -86,7 +89,7 @@ export default function UserResourcePermissionsIndex({ resourcePerms, users, per
 
     const applyFilters = () => {
         filterPopoverRef.current?.removeAttribute('open');
-        router.get('/access-control/user-resource-permissions', form, {
+        router.get(urpIndex.url(), form, {
             preserveState: true,
             preserveScroll: true,
             replace: true,
@@ -97,7 +100,7 @@ export default function UserResourcePermissionsIndex({ resourcePerms, users, per
         const reset = { search: '', user_id: '', permission_id: '', resource_type: '', effect: '', is_active: '', per_page: '10' };
         setForm(reset);
         filterPopoverRef.current?.removeAttribute('open');
-        router.get('/access-control/user-resource-permissions', {}, {
+        router.get(urpIndex.url(), {}, {
             preserveState: true,
             preserveScroll: true,
             replace: true,
@@ -107,7 +110,7 @@ export default function UserResourcePermissionsIndex({ resourcePerms, users, per
     const updatePerPage = (nextValue: string) => {
         const nextFilters = { ...form, per_page: nextValue, page: '1' };
         setForm((current) => ({ ...current, per_page: nextValue }));
-        router.get('/access-control/user-resource-permissions', nextFilters, {
+        router.get(urpIndex.url(), nextFilters, {
             preserveState: true,
             preserveScroll: true,
             replace: true,
@@ -118,7 +121,7 @@ export default function UserResourcePermissionsIndex({ resourcePerms, users, per
         value: form.search,
         onSearch: (value, { onCancelToken }) => {
             router.get(
-                '/access-control/user-resource-permissions',
+                urpIndex.url(),
                 { ...form, search: value, page: '1' },
                 { preserveState: true, preserveScroll: true, replace: true, onCancelToken },
             );
@@ -127,12 +130,12 @@ export default function UserResourcePermissionsIndex({ resourcePerms, users, per
 
     function confirmDelete(rp: ResourcePerm) {
         if (confirm(`Remove resource permission for "${rp.user?.name}"? This cannot be undone.`)) {
-            router.delete(`/access-control/user-resource-permissions/${rp.id}`, { preserveScroll: true });
+            router.delete(urpDestroy.url(rp.id), { preserveScroll: true });
         }
     }
 
     function toggleActive(rp: ResourcePerm) {
-        router.patch(`/access-control/user-resource-permissions/${rp.id}`, { is_active: !rp.is_active }, { preserveScroll: true });
+        router.patch(urpUpdate.url(rp.id), { is_active: !rp.is_active }, { preserveScroll: true });
     }
 
     return (
@@ -140,8 +143,8 @@ export default function UserResourcePermissionsIndex({ resourcePerms, users, per
             <Head title="Resource Permissions" />
             <PageHeader
                 breadcrumbs={[
-                    { label: 'Home', href: '/dashboard' },
-                    { label: 'Access Control', href: '/access-control/roles' },
+                    { label: 'Home', href: dashboard.url() },
+                    { label: 'Access Control', href: rolesIndex.url() },
                     { label: 'Resource Permissions' },
                 ]}
                 title="User Resource Permissions"
@@ -149,7 +152,7 @@ export default function UserResourcePermissionsIndex({ resourcePerms, users, per
                 actions={
                     <Can permission="access-control-manage">
                         <Link
-                            href="/access-control/user-resource-permissions/create"
+                            href={urpCreate.url()}
                             className="inline-flex items-center gap-2 rounded-lg bg-primary px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition-colors hover:bg-primary/90"
                         >
                             <span className="material-symbols-outlined text-[18px]">add_circle</span>

@@ -1,4 +1,7 @@
 import { Head, Link, router } from '@inertiajs/react';
+import { dashboard } from '@/routes';
+import { index as rolesIndex, edit as rolesEdit } from '@/routes/access-control/roles';
+import { store as rolePermissionsStore, destroy as rolePermissionsDestroy } from '@/routes/access-control/role-permissions';
 import { useState } from 'react';
 import { PageHeader } from '@/components/page-header';
 import { Badge } from '@/components/ui/badge';
@@ -40,14 +43,14 @@ export default function RoleShow({ role, permissions }: Props) {
         setProcessing(permission.id);
 
         if (has) {
-            router.delete('/access-control/role-permissions', {
+            router.delete(rolePermissionsDestroy.url(), {
                 data: { role_id: role.id, permission_id: permission.id },
                 preserveScroll: true,
                 onFinish: () => setProcessing(null),
             });
         } else {
             router.post(
-                '/access-control/role-permissions',
+                rolePermissionsStore.url(),
                 { role_id: role.id, permission_ids: [permission.id] },
                 { preserveScroll: true, onFinish: () => setProcessing(null) },
             );
@@ -66,16 +69,16 @@ export default function RoleShow({ role, permissions }: Props) {
             <Head title={`Role: ${role.name}`} />
             <PageHeader
                 breadcrumbs={[
-                    { label: 'Home', href: '/dashboard' },
-                    { label: 'Access Control', href: '/access-control/roles' },
-                    { label: 'Roles', href: '/access-control/roles' },
+                    { label: 'Home', href: dashboard.url() },
+                    { label: 'Access Control', href: rolesIndex.url() },
+                    { label: 'Roles', href: rolesIndex.url() },
                     { label: role.name },
                 ]}
                 title={role.name}
                 description={role.description ?? 'View role details and manage permissions.'}
                 actions={
                     <Link
-                        href={`/access-control/roles/${role.id}/edit`}
+                        href={rolesEdit.url(role.id)}
                         className="inline-flex items-center gap-2 rounded-lg border border-border/30 bg-white px-4 py-2.5 text-sm font-semibold text-foreground shadow-sm transition-colors hover:bg-muted dark:border-border dark:bg-card dark:hover:bg-accent"
                     >
                         <span className="material-symbols-outlined text-[18px]">edit</span>

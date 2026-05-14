@@ -2,6 +2,8 @@ import { Head, Link, router } from '@inertiajs/react';
 import { Filter } from 'lucide-react';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { PageHeader } from '@/components/page-header';
+import { dashboard } from '@/routes';
+import { index as rolesIndex, create as rolesCreate, show as rolesShow, edit as rolesEdit, destroy as rolesDestroy } from '@/routes/access-control/roles';
 import { Can } from '@/components/can';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -74,7 +76,7 @@ export default function RolesIndex({ roles, filters }: Props) {
 
     const applyFilters = () => {
         filterPopoverRef.current?.removeAttribute('open');
-        router.get('/access-control/roles', form, {
+        router.get(rolesIndex.url(), form, {
             preserveState: true,
             preserveScroll: true,
             replace: true,
@@ -85,7 +87,7 @@ export default function RolesIndex({ roles, filters }: Props) {
         const reset = { search: '', level: '', is_active: '', per_page: '10' };
         setForm(reset);
         filterPopoverRef.current?.removeAttribute('open');
-        router.get('/access-control/roles', {}, {
+        router.get(rolesIndex.url(), {}, {
             preserveState: true,
             preserveScroll: true,
             replace: true,
@@ -95,7 +97,7 @@ export default function RolesIndex({ roles, filters }: Props) {
     const updatePerPage = (nextValue: string) => {
         const nextFilters = { ...form, per_page: nextValue, page: '1' };
         setForm((current) => ({ ...current, per_page: nextValue }));
-        router.get('/access-control/roles', nextFilters, {
+        router.get(rolesIndex.url(), nextFilters, {
             preserveState: true,
             preserveScroll: true,
             replace: true,
@@ -106,7 +108,7 @@ export default function RolesIndex({ roles, filters }: Props) {
         value: form.search,
         onSearch: (value, { onCancelToken }) => {
             router.get(
-                '/access-control/roles',
+                rolesIndex.url(),
                 { ...form, search: value, page: '1' },
                 { preserveState: true, preserveScroll: true, replace: true, onCancelToken },
             );
@@ -115,7 +117,7 @@ export default function RolesIndex({ roles, filters }: Props) {
 
     function confirmDelete(role: Role) {
         if (confirm(`Delete role "${role.name}"? This cannot be undone.`)) {
-            router.delete(`/access-control/roles/${role.id}`);
+            router.delete(rolesDestroy.url(role.id));
         }
     }
 
@@ -124,8 +126,8 @@ export default function RolesIndex({ roles, filters }: Props) {
             <Head title="Roles" />
             <PageHeader
                 breadcrumbs={[
-                    { label: 'Home', href: '/dashboard' },
-                    { label: 'Access Control', href: '/access-control/roles' },
+                    { label: 'Home', href: dashboard.url() },
+                    { label: 'Access Control', href: rolesIndex.url() },
                     { label: 'Roles' },
                 ]}
                 title="Roles"
@@ -133,7 +135,7 @@ export default function RolesIndex({ roles, filters }: Props) {
                 actions={
                     <Can permission="roles-create">
                         <Link
-                            href="/access-control/roles/create"
+                            href={rolesCreate.url()}
                             className="inline-flex items-center gap-2 rounded-lg bg-primary px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition-colors hover:bg-primary/90"
                         >
                             <span className="material-symbols-outlined text-[18px]">add_circle</span>
@@ -311,7 +313,7 @@ export default function RolesIndex({ roles, filters }: Props) {
                                             </div>
                                             <div>
                                                 <Link
-                                                    href={`/access-control/roles/${role.id}`}
+                                                    href={rolesShow.url(role.id)}
                                                     className="block font-bold text-gray-900 transition-colors hover:text-primary dark:text-gray-100"
                                                 >
                                                     {role.name}
@@ -361,8 +363,8 @@ export default function RolesIndex({ roles, filters }: Props) {
                                             itemLabel={role.name}
                                             onToggle={(id) => toggleActionMenu(id as number | null)}
                                             actions={[
-                                                { id: `view-${role.id}`, label: 'View role', icon: 'visibility', href: `/access-control/roles/${role.id}` },
-                                                { id: `edit-${role.id}`, label: 'Edit role', icon: 'edit', href: `/access-control/roles/${role.id}/edit` },
+                                                { id: `view-${role.id}`, label: 'View role', icon: 'visibility', href: rolesShow.url(role.id) },
+                                                { id: `edit-${role.id}`, label: 'Edit role', icon: 'edit', href: rolesEdit.url(role.id) },
                                                 ...(!role.is_system ? [{
                                                     id: `delete-${role.id}`,
                                                     label: 'Delete role',

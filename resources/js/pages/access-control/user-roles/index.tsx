@@ -1,5 +1,8 @@
 import { Head, Link, router } from '@inertiajs/react';
 import { Filter } from 'lucide-react';
+import { dashboard } from '@/routes';
+import { index as rolesIndex } from '@/routes/access-control/roles';
+import { index as urIndex, create as urCreate, destroy as urDestroy, update as urUpdate } from '@/routes/access-control/user-roles';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { PageHeader } from '@/components/page-header';
 import { Can } from '@/components/can';
@@ -83,7 +86,7 @@ export default function UserRolesIndex({ assignments, users, roles, filters }: P
 
     const applyFilters = () => {
         filterPopoverRef.current?.removeAttribute('open');
-        router.get('/access-control/user-roles', form, {
+        router.get(urIndex.url(), form, {
             preserveState: true,
             preserveScroll: true,
             replace: true,
@@ -94,7 +97,7 @@ export default function UserRolesIndex({ assignments, users, roles, filters }: P
         const reset = { search: '', user_id: '', role_id: '', scope_type: '', is_active: '', per_page: '10' };
         setForm(reset);
         filterPopoverRef.current?.removeAttribute('open');
-        router.get('/access-control/user-roles', {}, {
+        router.get(urIndex.url(), {}, {
             preserveState: true,
             preserveScroll: true,
             replace: true,
@@ -104,7 +107,7 @@ export default function UserRolesIndex({ assignments, users, roles, filters }: P
     const updatePerPage = (nextValue: string) => {
         const nextFilters = { ...form, per_page: nextValue, page: '1' };
         setForm((current) => ({ ...current, per_page: nextValue }));
-        router.get('/access-control/user-roles', nextFilters, {
+        router.get(urIndex.url(), nextFilters, {
             preserveState: true,
             preserveScroll: true,
             replace: true,
@@ -115,7 +118,7 @@ export default function UserRolesIndex({ assignments, users, roles, filters }: P
         value: form.search,
         onSearch: (value, { onCancelToken }) => {
             router.get(
-                '/access-control/user-roles',
+                urIndex.url(),
                 { ...form, search: value, page: '1' },
                 { preserveState: true, preserveScroll: true, replace: true, onCancelToken },
             );
@@ -124,12 +127,12 @@ export default function UserRolesIndex({ assignments, users, roles, filters }: P
 
     function confirmDelete(assignment: Assignment) {
         if (confirm(`Remove role "${assignment.role?.name}" from "${assignment.user?.name}"? This cannot be undone.`)) {
-            router.delete(`/access-control/user-roles/${assignment.id}`, { preserveScroll: true });
+            router.delete(urDestroy.url(assignment.id), { preserveScroll: true });
         }
     }
 
     function toggleActive(assignment: Assignment) {
-        router.patch(`/access-control/user-roles/${assignment.id}`, { is_active: !assignment.is_active }, { preserveScroll: true });
+        router.patch(urUpdate.url(assignment.id), { is_active: !assignment.is_active }, { preserveScroll: true });
     }
 
     return (
@@ -137,8 +140,8 @@ export default function UserRolesIndex({ assignments, users, roles, filters }: P
             <Head title="User Role Assignments" />
             <PageHeader
                 breadcrumbs={[
-                    { label: 'Home', href: '/dashboard' },
-                    { label: 'Access Control', href: '/access-control/roles' },
+                    { label: 'Home', href: dashboard.url() },
+                    { label: 'Access Control', href: rolesIndex.url() },
                     { label: 'User Roles' },
                 ]}
                 title="User Role Assignments"
@@ -146,7 +149,7 @@ export default function UserRolesIndex({ assignments, users, roles, filters }: P
                 actions={
                     <Can permission="access-control-manage">
                         <Link
-                            href="/access-control/user-roles/create"
+                            href={urCreate.url()}
                             className="inline-flex items-center gap-2 rounded-lg bg-primary px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition-colors hover:bg-primary/90"
                         >
                             <span className="material-symbols-outlined text-[18px]">add_circle</span>

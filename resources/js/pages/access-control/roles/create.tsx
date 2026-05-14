@@ -1,4 +1,6 @@
 import { Head, Link, useForm } from '@inertiajs/react';
+import { dashboard } from '@/routes';
+import { index as rolesIndex, store as rolesStore } from '@/routes/access-control/roles';
 import { PageHeader } from '@/components/page-header';
 import { FormSection } from '@/components/form-section';
 import { FormField } from '@/components/ui/form-field';
@@ -22,7 +24,7 @@ export default function RolesCreate() {
 
     function submit(e: React.FormEvent) {
         e.preventDefault();
-        post('/access-control/roles');
+        post(rolesStore.url());
     }
 
     return (
@@ -30,9 +32,9 @@ export default function RolesCreate() {
             <Head title="Create Role" />
             <PageHeader
                 breadcrumbs={[
-                    { label: 'Home', href: '/dashboard' },
-                    { label: 'Access Control', href: '/access-control/roles' },
-                    { label: 'Roles', href: '/access-control/roles' },
+                    { label: 'Home', href: dashboard.url() },
+                    { label: 'Access Control', href: rolesIndex.url() },
+                    { label: 'Roles', href: rolesIndex.url() },
                     { label: 'Create' },
                 ]}
                 title="Create Role"
@@ -120,7 +122,7 @@ export default function RolesCreate() {
                 <div className="flex flex-wrap items-center justify-end gap-4 border-t border-border/70 pt-8 dark:border-stone-700">
                     <span className="hidden text-sm text-muted-foreground italic sm:inline">Unsaved changes will be lost.</span>
                     <Link
-                        href="/access-control/roles"
+                        href={rolesIndex.url()}
                         className="rounded-lg px-6 py-2.5 text-sm font-semibold text-muted-foreground transition-colors hover:bg-secondary"
                     >
                         Discard Draft

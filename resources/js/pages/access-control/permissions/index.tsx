@@ -11,6 +11,9 @@ import { ActionDropdown } from '@/components/action-dropdown';
 import { tablePerPageOptions } from '@/hooks/use-client-pagination';
 import { useDebouncedInertiaSearch } from '@/hooks/use-debounced-inertia-search';
 import { cn } from '@/lib/utils';
+import { dashboard } from '@/routes';
+import { index as rolesIndex } from '@/routes/access-control/roles';
+import { index as permissionsIndex, create as permissionsCreate, edit as permissionsEdit, destroy as permissionsDestroy } from '@/routes/access-control/permissions';
 import type { Permission } from '@/types';
 
 type PaginatedPermissions = {
@@ -78,7 +81,7 @@ export default function PermissionsIndex({ permissions, modules, actions, filter
 
     const applyFilters = () => {
         filterPopoverRef.current?.removeAttribute('open');
-        router.get('/access-control/permissions', form, {
+        router.get(permissionsIndex.url(), form, {
             preserveState: true,
             preserveScroll: true,
             replace: true,
@@ -89,7 +92,7 @@ export default function PermissionsIndex({ permissions, modules, actions, filter
         const reset = { search: '', module: '', action: '', level: '', is_active: '', per_page: '10' };
         setForm(reset);
         filterPopoverRef.current?.removeAttribute('open');
-        router.get('/access-control/permissions', {}, {
+        router.get(permissionsIndex.url(), {}, {
             preserveState: true,
             preserveScroll: true,
             replace: true,
@@ -99,7 +102,7 @@ export default function PermissionsIndex({ permissions, modules, actions, filter
     const updatePerPage = (nextValue: string) => {
         const nextFilters = { ...form, per_page: nextValue, page: '1' };
         setForm((current) => ({ ...current, per_page: nextValue }));
-        router.get('/access-control/permissions', nextFilters, {
+        router.get(permissionsIndex.url(), nextFilters, {
             preserveState: true,
             preserveScroll: true,
             replace: true,
@@ -110,7 +113,7 @@ export default function PermissionsIndex({ permissions, modules, actions, filter
         value: form.search,
         onSearch: (value, { onCancelToken }) => {
             router.get(
-                '/access-control/permissions',
+                permissionsIndex.url(),
                 { ...form, search: value, page: '1' },
                 { preserveState: true, preserveScroll: true, replace: true, onCancelToken },
             );
@@ -119,7 +122,7 @@ export default function PermissionsIndex({ permissions, modules, actions, filter
 
     function confirmDelete(permission: Permission) {
         if (confirm(`Delete permission "${permission.slug}"? This cannot be undone.`)) {
-            router.delete(`/access-control/permissions/${permission.id}`);
+            router.delete(permissionsDestroy.url(permission.id));
         }
     }
 
@@ -128,8 +131,8 @@ export default function PermissionsIndex({ permissions, modules, actions, filter
             <Head title="Permissions" />
             <PageHeader
                 breadcrumbs={[
-                    { label: 'Home', href: '/dashboard' },
-                    { label: 'Access Control', href: '/access-control/roles' },
+                    { label: 'Home', href: dashboard.url() },
+                    { label: 'Access Control', href: rolesIndex.url() },
                     { label: 'Permissions' },
                 ]}
                 title="Permissions"
@@ -137,7 +140,7 @@ export default function PermissionsIndex({ permissions, modules, actions, filter
                 actions={
                     <Can permission="permissions-create">
                         <Link
-                            href="/access-control/permissions/create"
+                            href={permissionsCreate.url()}
                             className="inline-flex items-center gap-2 rounded-lg bg-primary px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition-colors hover:bg-primary/90"
                         >
                             <span className="material-symbols-outlined text-[18px]">add_circle</span>
@@ -362,7 +365,7 @@ export default function PermissionsIndex({ permissions, modules, actions, filter
                                             itemLabel={perm.name}
                                             onToggle={(id) => toggleActionMenu(id as number | null)}
                                             actions={[
-                                                { id: `edit-${perm.id}`, label: 'Edit permission', icon: 'edit', href: `/access-control/permissions/${perm.id}/edit` },
+                                                { id: `edit-${perm.id}`, label: 'Edit permission', icon: 'edit', href: permissionsEdit.url(perm.id) },
                                                 ...(!perm.is_system ? [{
                                                     id: `delete-${perm.id}`,
                                                     label: 'Delete permission',

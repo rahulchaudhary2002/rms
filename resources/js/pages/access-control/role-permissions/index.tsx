@@ -1,5 +1,8 @@
 import { Head, Link, router } from '@inertiajs/react';
 import { ChevronDown, Filter, Minus, Plus } from 'lucide-react';
+import { dashboard } from '@/routes';
+import { index as rolesIndex } from '@/routes/access-control/roles';
+import { index as rpIndex, store as rpStore, destroy as rpDestroy } from '@/routes/access-control/role-permissions';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { PageHeader } from '@/components/page-header';
 import { Badge } from '@/components/ui/badge';
@@ -72,7 +75,7 @@ export default function RolePermissionsIndex({ roles, permissions, filters }: Pr
 
     const applyFilters = () => {
         filterPopoverRef.current?.removeAttribute('open');
-        router.get('/access-control/role-permissions', form, {
+        router.get(rpIndex.url(), form, {
             preserveState: true,
             preserveScroll: true,
             replace: true,
@@ -83,7 +86,7 @@ export default function RolePermissionsIndex({ roles, permissions, filters }: Pr
         const reset = { search: '', level: '', per_page: '10' };
         setForm(reset);
         filterPopoverRef.current?.removeAttribute('open');
-        router.get('/access-control/role-permissions', {}, {
+        router.get(rpIndex.url(), {}, {
             preserveState: true,
             preserveScroll: true,
             replace: true,
@@ -93,7 +96,7 @@ export default function RolePermissionsIndex({ roles, permissions, filters }: Pr
     const updatePerPage = (nextValue: string) => {
         const nextFilters = { ...form, per_page: nextValue, page: '1' };
         setForm((current) => ({ ...current, per_page: nextValue }));
-        router.get('/access-control/role-permissions', nextFilters, {
+        router.get(rpIndex.url(), nextFilters, {
             preserveState: true,
             preserveScroll: true,
             replace: true,
@@ -104,7 +107,7 @@ export default function RolePermissionsIndex({ roles, permissions, filters }: Pr
         value: form.search,
         onSearch: (value, { onCancelToken }) => {
             router.get(
-                '/access-control/role-permissions',
+                rpIndex.url(),
                 { ...form, search: value, page: '1' },
                 { preserveState: true, preserveScroll: true, replace: true, onCancelToken },
             );
@@ -114,12 +117,12 @@ export default function RolePermissionsIndex({ roles, permissions, filters }: Pr
     function toggle(permId: number, role: RoleWithPermissions) {
         const has = role.permissions.some((p) => p.id === permId);
         if (has) {
-            router.delete('/access-control/role-permissions', {
+            router.delete(rpDestroy.url(), {
                 data: { role_id: role.id, permission_id: permId },
                 preserveScroll: true,
             });
         } else {
-            router.post('/access-control/role-permissions', {
+            router.post(rpStore.url(), {
                 role_id: role.id,
                 permission_ids: [permId],
             }, { preserveScroll: true });
@@ -131,8 +134,8 @@ export default function RolePermissionsIndex({ roles, permissions, filters }: Pr
             <Head title="Role Permissions" />
             <PageHeader
                 breadcrumbs={[
-                    { label: 'Home', href: '/dashboard' },
-                    { label: 'Access Control', href: '/access-control/roles' },
+                    { label: 'Home', href: dashboard.url() },
+                    { label: 'Access Control', href: rolesIndex.url() },
                     { label: 'Role Permissions' },
                 ]}
                 title="Role Permissions"

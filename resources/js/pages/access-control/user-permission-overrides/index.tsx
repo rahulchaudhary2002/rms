@@ -1,5 +1,8 @@
 import { Head, Link, router } from '@inertiajs/react';
 import { Filter } from 'lucide-react';
+import { dashboard } from '@/routes';
+import { index as rolesIndex } from '@/routes/access-control/roles';
+import { index as upoIndex, create as upoCreate, destroy as upoDestroy, update as upoUpdate } from '@/routes/access-control/user-permission-overrides';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { PageHeader } from '@/components/page-header';
 import { Can } from '@/components/can';
@@ -85,7 +88,7 @@ export default function UserPermissionOverridesIndex({ overrides, users, permiss
 
     const applyFilters = () => {
         filterPopoverRef.current?.removeAttribute('open');
-        router.get('/access-control/user-permission-overrides', form, {
+        router.get(upoIndex.url(), form, {
             preserveState: true,
             preserveScroll: true,
             replace: true,
@@ -96,7 +99,7 @@ export default function UserPermissionOverridesIndex({ overrides, users, permiss
         const reset = { search: '', user_id: '', permission_id: '', scope_type: '', effect: '', is_active: '', per_page: '10' };
         setForm(reset);
         filterPopoverRef.current?.removeAttribute('open');
-        router.get('/access-control/user-permission-overrides', {}, {
+        router.get(upoIndex.url(), {}, {
             preserveState: true,
             preserveScroll: true,
             replace: true,
@@ -106,7 +109,7 @@ export default function UserPermissionOverridesIndex({ overrides, users, permiss
     const updatePerPage = (nextValue: string) => {
         const nextFilters = { ...form, per_page: nextValue, page: '1' };
         setForm((current) => ({ ...current, per_page: nextValue }));
-        router.get('/access-control/user-permission-overrides', nextFilters, {
+        router.get(upoIndex.url(), nextFilters, {
             preserveState: true,
             preserveScroll: true,
             replace: true,
@@ -117,7 +120,7 @@ export default function UserPermissionOverridesIndex({ overrides, users, permiss
         value: form.search,
         onSearch: (value, { onCancelToken }) => {
             router.get(
-                '/access-control/user-permission-overrides',
+                upoIndex.url(),
                 { ...form, search: value, page: '1' },
                 { preserveState: true, preserveScroll: true, replace: true, onCancelToken },
             );
@@ -126,12 +129,12 @@ export default function UserPermissionOverridesIndex({ overrides, users, permiss
 
     function confirmDelete(o: Override) {
         if (confirm(`Remove override for "${o.user?.name}"? This cannot be undone.`)) {
-            router.delete(`/access-control/user-permission-overrides/${o.id}`, { preserveScroll: true });
+            router.delete(upoDestroy.url(o.id), { preserveScroll: true });
         }
     }
 
     function toggleActive(o: Override) {
-        router.patch(`/access-control/user-permission-overrides/${o.id}`, { is_active: !o.is_active }, { preserveScroll: true });
+        router.patch(upoUpdate.url(o.id), { is_active: !o.is_active }, { preserveScroll: true });
     }
 
     return (
@@ -139,8 +142,8 @@ export default function UserPermissionOverridesIndex({ overrides, users, permiss
             <Head title="Permission Overrides" />
             <PageHeader
                 breadcrumbs={[
-                    { label: 'Home', href: '/dashboard' },
-                    { label: 'Access Control', href: '/access-control/roles' },
+                    { label: 'Home', href: dashboard.url() },
+                    { label: 'Access Control', href: rolesIndex.url() },
                     { label: 'Permission Overrides' },
                 ]}
                 title="User Permission Overrides"
@@ -148,7 +151,7 @@ export default function UserPermissionOverridesIndex({ overrides, users, permiss
                 actions={
                     <Can permission="access-control-manage">
                         <Link
-                            href="/access-control/user-permission-overrides/create"
+                            href={upoCreate.url()}
                             className="inline-flex items-center gap-2 rounded-lg bg-primary px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition-colors hover:bg-primary/90"
                         >
                             <span className="material-symbols-outlined text-[18px]">add_circle</span>

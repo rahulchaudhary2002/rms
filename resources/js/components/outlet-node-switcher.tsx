@@ -1,4 +1,5 @@
 import { router, usePage } from '@inertiajs/react';
+import { store as outletsStore } from '@/routes/outlets';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import type { FormEvent } from 'react';
 import { Button } from '@/components/ui/button';
@@ -318,7 +319,7 @@ export function OutletNodeSwitcher() {
             const csrfToken =
                 document.querySelector<HTMLMetaElement>('meta[name="csrf-token"]')?.content ?? '';
 
-            const response = await fetch('/outlets', {
+            const response = await fetch(outletsStore.url(), {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',

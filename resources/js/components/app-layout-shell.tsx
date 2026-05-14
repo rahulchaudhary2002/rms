@@ -10,6 +10,14 @@ import { cn } from '@/lib/utils';
 import { edit as editAppearance } from '@/routes/appearance';
 import { edit as editProfile } from '@/routes/profile';
 import { edit as editSecurity } from '@/routes/security';
+import { dashboard, logout } from '@/routes';
+import { index as usersIndex } from '@/routes/users';
+import { index as rolesIndex } from '@/routes/access-control/roles';
+import { index as permissionsIndex } from '@/routes/access-control/permissions';
+import { index as rpIndex } from '@/routes/access-control/role-permissions';
+import { index as urIndex } from '@/routes/access-control/user-roles';
+import { index as upoIndex } from '@/routes/access-control/user-permission-overrides';
+import { index as urpIndex } from '@/routes/access-control/user-resource-permissions';
 import type { AppLayoutProps, Auth, BreadcrumbItem } from '@/types';
 
 type ViewportMode = 'mobile' | 'medium' | 'large';
@@ -77,9 +85,9 @@ const appLogoName =
 const primaryItems: MenuItem[] = [
     {
         title: 'Dashboard',
-        href: '/dashboard',
+        href: dashboard.url(),
         icon: 'space_dashboard',
-        activeMatch: ['/dashboard'],
+        activeMatch: [dashboard.url()],
     },
 ];
 
@@ -168,13 +176,13 @@ function buildBreadcrumbsFromUrl(currentUrl: string): BreadcrumbItem[] {
     const path = currentUrl.split('?')[0].split('#')[0] || '/';
 
     if (path === '/' || path === '') {
-        return [{ title: 'Dashboard', href: '/dashboard' }];
+        return [{ title: 'Dashboard', href: dashboard.url() }];
     }
 
     const segments = path.split('/').filter(Boolean);
 
     if (segments.length === 0) {
-        return [{ title: 'Dashboard', href: '/dashboard' }];
+        return [{ title: 'Dashboard', href: dashboard.url() }];
     }
 
     const breadcrumbs: BreadcrumbItem[] = [];
@@ -198,19 +206,19 @@ function buildDynamicGroups(auth: Auth): MenuGroup[] {
     const acItems: MenuItem[] = [];
 
     if (can('users-manage')) {
-        acItems.push({ title: 'Users', href: '/users', icon: 'group', activeMatch: ['/users'] });
+        acItems.push({ title: 'Users', href: usersIndex.url(), icon: 'group', activeMatch: [usersIndex.url()] });
     }
     if (can('roles-view')) {
-        acItems.push({ title: 'Roles', href: '/access-control/roles', icon: 'shield_person', activeMatch: ['/access-control/roles'] });
+        acItems.push({ title: 'Roles', href: rolesIndex.url(), icon: 'shield_person', activeMatch: [rolesIndex.url()] });
     }
     if (can('permissions-view')) {
-        acItems.push({ title: 'Permissions', href: '/access-control/permissions', icon: 'key', activeMatch: ['/access-control/permissions'] });
+        acItems.push({ title: 'Permissions', href: permissionsIndex.url(), icon: 'key', activeMatch: [permissionsIndex.url()] });
     }
     if (can('access-control-manage')) {
-        acItems.push({ title: 'Role Permissions', href: '/access-control/role-permissions', icon: 'lock', activeMatch: ['/access-control/role-permissions'] });
-        acItems.push({ title: 'User Roles', href: '/access-control/user-roles', icon: 'manage_accounts', activeMatch: ['/access-control/user-roles'] });
-        acItems.push({ title: 'Permission Overrides', href: '/access-control/user-permission-overrides', icon: 'tune', activeMatch: ['/access-control/user-permission-overrides'] });
-        acItems.push({ title: 'Resource Permissions', href: '/access-control/user-resource-permissions', icon: 'rule', activeMatch: ['/access-control/user-resource-permissions'] });
+        acItems.push({ title: 'Role Permissions', href: rpIndex.url(), icon: 'lock', activeMatch: [rpIndex.url()] });
+        acItems.push({ title: 'User Roles', href: urIndex.url(), icon: 'manage_accounts', activeMatch: [urIndex.url()] });
+        acItems.push({ title: 'Permission Overrides', href: upoIndex.url(), icon: 'tune', activeMatch: [upoIndex.url()] });
+        acItems.push({ title: 'Resource Permissions', href: urpIndex.url(), icon: 'rule', activeMatch: [urpIndex.url()] });
     }
 
     const groups: MenuGroup[] = [];
@@ -758,7 +766,7 @@ export default function AppLayoutShell({
         setNotificationsOpen(false);
         setOpenDropRight(null);
         router.flushAll();
-        router.post('/logout');
+        router.post(logout.url());
     };
 
     const handleNotificationClick = (notification: NotificationItem) => {

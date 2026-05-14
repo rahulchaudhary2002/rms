@@ -1,4 +1,7 @@
 import { Head, Link, useForm } from '@inertiajs/react';
+import { dashboard } from '@/routes';
+import { index as rolesIndex } from '@/routes/access-control/roles';
+import { index as urpIndex, store as urpStore } from '@/routes/access-control/user-resource-permissions';
 import { PageHeader } from '@/components/page-header';
 import { FormSection } from '@/components/form-section';
 import { FormField } from '@/components/ui/form-field';
@@ -28,7 +31,7 @@ export default function UserResourcePermissionsCreate({ users, permissions, reso
 
     function submit(e: React.FormEvent) {
         e.preventDefault();
-        post('/access-control/user-resource-permissions');
+        post(urpStore.url());
     }
 
     return (
@@ -36,9 +39,9 @@ export default function UserResourcePermissionsCreate({ users, permissions, reso
             <Head title="Add Resource Permission" />
             <PageHeader
                 breadcrumbs={[
-                    { label: 'Home', href: '/dashboard' },
-                    { label: 'Access Control', href: '/access-control/roles' },
-                    { label: 'Resource Permissions', href: '/access-control/user-resource-permissions' },
+                    { label: 'Home', href: dashboard.url() },
+                    { label: 'Access Control', href: rolesIndex.url() },
+                    { label: 'Resource Permissions', href: urpIndex.url() },
                     { label: 'Add Permission' },
                 ]}
                 title="Add Resource Permission"
@@ -129,7 +132,7 @@ export default function UserResourcePermissionsCreate({ users, permissions, reso
                 <div className="flex flex-wrap items-center justify-end gap-4 border-t border-border/70 pt-8 dark:border-stone-700">
                     <span className="hidden text-sm text-muted-foreground italic sm:inline">Unsaved changes will be lost.</span>
                     <Link
-                        href="/access-control/user-resource-permissions"
+                        href={urpIndex.url()}
                         className="rounded-lg px-6 py-2.5 text-sm font-semibold text-muted-foreground transition-colors hover:bg-secondary"
                     >
                         Cancel

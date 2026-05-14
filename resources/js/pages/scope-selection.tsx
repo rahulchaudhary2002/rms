@@ -2,6 +2,10 @@ import { Head, router, usePage } from '@inertiajs/react';
 import { useMemo, useState } from 'react';
 import type { FormEvent } from 'react';
 import { PageHeader } from '@/components/page-header';
+import { dashboard } from '@/routes';
+import { store as scopeSelectionStore } from '@/routes/scope-selection';
+import { store as outletsStore } from '@/routes/outlets';
+import { store as warehousesStore } from '@/routes/warehouses';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import {
@@ -96,7 +100,7 @@ export default function ScopeSelection() {
         setCreationError('');
 
         try {
-            const response = await fetch('/outlets', {
+            const response = await fetch(outletsStore.url(), {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
@@ -128,7 +132,7 @@ export default function ScopeSelection() {
         setCreationError('');
 
         try {
-            const response = await fetch('/warehouses', {
+            const response = await fetch(warehousesStore.url(), {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
@@ -219,12 +223,12 @@ export default function ScopeSelection() {
         setProcessing(true);
 
         router.post(
-            '/scope-selection',
+            scopeSelectionStore.url(),
             {
                 scope_type: selectedScopeType,
                 outlet_id: selectedScopeType === 'outlet' ? selectedOutletId : null,
                 warehouse_id: selectedScopeType === 'warehouse' ? selectedNodeId : null,
-                redirect_to: '/dashboard',
+                redirect_to: dashboard.url(),
             },
             {
                 preserveScroll: false,
@@ -239,7 +243,7 @@ export default function ScopeSelection() {
 
             <div className="mx-auto w-full max-w-3xl space-y-6 px-4 py-8">
                 <PageHeader
-                    breadcrumbs={[{ label: 'Dashboard', href: '/dashboard' }, { label: 'Scope Selection' }]}
+                    breadcrumbs={[{ label: 'Dashboard', href: dashboard.url() }, { label: 'Scope Selection' }]}
                     title="Select active outlet or warehouse"
                     description="Choose an outlet for all warehouse operations, or a warehouse for warehouse-specific data."
                 />

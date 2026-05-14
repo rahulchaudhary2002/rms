@@ -1,5 +1,8 @@
 import { Head, Link, router } from '@inertiajs/react';
 import { Filter } from 'lucide-react';
+import { dashboard } from '@/routes';
+import { index as rolesIndex } from '@/routes/access-control/roles';
+import { index as usersIndex, create as usersCreate, show as usersShow, edit as usersEdit, destroy as usersDestroy } from '@/routes/users';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { PageHeader } from '@/components/page-header';
 import { TableCard, TableSearchInput } from '@/components/table-card';
@@ -70,31 +73,31 @@ export default function UsersIndex({ users, filters }: Props) {
 
     const applyFilters = () => {
         filterPopoverRef.current?.removeAttribute('open');
-        router.get('/users', form, { preserveState: true, preserveScroll: true, replace: true });
+        router.get(usersIndex.url(), form, { preserveState: true, preserveScroll: true, replace: true });
     };
 
     const clearFilters = () => {
         const reset = { search: '', verified: '', per_page: '10' };
         setForm(reset);
         filterPopoverRef.current?.removeAttribute('open');
-        router.get('/users', {}, { preserveState: true, preserveScroll: true, replace: true });
+        router.get(usersIndex.url(), {}, { preserveState: true, preserveScroll: true, replace: true });
     };
 
     const updatePerPage = (value: string) => {
         setForm((f) => ({ ...f, per_page: value }));
-        router.get('/users', { ...form, per_page: value, page: '1' }, { preserveState: true, preserveScroll: true, replace: true });
+        router.get(usersIndex.url(), { ...form, per_page: value, page: '1' }, { preserveState: true, preserveScroll: true, replace: true });
     };
 
     useDebouncedInertiaSearch({
         value: form.search,
         onSearch: (value, { onCancelToken }) => {
-            router.get('/users', { ...form, search: value, page: '1' }, { preserveState: true, preserveScroll: true, replace: true, onCancelToken });
+            router.get(usersIndex.url(), { ...form, search: value, page: '1' }, { preserveState: true, preserveScroll: true, replace: true, onCancelToken });
         },
     });
 
     function confirmDelete(user: User) {
         if (confirm(`Delete user "${user.name}"? This cannot be undone.`)) {
-            router.delete(`/users/${user.id}`);
+            router.delete(usersDestroy.url(user.id));
         }
     }
 
@@ -103,15 +106,15 @@ export default function UsersIndex({ users, filters }: Props) {
             <Head title="Users" />
             <PageHeader
                 breadcrumbs={[
-                    { label: 'Home', href: '/dashboard' },
-                    { label: 'Access Control', href: '/access-control/roles' },
+                    { label: 'Home', href: dashboard.url() },
+                    { label: 'Access Control', href: rolesIndex.url() },
                     { label: 'Users' },
                 ]}
                 title="Users"
                 description="Manage system accounts and superadmin access."
                 actions={
                     <Link
-                        href="/users/create"
+                        href={usersCreate.url()}
                         className="inline-flex items-center gap-2 rounded-lg bg-primary px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition-colors hover:bg-primary/90"
                     >
                         <span className="material-symbols-outlined text-[18px]">person_add</span>
@@ -256,7 +259,7 @@ export default function UsersIndex({ users, filters }: Props) {
                                             </div>
                                             <div>
                                                 <Link
-                                                    href={`/users/${user.id}`}
+                                                    href={usersShow.url(user.id)}
                                                     className="block font-bold text-foreground transition-colors hover:text-primary"
                                                 >
                                                     {user.name}
@@ -288,7 +291,7 @@ export default function UsersIndex({ users, filters }: Props) {
                                             itemLabel={user.name}
                                             onToggle={(id) => setOpenActionId((cur) => (id === null ? null : cur === id ? null : id as number))}
                                             actions={[
-                                                { id: `edit-${user.id}`, label: 'Edit user', icon: 'edit', href: `/users/${user.id}/edit` },
+                                                { id: `edit-${user.id}`, label: 'Edit user', icon: 'edit', href: usersEdit.url(user.id) },
                                                 {
                                                     id: `delete-${user.id}`,
                                                     label: 'Delete user',
