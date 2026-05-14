@@ -37,7 +37,7 @@ class CountryController extends Controller
     {
         $this->countryService->createCountry($request->validated());
 
-        return redirect()->route('countries.index')
+        return redirect($request->input('_redirect', route('countries.index')))
             ->with('success', 'Country created successfully.');
     }
 

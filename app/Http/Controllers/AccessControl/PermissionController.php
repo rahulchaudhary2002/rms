@@ -36,7 +36,7 @@ class PermissionController extends Controller
     {
         $this->permissionService->createPermission($request->validated());
 
-        return redirect()->route('access-control.permissions.index')
+        return redirect($request->input('_redirect', route('access-control.permissions.index')))
             ->with('success', 'Permission created successfully.');
     }
 

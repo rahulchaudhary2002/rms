@@ -1,35 +1,52 @@
 import { Head, Link, useForm } from '@inertiajs/react';
-import { dashboard } from '@/routes';
-import { index as conversionsIndex, store as conversionsStore } from '@/routes/unit-conversions';
-import { PageHeader } from '@/components/page-header';
+import { useState } from 'react';
 import { FormSection } from '@/components/form-section';
+import { PageHeader } from '@/components/page-header';
+import { QuickCreateUnitModal } from '@/components/quick-create-modals';
 import { FormField } from '@/components/ui/form-field';
 import { Input } from '@/components/ui/input';
 import { SearchableSelect } from '@/components/ui/searchable-select';
+import { useCan } from '@/hooks/use-can';
+import { dashboard } from '@/routes';
+import {
+    index as conversionsIndex,
+    store as conversionsStore,
+} from '@/routes/unit-conversions';
 import type { Unit } from '@/types';
 
 type Props = { units: Unit[] };
 
 export default function UnitConversionsCreate({ units }: Props) {
+    const { can } = useCan();
+    const [showUnitModal, setShowUnitModal] = useState(false);
     const { data, setData, post, processing, errors } = useForm({
         from_unit_id: '',
-        to_unit_id:   '',
-        multiplier:   '',
-        is_active:    true,
+        to_unit_id: '',
+        multiplier: '',
+        is_active: true,
     });
 
-    const fromUnit     = units.find((u) => String(u.id) === String(data.from_unit_id));
-    const toUnit       = units.find((u) => String(u.id) === String(data.to_unit_id));
-    const sameTypeUnits = fromUnit ? units.filter((u) => u.type === fromUnit.type) : units;
+    const fromUnit = units.find(
+        (u) => String(u.id) === String(data.from_unit_id),
+    );
+    const toUnit = units.find((u) => String(u.id) === String(data.to_unit_id));
+    const sameTypeUnits = fromUnit
+        ? units.filter((u) => u.type === fromUnit.type)
+        : units;
 
     function handleFromUnitChange(value: string) {
         const selected = units.find((u) => String(u.id) === value);
-        const currentTo = units.find((u) => String(u.id) === String(data.to_unit_id));
+        const currentTo = units.find(
+            (u) => String(u.id) === String(data.to_unit_id),
+        );
 
         setData((prev) => ({
             ...prev,
             from_unit_id: value,
-            to_unit_id: selected && currentTo && currentTo.type !== selected.type ? '' : prev.to_unit_id,
+            to_unit_id:
+                selected && currentTo && currentTo.type !== selected.type
+                    ? ''
+                    : prev.to_unit_id,
         }));
     }
 
@@ -57,20 +74,54 @@ export default function UnitConversionsCreate({ units }: Props) {
                     description="Select the two units and specify the multiplier."
                 >
                     <div className="grid grid-cols-1 gap-5 md:grid-cols-2">
-                        <FormField label="From Unit" error={errors.from_unit_id}>
+                        <FormField
+                            label="From Unit"
+                            error={errors.from_unit_id}
+                        >
                             <SearchableSelect
                                 value={String(data.from_unit_id)}
-                                onChange={(e) => handleFromUnitChange(e.target.value)}
+                                onChange={(e) =>
+                                    handleFromUnitChange(e.target.value)
+                                }
+                                onAddNew={
+                                    can('units-create')
+                                        ? () => setShowUnitModal(true)
+                                        : undefined
+                                }
+                                addNewLabel="Add Unit"
                             >
                                 <option value="">Select unit…</option>
-                                {(['weight', 'volume', 'quantity', 'custom'] as const).map((type) => {
-                                    const typeUnits = units.filter((u) => u.type === type);
-                                    if (typeUnits.length === 0) return null;
+                                {(
+                                    [
+                                        'weight',
+                                        'volume',
+                                        'quantity',
+                                        'custom',
+                                    ] as const
+                                ).map((type) => {
+                                    const typeUnits = units.filter(
+                                        (u) => u.type === type,
+                                    );
+
+                                    if (typeUnits.length === 0) {
+                                        return null;
+                                    }
+
                                     return (
-                                        <optgroup key={type} label={type.charAt(0).toUpperCase() + type.slice(1)}>
+                                        <optgroup
+                                            key={type}
+                                            label={
+                                                type.charAt(0).toUpperCase() +
+                                                type.slice(1)
+                                            }
+                                        >
                                             {typeUnits.map((unit) => (
-                                                <option key={unit.id} value={unit.id}>
-                                                    {unit.name} ({unit.short_name})
+                                                <option
+                                                    key={unit.id}
+                                                    value={unit.id}
+                                                >
+                                                    {unit.name} (
+                                                    {unit.short_name})
                                                 </option>
                                             ))}
                                         </optgroup>
@@ -82,18 +133,36 @@ export default function UnitConversionsCreate({ units }: Props) {
                         <FormField
                             label="To Unit"
                             error={errors.to_unit_id}
-                            description={fromUnit ? `Only ${fromUnit.type} units shown` : undefined}
+                            description={
+                                fromUnit
+                                    ? `Only ${fromUnit.type} units shown`
+                                    : undefined
+                            }
                         >
                             <SearchableSelect
                                 value={String(data.to_unit_id)}
-                                onChange={(e) => setData('to_unit_id', e.target.value)}
+                                onChange={(e) =>
+                                    setData('to_unit_id', e.target.value)
+                                }
                                 disabled={!data.from_unit_id}
+                                onAddNew={
+                                    can('units-create')
+                                        ? () => setShowUnitModal(true)
+                                        : undefined
+                                }
+                                addNewLabel="Add Unit"
                             >
                                 <option value="">
-                                    {data.from_unit_id ? 'Select unit…' : 'Select a From Unit first'}
+                                    {data.from_unit_id
+                                        ? 'Select unit…'
+                                        : 'Select a From Unit first'}
                                 </option>
                                 {sameTypeUnits
-                                    .filter((u) => String(u.id) !== String(data.from_unit_id))
+                                    .filter(
+                                        (u) =>
+                                            String(u.id) !==
+                                            String(data.from_unit_id),
+                                    )
                                     .map((unit) => (
                                         <option key={unit.id} value={unit.id}>
                                             {unit.name} ({unit.short_name})
@@ -102,19 +171,27 @@ export default function UnitConversionsCreate({ units }: Props) {
                             </SearchableSelect>
                         </FormField>
 
-                        <FormField label="Multiplier" htmlFor="multiplier" error={errors.multiplier} className="md:col-span-2">
+                        <FormField
+                            label="Multiplier"
+                            htmlFor="multiplier"
+                            error={errors.multiplier}
+                            className="md:col-span-2"
+                        >
                             <Input
                                 id="multiplier"
                                 type="number"
                                 step="any"
                                 min="0.000001"
                                 value={data.multiplier}
-                                onChange={(e) => setData('multiplier', e.target.value)}
+                                onChange={(e) =>
+                                    setData('multiplier', e.target.value)
+                                }
                                 placeholder="e.g. 1000"
                             />
                             {fromUnit && toUnit && data.multiplier && (
                                 <p className="mt-1.5 text-xs text-muted-foreground">
-                                    Formula: 1 {fromUnit.short_name} = {data.multiplier} {toUnit.short_name}
+                                    Formula: 1 {fromUnit.short_name} ={' '}
+                                    {data.multiplier} {toUnit.short_name}
                                 </p>
                             )}
                         </FormField>
@@ -122,7 +199,12 @@ export default function UnitConversionsCreate({ units }: Props) {
                         <FormField label="Status" error={errors.is_active}>
                             <SearchableSelect
                                 value={data.is_active ? 'true' : 'false'}
-                                onChange={(e) => setData('is_active', e.target.value === 'true')}
+                                onChange={(e) =>
+                                    setData(
+                                        'is_active',
+                                        e.target.value === 'true',
+                                    )
+                                }
                             >
                                 <option value="true">Active</option>
                                 <option value="false">Inactive</option>
@@ -132,8 +214,13 @@ export default function UnitConversionsCreate({ units }: Props) {
                 </FormSection>
 
                 <div className="flex flex-wrap items-center justify-end gap-4 border-t border-border/70 pt-8 dark:border-stone-700">
-                    <span className="hidden text-sm text-muted-foreground italic sm:inline">Unsaved changes will be lost.</span>
-                    <Link href={conversionsIndex.url()} className="rounded-lg px-6 py-2.5 text-sm font-semibold text-muted-foreground transition-colors hover:bg-secondary">
+                    <span className="hidden text-sm text-muted-foreground italic sm:inline">
+                        Unsaved changes will be lost.
+                    </span>
+                    <Link
+                        href={conversionsIndex.url()}
+                        className="rounded-lg px-6 py-2.5 text-sm font-semibold text-muted-foreground transition-colors hover:bg-secondary"
+                    >
                         Discard Draft
                     </Link>
                     <button
@@ -145,6 +232,11 @@ export default function UnitConversionsCreate({ units }: Props) {
                     </button>
                 </div>
             </form>
+
+            <QuickCreateUnitModal
+                open={showUnitModal}
+                onClose={() => setShowUnitModal(false)}
+            />
         </>
     );
 }

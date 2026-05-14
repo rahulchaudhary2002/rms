@@ -46,7 +46,7 @@ class RoleController extends Controller
     {
         Role::create($request->validated());
 
-        return redirect()->route('access-control.roles.index')
+        return redirect($request->input('_redirect', route('access-control.roles.index')))
             ->with('success', 'Role created successfully.');
     }
 

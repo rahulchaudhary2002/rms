@@ -38,7 +38,7 @@ class IngredientCategoryController extends Controller
     {
         $this->categoryService->createCategory($request->validated());
 
-        return redirect()->route('ingredient-categories.index')
+        return redirect($request->input('_redirect', route('ingredient-categories.index')))
             ->with('success', 'Ingredient category created successfully.');
     }
 

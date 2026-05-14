@@ -37,7 +37,7 @@ class UnitController extends Controller
     {
         $this->unitService->createUnit($request->validated());
 
-        return redirect()->route('units.index')
+        return redirect($request->input('_redirect', route('units.index')))
             ->with('success', 'Unit created successfully.');
     }
 

@@ -1,12 +1,17 @@
 import { Head, Link, useForm } from '@inertiajs/react';
-import { useMemo } from 'react';
-import { dashboard } from '@/routes';
-import { index as citiesIndex, update as citiesUpdate } from '@/routes/cities';
-import { PageHeader } from '@/components/page-header';
+import { useMemo, useState } from 'react';
 import { FormSection } from '@/components/form-section';
+import { PageHeader } from '@/components/page-header';
+import {
+    QuickCreateCountryModal,
+    QuickCreateStateModal,
+} from '@/components/quick-create-modals';
 import { FormField } from '@/components/ui/form-field';
 import { Input } from '@/components/ui/input';
 import { SearchableSelect } from '@/components/ui/searchable-select';
+import { useCan } from '@/hooks/use-can';
+import { dashboard } from '@/routes';
+import { index as citiesIndex, update as citiesUpdate } from '@/routes/cities';
 import type { City, Country, State } from '@/types';
 
 type Props = {
@@ -16,15 +21,20 @@ type Props = {
 };
 
 export default function CitiesEdit({ city, countries, states }: Props) {
+    const { can } = useCan();
+    const [modal, setModal] = useState<'country' | 'state' | null>(null);
     const { data, setData, put, processing, errors } = useForm({
         country_id: String(city.country_id),
-        state_id:   city.state_id ? String(city.state_id) : '',
-        name:       city.name,
-        is_active:  city.is_active,
+        state_id: city.state_id ? String(city.state_id) : '',
+        name: city.name,
+        is_active: city.is_active,
     });
 
     const filteredStates = useMemo(
-        () => data.country_id ? states.filter((s) => String(s.country_id) === data.country_id) : [],
+        () =>
+            data.country_id
+                ? states.filter((s) => String(s.country_id) === data.country_id)
+                : [],
         [states, data.country_id],
     );
 
@@ -55,40 +65,79 @@ export default function CitiesEdit({ city, countries, states }: Props) {
                         <FormField label="Country" error={errors.country_id}>
                             <SearchableSelect
                                 value={data.country_id}
-                                onChange={(e) => setData((prev) => ({ ...prev, country_id: e.target.value, state_id: '' }))}
+                                onChange={(e) =>
+                                    setData((prev) => ({
+                                        ...prev,
+                                        country_id: e.target.value,
+                                        state_id: '',
+                                    }))
+                                }
+                                onAddNew={
+                                    can('countries-create')
+                                        ? () => setModal('country')
+                                        : undefined
+                                }
+                                addNewLabel="Add Country"
                             >
                                 <option value="">Select Country</option>
                                 {countries.map((c) => (
-                                    <option key={c.id} value={c.id}>{c.name}</option>
+                                    <option key={c.id} value={c.id}>
+                                        {c.name}
+                                    </option>
                                 ))}
                             </SearchableSelect>
                         </FormField>
 
-                        <FormField label="State / Province" error={errors.state_id}>
+                        <FormField
+                            label="State / Province"
+                            error={errors.state_id}
+                        >
                             <SearchableSelect
                                 value={data.state_id}
-                                onChange={(e) => setData('state_id', e.target.value)}
+                                onChange={(e) =>
+                                    setData('state_id', e.target.value)
+                                }
                                 disabled={!data.country_id}
+                                onAddNew={
+                                    can('states-create')
+                                        ? () => setModal('state')
+                                        : undefined
+                                }
+                                addNewLabel="Add State"
                             >
                                 <option value="">No State</option>
                                 {filteredStates.map((s) => (
-                                    <option key={s.id} value={s.id}>{s.name}</option>
+                                    <option key={s.id} value={s.id}>
+                                        {s.name}
+                                    </option>
                                 ))}
                             </SearchableSelect>
                         </FormField>
 
-                        <FormField label="Name" htmlFor="name" error={errors.name} className="md:col-span-2">
+                        <FormField
+                            label="Name"
+                            htmlFor="name"
+                            error={errors.name}
+                            className="md:col-span-2"
+                        >
                             <Input
                                 id="name"
                                 value={data.name}
-                                onChange={(e) => setData('name', e.target.value)}
+                                onChange={(e) =>
+                                    setData('name', e.target.value)
+                                }
                             />
                         </FormField>
 
                         <FormField label="Status" error={errors.is_active}>
                             <SearchableSelect
                                 value={data.is_active ? 'true' : 'false'}
-                                onChange={(e) => setData('is_active', e.target.value === 'true')}
+                                onChange={(e) =>
+                                    setData(
+                                        'is_active',
+                                        e.target.value === 'true',
+                                    )
+                                }
                             >
                                 <option value="true">Active</option>
                                 <option value="false">Inactive</option>
@@ -98,8 +147,13 @@ export default function CitiesEdit({ city, countries, states }: Props) {
                 </FormSection>
 
                 <div className="flex flex-wrap items-center justify-end gap-4 border-t border-border/70 pt-8 dark:border-stone-700">
-                    <span className="hidden text-sm text-muted-foreground italic sm:inline">Unsaved changes will be lost.</span>
-                    <Link href={citiesIndex.url()} className="rounded-lg px-6 py-2.5 text-sm font-semibold text-muted-foreground transition-colors hover:bg-secondary">
+                    <span className="hidden text-sm text-muted-foreground italic sm:inline">
+                        Unsaved changes will be lost.
+                    </span>
+                    <Link
+                        href={citiesIndex.url()}
+                        className="rounded-lg px-6 py-2.5 text-sm font-semibold text-muted-foreground transition-colors hover:bg-secondary"
+                    >
                         Discard Changes
                     </Link>
                     <button
@@ -111,6 +165,17 @@ export default function CitiesEdit({ city, countries, states }: Props) {
                     </button>
                 </div>
             </form>
+
+            <QuickCreateCountryModal
+                open={modal === 'country'}
+                onClose={() => setModal(null)}
+            />
+            <QuickCreateStateModal
+                open={modal === 'state'}
+                onClose={() => setModal(null)}
+                countries={countries}
+                defaultCountryId={data.country_id}
+            />
         </>
     );
 }

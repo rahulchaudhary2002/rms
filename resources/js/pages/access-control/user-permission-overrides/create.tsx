@@ -1,13 +1,22 @@
 import { Head, Link, useForm } from '@inertiajs/react';
+import { useState } from 'react';
+import { FormSection } from '@/components/form-section';
+import { PageHeader } from '@/components/page-header';
+import {
+    QuickCreatePermissionModal,
+    QuickCreateUserModal,
+} from '@/components/quick-create-modals';
+import { AsyncResourceSelect } from '@/components/ui/async-resource-select';
+import { FormField } from '@/components/ui/form-field';
+import { Input } from '@/components/ui/input';
+import { SearchableSelect } from '@/components/ui/searchable-select';
+import { useCan } from '@/hooks/use-can';
 import { dashboard } from '@/routes';
 import { index as rolesIndex } from '@/routes/access-control/roles';
-import { index as upoIndex, store as upoStore } from '@/routes/access-control/user-permission-overrides';
-import { PageHeader } from '@/components/page-header';
-import { FormSection } from '@/components/form-section';
-import { FormField } from '@/components/ui/form-field';
-import { SearchableSelect } from '@/components/ui/searchable-select';
-import { Input } from '@/components/ui/input';
-import { AsyncResourceSelect } from '@/components/ui/async-resource-select';
+import {
+    index as upoIndex,
+    store as upoStore,
+} from '@/routes/access-control/user-permission-overrides';
 import type { Permission } from '@/types';
 
 type User = { id: number; name: string; email: string };
@@ -22,7 +31,15 @@ type Props = {
     allowedScopeTypes: string[];
 };
 
-export default function UserPermissionOverridesCreate({ users, permissions, scopeTypes, allowedScopes, allowedScopeTypes }: Props) {
+export default function UserPermissionOverridesCreate({
+    users,
+    permissions,
+    scopeTypes,
+    allowedScopes,
+    allowedScopeTypes,
+}: Props) {
+    const { can } = useCan();
+    const [modal, setModal] = useState<'user' | 'permission' | null>(null);
     const defaultScopeType = allowedScopeTypes[0] ?? 'global';
     const { data, setData, post, processing, errors } = useForm({
         user_id: '',
@@ -60,10 +77,22 @@ export default function UserPermissionOverridesCreate({ users, permissions, scop
                     description="Select the user, permission, scope, and effect for this override."
                 >
                     <div className="grid grid-cols-1 gap-5 md:grid-cols-2">
-                        <FormField label="User" error={errors.user_id} className="md:col-span-2">
+                        <FormField
+                            label="User"
+                            error={errors.user_id}
+                            className="md:col-span-2"
+                        >
                             <SearchableSelect
                                 value={data.user_id}
-                                onChange={(e) => setData('user_id', e.target.value)}
+                                onChange={(e) =>
+                                    setData('user_id', e.target.value)
+                                }
+                                onAddNew={
+                                    can('users-manage')
+                                        ? () => setModal('user')
+                                        : undefined
+                                }
+                                addNewLabel="Add User"
                             >
                                 <option value="">Select a user...</option>
                                 {users.map((u) => (
@@ -74,10 +103,22 @@ export default function UserPermissionOverridesCreate({ users, permissions, scop
                             </SearchableSelect>
                         </FormField>
 
-                        <FormField label="Permission" error={errors.permission_id} className="md:col-span-2">
+                        <FormField
+                            label="Permission"
+                            error={errors.permission_id}
+                            className="md:col-span-2"
+                        >
                             <SearchableSelect
                                 value={data.permission_id}
-                                onChange={(e) => setData('permission_id', e.target.value)}
+                                onChange={(e) =>
+                                    setData('permission_id', e.target.value)
+                                }
+                                onAddNew={
+                                    can('permissions-create')
+                                        ? () => setModal('permission')
+                                        : undefined
+                                }
+                                addNewLabel="Add Permission"
                             >
                                 <option value="">Select a permission...</option>
                                 {permissions.map((p) => (
@@ -91,7 +132,9 @@ export default function UserPermissionOverridesCreate({ users, permissions, scop
                         <FormField label="Effect" error={errors.effect}>
                             <SearchableSelect
                                 value={data.effect}
-                                onChange={(e) => setData('effect', e.target.value)}
+                                onChange={(e) =>
+                                    setData('effect', e.target.value)
+                                }
                             >
                                 <option value="allow">Allow</option>
                                 <option value="deny">Deny</option>
@@ -106,31 +149,55 @@ export default function UserPermissionOverridesCreate({ users, permissions, scop
                                     setData('scope_id', '');
                                 }}
                             >
-                                {allowedScopeTypes.includes('global') && <option value="global">Global</option>}
-                                {scopeTypes.filter((st) => allowedScopeTypes.includes(st.type)).map((st) => (
-                                    <option key={st.type} value={st.type}>
-                                        {st.label}
-                                    </option>
-                                ))}
+                                {allowedScopeTypes.includes('global') && (
+                                    <option value="global">Global</option>
+                                )}
+                                {scopeTypes
+                                    .filter((st) =>
+                                        allowedScopeTypes.includes(st.type),
+                                    )
+                                    .map((st) => (
+                                        <option key={st.type} value={st.type}>
+                                            {st.label}
+                                        </option>
+                                    ))}
                             </SearchableSelect>
                         </FormField>
 
                         {isScoped && (
-                            <FormField label="Scope Resource" error={errors.scope_id} className="md:col-span-2">
+                            <FormField
+                                label="Scope Resource"
+                                error={errors.scope_id}
+                                className="md:col-span-2"
+                            >
                                 <AsyncResourceSelect
                                     resourceType={data.scope_type}
                                     value={data.scope_id}
                                     onChange={(val) => setData('scope_id', val)}
-                                    allowedIds={allowedScopes ? (allowedScopes[data.scope_type as 'outlet' | 'warehouse'] ?? null) : null}
+                                    allowedIds={
+                                        allowedScopes
+                                            ? (allowedScopes[
+                                                  data.scope_type as
+                                                      | 'outlet'
+                                                      | 'warehouse'
+                                              ] ?? null)
+                                            : null
+                                    }
                                     placeholder="Select a resource..."
                                 />
                             </FormField>
                         )}
 
-                        <FormField label="Reason (optional)" error={errors.reason} className="md:col-span-2">
+                        <FormField
+                            label="Reason (optional)"
+                            error={errors.reason}
+                            className="md:col-span-2"
+                        >
                             <Input
                                 value={data.reason}
-                                onChange={(e) => setData('reason', e.target.value)}
+                                onChange={(e) =>
+                                    setData('reason', e.target.value)
+                                }
                                 placeholder="Why is this override needed?"
                             />
                         </FormField>
@@ -138,7 +205,9 @@ export default function UserPermissionOverridesCreate({ users, permissions, scop
                 </FormSection>
 
                 <div className="flex flex-wrap items-center justify-end gap-4 border-t border-border/70 pt-8 dark:border-stone-700">
-                    <span className="hidden text-sm text-muted-foreground italic sm:inline">Unsaved changes will be lost.</span>
+                    <span className="hidden text-sm text-muted-foreground italic sm:inline">
+                        Unsaved changes will be lost.
+                    </span>
                     <Link
                         href={upoIndex.url()}
                         className="rounded-lg px-6 py-2.5 text-sm font-semibold text-muted-foreground transition-colors hover:bg-secondary"
@@ -154,6 +223,15 @@ export default function UserPermissionOverridesCreate({ users, permissions, scop
                     </button>
                 </div>
             </form>
+
+            <QuickCreateUserModal
+                open={modal === 'user'}
+                onClose={() => setModal(null)}
+            />
+            <QuickCreatePermissionModal
+                open={modal === 'permission'}
+                onClose={() => setModal(null)}
+            />
         </>
     );
 }

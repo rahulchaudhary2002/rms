@@ -52,7 +52,8 @@ class UserController extends Controller
     {
         $this->userService->createUser($request->validated());
 
-        return redirect()->route('users.index')->with('success', 'User created successfully.');
+        return redirect($request->input('_redirect', route('users.index')))
+            ->with('success', 'User created successfully.');
     }
 
     public function edit(User $user): Response

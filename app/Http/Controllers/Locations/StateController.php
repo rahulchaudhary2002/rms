@@ -38,7 +38,7 @@ class StateController extends Controller
     {
         $this->stateService->createState($request->validated());
 
-        return redirect()->route('states.index')
+        return redirect($request->input('_redirect', route('states.index')))
             ->with('success', 'State created successfully.');
     }
 
