@@ -12,14 +12,16 @@ import type { Permission } from '@/types';
 
 type User = { id: number; name: string; email: string };
 type ResourceType = { type: string; label: string };
+type AllowedResourceIds = { outlet_ids: number[]; warehouse_ids: number[] } | null;
 
 type Props = {
     users: User[];
     permissions: Permission[];
     resourceTypes: ResourceType[];
+    allowedResourceIds: AllowedResourceIds;
 };
 
-export default function UserResourcePermissionsCreate({ users, permissions, resourceTypes }: Props) {
+export default function UserResourcePermissionsCreate({ users, permissions, resourceTypes, allowedResourceIds }: Props) {
     const { data, setData, post, processing, errors } = useForm({
         user_id: '',
         permission_id: '',
@@ -104,6 +106,11 @@ export default function UserResourcePermissionsCreate({ users, permissions, reso
                                 resourceType={data.resource_type}
                                 value={data.resource_id}
                                 onChange={(val) => setData('resource_id', val)}
+                                allowedIds={
+                                    allowedResourceIds && data.resource_type === 'outlet' ? allowedResourceIds.outlet_ids
+                                    : allowedResourceIds && data.resource_type === 'warehouse' ? allowedResourceIds.warehouse_ids
+                                    : null
+                                }
                                 placeholder="Select a resource..."
                                 disabled={!data.resource_type}
                             />

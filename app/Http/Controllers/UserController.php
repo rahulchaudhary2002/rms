@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Models\Permission;
 use App\Models\Role;
 use App\Models\User;
+use App\Models\UserRoleAssignment;
 use App\Services\AccessControlService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -84,16 +85,80 @@ class UserController extends Controller
         abort_if($user->is_superadmin, 404);
         abort_if($user->id === $request->user()->id, 403);
 
-        $actorMinRank       = $this->accessControl->getActorMinRank($request->user());
-        $actorPermissionIds = $this->accessControl->getActorPermissionIds($request->user());
+        $actor               = $request->user();
+        $actorMinRank        = $this->accessControl->getActorMinRank($actor);
+        $actorPermissionIds  = $this->accessControl->getActorPermissionIds($actor);
+        $actorAssignedScopes = $this->accessControl->getActorAssignedScopeIds($actor);
+        $actorMaxScopeLevel  = $this->accessControl->getActorMaxScopeLevel($actor);
+        $scope               = $this->accessControl->resolveSessionScope($request);
+
+        // Determine which scopes the actor may assign roles in
+        $hasGlobalRole = $this->accessControl->isSuperAdmin($actor)
+            || UserRoleAssignment::where('user_id', $actor->id)
+                ->where('is_active', true)
+                ->where('scope_type', 'global')
+                ->whereHas('role', fn ($q) => $q->where('is_active', true))
+                ->exists();
+
+        if ($hasGlobalRole) {
+            $allowedScopes = null;
+        } else {
+            $actorAssignments = UserRoleAssignment::where('user_id', $actor->id)
+                ->where('is_active', true)
+                ->whereIn('scope_type', ['outlet', 'warehouse'])
+                ->get(['scope_type', 'scope_id']);
+
+            $allowedScopes = [
+                'outlet'    => $actorAssignments->where('scope_type', 'outlet')->pluck('scope_id')->unique()->values()->toArray(),
+                'warehouse' => $actorAssignments->where('scope_type', 'warehouse')->pluck('scope_id')->unique()->values()->toArray(),
+            ];
+        }
 
         $user->load([
-            'roleAssignments.role',
-            'roleAssignments.assignedBy',
-            'permissionOverrides.permission',
-            'permissionOverrides.assignedBy',
-            'resourcePermissions.permission',
-            'resourcePermissions.assignedBy',
+            'roleAssignments' => function ($q) use ($scope) {
+                $q->with(['role', 'assignedBy']);
+                $this->accessControl->applyScopeFilter($q, $scope);
+            },
+            'permissionOverrides' => function ($q) use ($actorPermissionIds, $scope) {
+                $q->with(['permission', 'assignedBy']);
+                if ($actorPermissionIds !== null) {
+                    $q->whereIn('permission_id', $actorPermissionIds);
+                }
+                $this->accessControl->applyScopeFilter($q, $scope);
+            },
+            'resourcePermissions' => function ($q) use ($actorPermissionIds, $actorAssignedScopes, $scope) {
+                $q->with(['permission', 'assignedBy']);
+                if ($actorPermissionIds !== null) {
+                    $q->whereIn('permission_id', $actorPermissionIds);
+                }
+                if ($actorAssignedScopes !== null) {
+                    $q->where(function ($q2) use ($actorAssignedScopes) {
+                        $q2->where(function ($q3) use ($actorAssignedScopes) {
+                            $q3->where('resource_type', 'outlet')
+                               ->when(! empty($actorAssignedScopes['outlet_ids']), fn ($q4) => $q4->whereIn('resource_id', $actorAssignedScopes['outlet_ids']), fn ($q4) => $q4->whereRaw('1 = 0'));
+                        });
+                        $q2->orWhere(function ($q3) use ($actorAssignedScopes) {
+                            $q3->where('resource_type', 'warehouse')
+                               ->when(! empty($actorAssignedScopes['warehouse_ids']), fn ($q4) => $q4->whereIn('resource_id', $actorAssignedScopes['warehouse_ids']), fn ($q4) => $q4->whereRaw('1 = 0'));
+                        });
+                        $q2->orWhereNotIn('resource_type', ['outlet', 'warehouse']);
+                    });
+                }
+                if ($scope['type'] !== 'global') {
+                    $q->where(function ($q2) use ($scope) {
+                        if ($scope['type'] === 'outlet') {
+                            $q2->where(fn ($q3) => $q3->where('resource_type', 'outlet')->where('resource_id', $scope['scope_id']));
+                            $q2->orWhereNotIn('resource_type', ['outlet', 'warehouse']);
+                        } elseif ($scope['type'] === 'warehouse') {
+                            $q2->where(fn ($q3) => $q3->where('resource_type', 'warehouse')->where('resource_id', $scope['scope_id']));
+                            if ($scope['outlet_id'] !== null) {
+                                $q2->orWhere(fn ($q3) => $q3->where('resource_type', 'outlet')->where('resource_id', $scope['outlet_id']));
+                            }
+                            $q2->orWhereNotIn('resource_type', ['outlet', 'warehouse']);
+                        }
+                    });
+                }
+            },
         ]);
 
         $roles = Role::where('is_active', true)
@@ -105,16 +170,25 @@ class UserController extends Controller
         $scopeTypes = collect(config('access_control.scope_types', []))
             ->map(fn ($cfg, $key) => ['type' => $key, 'label' => $cfg['label']])
             ->values();
+
+        $allowedScopeTypes = match ($actorMaxScopeLevel) {
+            'global' => ['global', 'outlet', 'warehouse'],
+            'outlet' => ['outlet', 'warehouse'],
+            default  => ['warehouse'],
+        };
         $resourceTypes = collect(config('access_control.resource_types', []))
             ->map(fn ($cfg, $key) => ['type' => $key, 'label' => $cfg['label']])
             ->values();
 
         return Inertia::render('access-control/users/show', [
-            'user'          => $user,
-            'roles'         => $roles,
-            'permissions'   => $permissions,
-            'scopeTypes'    => $scopeTypes,
-            'resourceTypes' => $resourceTypes,
+            'user'               => $user,
+            'roles'              => $roles,
+            'permissions'        => $permissions,
+            'scopeTypes'         => $scopeTypes,
+            'resourceTypes'      => $resourceTypes,
+            'allowedScopes'      => $allowedScopes,
+            'allowedResourceIds' => $actorAssignedScopes,
+            'allowedScopeTypes'  => $allowedScopeTypes,
         ]);
     }
 

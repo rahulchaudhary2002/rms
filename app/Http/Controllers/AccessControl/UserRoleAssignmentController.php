@@ -71,12 +71,37 @@ class UserRoleAssignmentController extends Controller
         ]);
     }
 
-    public function create(): Response
+    public function create(Request $request): Response
     {
-        $actor = Auth::user();
-        $actorMinRank = $this->accessControl->getActorMinRank($actor);
+        $actor              = Auth::user();
+        $actorMinRank       = $this->accessControl->getActorMinRank($actor);
+        $actorMaxScopeLevel = $this->accessControl->getActorMaxScopeLevel($actor);
+        $scope              = $this->accessControl->resolveSessionScope($request);
 
-        $users = User::where('is_superadmin', false)->where('id', '!=', $actor->id)->orderBy('name')->get(['id', 'name', 'email']);
+        $users = User::where('is_superadmin', false)
+            ->where('id', '!=', $actor->id)
+            ->when($scope['type'] !== 'global', function ($builder) use ($scope) {
+                $builder->where(function ($q) use ($scope) {
+                    $q->whereDoesntHave('roleAssignments', fn ($q2) => $q2->where('is_active', true));
+
+                    $q->orWhereHas('roleAssignments', function ($q2) use ($scope) {
+                        $q2->where('is_active', true)
+                            ->where(function ($q3) use ($scope) {
+                                $q3->where('scope_type', 'global');
+
+                                if ($scope['type'] === 'outlet') {
+                                    $q3->orWhere(fn ($q4) => $q4->where('scope_type', 'outlet')->where('scope_id', $scope['scope_id']));
+                                } elseif ($scope['type'] === 'warehouse') {
+                                    if ($scope['outlet_id'] !== null) {
+                                        $q3->orWhere(fn ($q4) => $q4->where('scope_type', 'outlet')->where('scope_id', $scope['outlet_id']));
+                                    }
+                                    $q3->orWhere(fn ($q4) => $q4->where('scope_type', 'warehouse')->where('scope_id', $scope['scope_id']));
+                                }
+                            });
+                    });
+                });
+            })
+            ->orderBy('name')->get(['id', 'name', 'email']);
         $roles = Role::where('is_active', true)
             ->when($actorMinRank !== null, fn ($q) => $q->where('rank', '>', $actorMinRank))
             ->orderBy('name')->get(['id', 'name', 'slug', 'level']);
@@ -103,10 +128,22 @@ class UserRoleAssignmentController extends Controller
             ];
         }
 
+        $scopeTypes = collect(config('access_control.scope_types', []))
+            ->map(fn ($cfg, $key) => ['type' => $key, 'label' => $cfg['label']])
+            ->values();
+
+        $allowedScopeTypes = match ($actorMaxScopeLevel) {
+            'global' => ['global', 'outlet', 'warehouse'],
+            'outlet' => ['outlet', 'warehouse'],
+            default  => ['warehouse'],
+        };
+
         return Inertia::render('access-control/user-roles/create', [
-            'users'         => $users,
-            'roles'         => $roles,
-            'allowedScopes' => $allowedScopes,
+            'users'             => $users,
+            'roles'             => $roles,
+            'allowedScopes'     => $allowedScopes,
+            'scopeTypes'        => $scopeTypes,
+            'allowedScopeTypes' => $allowedScopeTypes,
         ]);
     }
 
@@ -156,8 +193,8 @@ class UserRoleAssignmentController extends Controller
         }
 
         $actorRoleAssignment = UserRoleAssignment::with('role')
-            ->where('user_id', $actor->id)
-            ->where('is_active', true)
+            ->where('user_role_assignments.user_id', $actor->id)
+            ->where('user_role_assignments.is_active', true)
             ->whereHas('role', fn ($q) => $q->where('is_active', true))
             ->join('roles', 'roles.id', '=', 'user_role_assignments.role_id')
             ->orderBy('roles.rank')

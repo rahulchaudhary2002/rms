@@ -12,18 +12,22 @@ import type { Permission } from '@/types';
 
 type User = { id: number; name: string; email: string };
 type ScopeType = { type: string; label: string };
+type AllowedScopes = { outlet: number[]; warehouse: number[] } | null;
 
 type Props = {
     users: User[];
     permissions: Permission[];
     scopeTypes: ScopeType[];
+    allowedScopes: AllowedScopes;
+    allowedScopeTypes: string[];
 };
 
-export default function UserPermissionOverridesCreate({ users, permissions, scopeTypes }: Props) {
+export default function UserPermissionOverridesCreate({ users, permissions, scopeTypes, allowedScopes, allowedScopeTypes }: Props) {
+    const defaultScopeType = allowedScopeTypes[0] ?? 'global';
     const { data, setData, post, processing, errors } = useForm({
         user_id: '',
         permission_id: '',
-        scope_type: 'global',
+        scope_type: defaultScopeType,
         scope_id: '',
         effect: 'allow',
         reason: '',
@@ -102,8 +106,8 @@ export default function UserPermissionOverridesCreate({ users, permissions, scop
                                     setData('scope_id', '');
                                 }}
                             >
-                                <option value="global">Global</option>
-                                {scopeTypes.map((st) => (
+                                {allowedScopeTypes.includes('global') && <option value="global">Global</option>}
+                                {scopeTypes.filter((st) => allowedScopeTypes.includes(st.type)).map((st) => (
                                     <option key={st.type} value={st.type}>
                                         {st.label}
                                     </option>
@@ -117,6 +121,7 @@ export default function UserPermissionOverridesCreate({ users, permissions, scop
                                     resourceType={data.scope_type}
                                     value={data.scope_id}
                                     onChange={(val) => setData('scope_id', val)}
+                                    allowedIds={allowedScopes ? (allowedScopes[data.scope_type as 'outlet' | 'warehouse'] ?? null) : null}
                                     placeholder="Select a resource..."
                                 />
                             </FormField>

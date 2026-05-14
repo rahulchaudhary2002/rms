@@ -46,12 +46,18 @@ type User = {
     resource_permissions: ResourcePermission[];
 };
 
+type AllowedScopes = { outlet: number[]; warehouse: number[] } | null;
+type AllowedResourceIds = { outlet_ids: number[]; warehouse_ids: number[] } | null;
+
 type Props = {
     user: User;
     roles: Role[];
     permissions: Permission[];
     scopeTypes: ScopeType[];
     resourceTypes: ScopeType[];
+    allowedScopes: AllowedScopes;
+    allowedResourceIds: AllowedResourceIds;
+    allowedScopeTypes: string[];
 };
 
 type Tab = 'overview' | 'roles' | 'overrides' | 'resources';
@@ -86,9 +92,9 @@ function EmptyRow({ colSpan, label }: { colSpan: number; label: string }) {
 
 // ─── Modals ───────────────────────────────────────────────────────────────────
 
-function AssignRoleModal({ open, onClose, userId, roles, returnUrl }: {
+function AssignRoleModal({ open, onClose, userId, roles, allowedScopes, returnUrl }: {
     open: boolean; onClose: () => void;
-    userId: number; roles: Role[]; returnUrl: string;
+    userId: number; roles: Role[]; allowedScopes: AllowedScopes; returnUrl: string;
 }) {
     const { data, setData, post, processing, errors, reset } = useForm({
         user_id: String(userId),
@@ -146,6 +152,7 @@ function AssignRoleModal({ open, onClose, userId, roles, returnUrl }: {
                                 resourceType={data.scope_type}
                                 value={data.scope_id}
                                 onChange={(val) => setData('scope_id', val)}
+                                allowedIds={allowedScopes ? (allowedScopes[data.scope_type as 'outlet' | 'warehouse'] ?? null) : null}
                                 placeholder={`Select a ${data.scope_type}...`}
                             />
                         </FormField>
@@ -167,14 +174,16 @@ function AssignRoleModal({ open, onClose, userId, roles, returnUrl }: {
     );
 }
 
-function AddOverrideModal({ open, onClose, userId, permissions, scopeTypes, returnUrl }: {
+function AddOverrideModal({ open, onClose, userId, permissions, scopeTypes, allowedScopes, allowedScopeTypes, returnUrl }: {
     open: boolean; onClose: () => void;
-    userId: number; permissions: Permission[]; scopeTypes: ScopeType[]; returnUrl: string;
+    userId: number; permissions: Permission[]; scopeTypes: ScopeType[];
+    allowedScopes: AllowedScopes; allowedScopeTypes: string[]; returnUrl: string;
 }) {
+    const defaultScopeType = allowedScopeTypes[0] ?? 'global';
     const { data, setData, post, processing, errors, reset } = useForm({
         user_id: String(userId),
         permission_id: '',
-        scope_type: 'global',
+        scope_type: defaultScopeType,
         scope_id: '',
         effect: 'allow',
         reason: '',
@@ -216,8 +225,8 @@ function AddOverrideModal({ open, onClose, userId, permissions, scopeTypes, retu
                             value={data.scope_type}
                             onChange={(e) => { setData('scope_type', e.target.value); setData('scope_id', ''); }}
                         >
-                            <option value="global">Global</option>
-                            {scopeTypes.map((st) => (
+                            {allowedScopeTypes.includes('global') && <option value="global">Global</option>}
+                            {scopeTypes.filter((st) => allowedScopeTypes.includes(st.type)).map((st) => (
                                 <option key={st.type} value={st.type}>{st.label}</option>
                             ))}
                         </SearchableSelect>
@@ -229,6 +238,7 @@ function AddOverrideModal({ open, onClose, userId, permissions, scopeTypes, retu
                                 resourceType={data.scope_type}
                                 value={data.scope_id}
                                 onChange={(val) => setData('scope_id', val)}
+                                allowedIds={allowedScopes ? (allowedScopes[data.scope_type as 'outlet' | 'warehouse'] ?? null) : null}
                                 placeholder="Select a resource..."
                             />
                         </FormField>
@@ -254,9 +264,10 @@ function AddOverrideModal({ open, onClose, userId, permissions, scopeTypes, retu
     );
 }
 
-function AddResourceModal({ open, onClose, userId, permissions, resourceTypes, returnUrl }: {
+function AddResourceModal({ open, onClose, userId, permissions, resourceTypes, allowedResourceIds, returnUrl }: {
     open: boolean; onClose: () => void;
-    userId: number; permissions: Permission[]; resourceTypes: ScopeType[]; returnUrl: string;
+    userId: number; permissions: Permission[]; resourceTypes: ScopeType[];
+    allowedResourceIds: AllowedResourceIds; returnUrl: string;
 }) {
     const { data, setData, post, processing, errors, reset } = useForm({
         user_id: String(userId),
@@ -308,6 +319,11 @@ function AddResourceModal({ open, onClose, userId, permissions, resourceTypes, r
                             resourceType={data.resource_type}
                             value={data.resource_id}
                             onChange={(val) => setData('resource_id', val)}
+                            allowedIds={
+                                allowedResourceIds && data.resource_type === 'outlet' ? allowedResourceIds.outlet_ids
+                                : allowedResourceIds && data.resource_type === 'warehouse' ? allowedResourceIds.warehouse_ids
+                                : null
+                            }
                             placeholder="Select a resource..."
                             disabled={!data.resource_type}
                         />
@@ -349,7 +365,7 @@ const tabList: { id: Tab; label: string; icon: string }[] = [
     { id: 'resources',  label: 'Resource Permissions',  icon: 'rule' },
 ];
 
-export default function UserShow({ user, roles, permissions, scopeTypes, resourceTypes }: Props) {
+export default function UserShow({ user, roles, permissions, scopeTypes, resourceTypes, allowedScopes, allowedResourceIds, allowedScopeTypes }: Props) {
     const [activeTab, setActiveTab] = useState<Tab>('overview');
     const [modal, setModal] = useState<'role' | 'override' | 'resource' | null>(null);
     const returnUrl = usersShow.url(user.id);
@@ -617,6 +633,7 @@ export default function UserShow({ user, roles, permissions, scopeTypes, resourc
                 onClose={() => setModal(null)}
                 userId={user.id}
                 roles={roles}
+                allowedScopes={allowedScopes}
                 returnUrl={returnUrl}
             />
             <AddOverrideModal
@@ -625,6 +642,8 @@ export default function UserShow({ user, roles, permissions, scopeTypes, resourc
                 userId={user.id}
                 permissions={permissions}
                 scopeTypes={scopeTypes}
+                allowedScopes={allowedScopes}
+                allowedScopeTypes={allowedScopeTypes}
                 returnUrl={returnUrl}
             />
             <AddResourceModal
@@ -633,6 +652,7 @@ export default function UserShow({ user, roles, permissions, scopeTypes, resourc
                 userId={user.id}
                 permissions={permissions}
                 resourceTypes={resourceTypes}
+                allowedResourceIds={allowedResourceIds}
                 returnUrl={returnUrl}
             />
         </>

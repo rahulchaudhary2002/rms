@@ -158,7 +158,7 @@ class AccessControlService
      * Applies a WHERE condition to a query so only records relevant to the
      * given scope are returned (mirrors applyScopeCondition for public use).
      */
-    public function applyScopeFilter(\Illuminate\Database\Eloquent\Builder $query, array $scope): \Illuminate\Database\Eloquent\Builder
+    public function applyScopeFilter(\Illuminate\Database\Eloquent\Builder|\Illuminate\Database\Eloquent\Relations\Relation $query, array $scope): \Illuminate\Database\Eloquent\Builder|\Illuminate\Database\Eloquent\Relations\Relation
     {
         return $query->where(function ($q) use ($scope) {
             $q->where('scope_type', 'global');
@@ -172,6 +172,61 @@ class AccessControlService
                 $q->orWhere(fn ($q2) => $q2->where('scope_type', 'warehouse')->where('scope_id', $scope['scope_id']));
             }
         });
+    }
+
+    /**
+     * Returns the highest scope level the actor is authorized to work in.
+     * global → can use global, outlet, and warehouse scope types
+     * outlet → can use outlet and warehouse scope types
+     * warehouse → can only use warehouse scope type
+     */
+    public function getActorMaxScopeLevel(User $actor): string
+    {
+        if ($this->isSuperAdmin($actor)) {
+            return 'global';
+        }
+
+        $assignments = UserRoleAssignment::where('user_role_assignments.user_id', $actor->id)
+            ->where('user_role_assignments.is_active', true)
+            ->whereHas('role', fn ($q) => $q->where('is_active', true))
+            ->pluck('scope_type');
+
+        if ($assignments->contains('global')) {
+            return 'global';
+        }
+
+        if ($assignments->contains('outlet')) {
+            return 'outlet';
+        }
+
+        return 'warehouse';
+    }
+
+    /**
+     * Returns the outlet and warehouse IDs the actor is explicitly assigned to via their roles.
+     * Returns null for superadmin or any user with a global-scope role (unrestricted).
+     *
+     * @return array{outlet_ids: int[], warehouse_ids: int[]}|null
+     */
+    public function getActorAssignedScopeIds(User $actor): ?array
+    {
+        if ($this->isSuperAdmin($actor)) {
+            return null;
+        }
+
+        $assignments = UserRoleAssignment::where('user_role_assignments.user_id', $actor->id)
+            ->where('user_role_assignments.is_active', true)
+            ->whereHas('role', fn ($q) => $q->where('is_active', true))
+            ->get(['scope_type', 'scope_id']);
+
+        if ($assignments->contains('scope_type', 'global')) {
+            return null;
+        }
+
+        return [
+            'outlet_ids'    => $assignments->where('scope_type', 'outlet')->pluck('scope_id')->filter()->unique()->values()->all(),
+            'warehouse_ids' => $assignments->where('scope_type', 'warehouse')->pluck('scope_id')->filter()->unique()->values()->all(),
+        ];
     }
 
     /**

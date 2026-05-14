@@ -7,6 +7,7 @@ use App\Http\Requests\AccessControl\StoreUserPermissionOverrideRequest;
 use App\Models\Permission;
 use App\Models\User;
 use App\Models\UserPermissionOverride;
+use App\Models\UserRoleAssignment;
 use App\Services\AccessControlService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -72,11 +73,37 @@ class UserPermissionOverrideController extends Controller
         ]);
     }
 
-    public function create(): Response
+    public function create(Request $request): Response
     {
-        $actorPermissionIds = $this->accessControl->getActorPermissionIds(Auth::user());
+        $actor              = Auth::user();
+        $actorPermissionIds = $this->accessControl->getActorPermissionIds($actor);
+        $actorMaxScopeLevel = $this->accessControl->getActorMaxScopeLevel($actor);
+        $scope              = $this->accessControl->resolveSessionScope($request);
 
-        $users = User::where('is_superadmin', false)->where('id', '!=', Auth::id())->orderBy('name')->get(['id', 'name', 'email']);
+        $allowedScopes = $this->resolveAllowedScopes($actor);
+
+        $users = User::where('is_superadmin', false)
+            ->where('id', '!=', $actor->id)
+            ->when($scope['type'] !== 'global', function ($builder) use ($scope) {
+                $builder->where(function ($q) use ($scope) {
+                    $q->whereDoesntHave('roleAssignments', fn ($q2) => $q2->where('is_active', true));
+                    $q->orWhereHas('roleAssignments', function ($q2) use ($scope) {
+                        $q2->where('is_active', true)->where(function ($q3) use ($scope) {
+                            $q3->where('scope_type', 'global');
+                            if ($scope['type'] === 'outlet') {
+                                $q3->orWhere(fn ($q4) => $q4->where('scope_type', 'outlet')->where('scope_id', $scope['scope_id']));
+                            } elseif ($scope['type'] === 'warehouse') {
+                                if ($scope['outlet_id'] !== null) {
+                                    $q3->orWhere(fn ($q4) => $q4->where('scope_type', 'outlet')->where('scope_id', $scope['outlet_id']));
+                                }
+                                $q3->orWhere(fn ($q4) => $q4->where('scope_type', 'warehouse')->where('scope_id', $scope['scope_id']));
+                            }
+                        });
+                    });
+                });
+            })
+            ->orderBy('name')->get(['id', 'name', 'email']);
+
         $permissions = Permission::where('is_active', true)
             ->when($actorPermissionIds !== null, fn ($q) => $q->whereIn('id', $actorPermissionIds))
             ->orderBy('module')->orderBy('action')->get(['id', 'name', 'slug', 'module', 'action']);
@@ -85,11 +112,43 @@ class UserPermissionOverrideController extends Controller
             ->map(fn ($cfg, $key) => ['type' => $key, 'label' => $cfg['label']])
             ->values();
 
+        $allowedScopeTypes = match ($actorMaxScopeLevel) {
+            'global' => ['global', 'outlet', 'warehouse'],
+            'outlet' => ['outlet', 'warehouse'],
+            default  => ['warehouse'],
+        };
+
         return Inertia::render('access-control/user-permission-overrides/create', [
-            'users'       => $users,
-            'permissions' => $permissions,
-            'scopeTypes'  => $scopeTypes,
+            'users'              => $users,
+            'permissions'        => $permissions,
+            'scopeTypes'         => $scopeTypes,
+            'allowedScopes'      => $allowedScopes,
+            'allowedScopeTypes'  => $allowedScopeTypes,
         ]);
+    }
+
+    private function resolveAllowedScopes(\App\Models\User $actor): ?array
+    {
+        $hasGlobalRole = $this->accessControl->isSuperAdmin($actor)
+            || UserRoleAssignment::where('user_id', $actor->id)
+                ->where('is_active', true)
+                ->where('scope_type', 'global')
+                ->whereHas('role', fn ($q) => $q->where('is_active', true))
+                ->exists();
+
+        if ($hasGlobalRole) {
+            return null;
+        }
+
+        $assignments = UserRoleAssignment::where('user_id', $actor->id)
+            ->where('is_active', true)
+            ->whereIn('scope_type', ['outlet', 'warehouse'])
+            ->get(['scope_type', 'scope_id']);
+
+        return [
+            'outlet'    => $assignments->where('scope_type', 'outlet')->pluck('scope_id')->unique()->values()->toArray(),
+            'warehouse' => $assignments->where('scope_type', 'warehouse')->pluck('scope_id')->unique()->values()->toArray(),
+        ];
     }
 
     public function store(StoreUserPermissionOverrideRequest $request): RedirectResponse
