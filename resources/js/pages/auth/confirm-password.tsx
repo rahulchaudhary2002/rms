@@ -14,7 +14,8 @@ export default function ConfirmPassword() {
             <Head title="Confirm password" />
 
             <Form
-                {...store.form()}
+                action={store.url()}
+                method="post"
                 resetOnSuccess={['password']}
                 className="space-y-6"
             >

@@ -19,6 +19,8 @@ return new class extends Migration
                 'outlet',
                 'warehouse',
             ])->default('global');
+            $table->unsignedInteger('rank')->default(100);
+            $table->boolean('is_assignable')->default(true);
 
             $table->text('description')->nullable();
             $table->boolean('is_system')->default(false);

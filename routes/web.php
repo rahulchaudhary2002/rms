@@ -38,3 +38,4 @@ require __DIR__.'/loyalty.php';
 require __DIR__.'/food.php';
 require __DIR__.'/departments.php';
 require __DIR__.'/outlets.php';
+require __DIR__.'/warehouses.php';

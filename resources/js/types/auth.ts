@@ -167,6 +167,24 @@ export type OutletDepartment = {
     updated_at: string;
 };
 
+export type WarehouseType = 'central' | 'outlet' | 'department';
+
+export type Warehouse = {
+    id: number;
+    outlet_id: number | null;
+    outlet_department_id: number | null;
+    name: string;
+    code: string;
+    type: WarehouseType;
+    address: string | null;
+    is_default: boolean;
+    is_active: boolean;
+    outlet?: Outlet;
+    department?: OutletDepartment;
+    created_at: string;
+    updated_at: string;
+};
+
 export type CustomerOutlet = {
     id: number;
     customer_id: number;
