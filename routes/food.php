@@ -81,6 +81,35 @@ Route::middleware(['auth', 'verified', 'node.selected'])->group(function () {
         ->middleware('permission:foods-update')
         ->name('foods.toggle-featured');
 
+    // ── Food Variant Management ──────────────────────────────────────────────
+    Route::get('food-variants', [FoodVariantController::class, 'index'])
+        ->middleware('permission:foods-view')
+        ->name('variants.index');
+
+    Route::get('food-variants/create', [FoodVariantController::class, 'create'])
+        ->middleware('permission:foods-update')
+        ->name('variants.create');
+
+    Route::post('food-variants', [FoodVariantController::class, 'storeStandalone'])
+        ->middleware('permission:foods-update')
+        ->name('variants.store');
+
+    Route::get('food-variants/{food_variant}/edit', [FoodVariantController::class, 'edit'])
+        ->middleware('permission:foods-update')
+        ->name('variants.edit');
+
+    Route::put('food-variants/{food_variant}', [FoodVariantController::class, 'updateStandalone'])
+        ->middleware('permission:foods-update')
+        ->name('variants.update');
+
+    Route::delete('food-variants/{food_variant}', [FoodVariantController::class, 'destroyStandalone'])
+        ->middleware('permission:foods-delete')
+        ->name('variants.destroy');
+
+    Route::patch('food-variants/{food_variant}/toggle-status', [FoodVariantController::class, 'toggleStatusStandalone'])
+        ->middleware('permission:foods-update')
+        ->name('variants.toggle-status');
+
     // ── Recipe Management ────────────────────────────────────────────────────
     Route::get('recipes/food', [FoodRecipeController::class, 'index'])
         ->middleware('permission:foods-view')

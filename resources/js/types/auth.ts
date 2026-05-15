@@ -253,6 +253,9 @@ export type FoodVariant = {
     is_default: boolean;
     is_active: boolean;
     sort_order: number;
+    food?: { id: number; name: string };
+    recipes_count?: number;
+    outlet_settings_count?: number;
     outlet_settings?: FoodVariantOutlet[];
     recipes?: FoodRecipe[];
     created_at: string;

@@ -99,6 +99,7 @@ const settingsGroup: MenuGroup = {
 
 const foodRecipesUrl = '/recipes/food';
 const addonRecipesUrl = '/recipes/addons';
+const foodVariantsUrl = '/food-variants';
 
 function isPathActive(currentUrl: string, href: string, activeMatch?: string[]) {
     const candidates = activeMatch && activeMatch.length > 0 ? activeMatch : [href];
@@ -140,6 +141,7 @@ function buildDynamicGroups(auth: Auth): MenuGroup[] {
         const items: MenuItem[] = [];
         if (can('food-categories-view')) items.push({ title: 'Food Categories', href: foodCategoriesIndex.url(), icon: 'category', activeMatch: [foodCategoriesIndex.url()] });
         if (can('foods-view')) items.push({ title: 'Foods & Menu', href: foodsIndex.url(), icon: 'restaurant_menu', activeMatch: [foodsIndex.url()] });
+        if (can('foods-view')) items.push({ title: 'Food Variants', href: foodVariantsUrl, icon: 'layers', activeMatch: [foodVariantsUrl] });
         if (can('addon-groups-view')) {
             items.push({
                 title: 'Add-ons',
