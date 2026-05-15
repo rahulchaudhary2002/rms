@@ -16,16 +16,24 @@ import { cn } from '@/lib/utils';
 import type { Permission } from '@/types';
 
 type User = { id: number; name: string; email: string };
+type ScopeTarget = { id: number; name: string } | null;
 type Override = {
     id: number;
     user: User;
     permission: Permission;
     scope_type: string;
-    scope_id: number | null;
+    outlet_id: number | null;
+    outlet_department_id: number | null;
+    warehouse_id: number | null;
+    outlet: ScopeTarget;
+    department: ScopeTarget;
+    warehouse: ScopeTarget;
     effect: 'allow' | 'deny';
     reason: string | null;
     is_active: boolean;
     assigned_by: User | null;
+    starts_at: string | null;
+    ends_at: string | null;
     created_at: string;
 };
 type PaginatedOverrides = {
@@ -199,8 +207,11 @@ export default function UserPermissionOverridesIndex({ overrides, users, permiss
                                         <SearchableSelect value={form.scope_type} onChange={(e) => setForm((c) => ({ ...c, scope_type: e.target.value }))}>
                                             <option value="">All Scopes</option>
                                             <option value="global">Global</option>
+                                            <option value="central_warehouse">Central Warehouse</option>
                                             <option value="outlet">Outlet</option>
-                                            <option value="warehouse">Warehouse</option>
+                                            <option value="outlet_warehouse">Outlet Warehouse</option>
+                                            <option value="outlet_department">Outlet Department</option>
+                                            <option value="department_warehouse">Department Warehouse</option>
                                         </SearchableSelect>
                                     </div>
                                     <div className="flex flex-col gap-1.5">
@@ -306,8 +317,13 @@ export default function UserPermissionOverridesIndex({ overrides, users, permiss
                                         </div>
                                     </td>
                                     <td className="px-6 py-4 font-mono text-xs text-gray-600 dark:text-gray-300">{o.permission?.slug}</td>
-                                    <td className="px-6 py-4 text-sm capitalize text-gray-700 dark:text-gray-300">
-                                        {o.scope_type}{o.scope_id ? ` #${o.scope_id}` : ''}
+                                    <td className="px-6 py-4">
+                                        <div className="flex flex-col gap-0.5">
+                                            <span className="text-sm text-gray-700 dark:text-gray-300">{o.scope_type.replace(/_/g, ' ')}</span>
+                                            {o.outlet && <span className="text-xs text-muted-foreground">{o.outlet.name}</span>}
+                                            {o.department && <span className="text-xs text-muted-foreground">{o.department.name}</span>}
+                                            {o.warehouse && <span className="text-xs text-muted-foreground">{o.warehouse.name}</span>}
+                                        </div>
                                     </td>
                                     <td className="px-6 py-4">
                                         <span className={cn(

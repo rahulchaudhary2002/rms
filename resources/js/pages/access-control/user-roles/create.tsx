@@ -1,60 +1,94 @@
 import { Head, Link, useForm } from '@inertiajs/react';
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import { FormSection } from '@/components/form-section';
 import { PageHeader } from '@/components/page-header';
-import {
-    QuickCreateRoleModal,
-    QuickCreateUserModal,
-} from '@/components/quick-create-modals';
-import { AsyncResourceSelect } from '@/components/ui/async-resource-select';
+import { QuickCreateRoleModal, QuickCreateUserModal } from '@/components/quick-create-modals';
 import { FormField } from '@/components/ui/form-field';
+import { Input } from '@/components/ui/input';
 import { SearchableSelect } from '@/components/ui/searchable-select';
 import { useCan } from '@/hooks/use-can';
 import { cn } from '@/lib/utils';
 import { dashboard } from '@/routes';
 import { index as rolesIndex } from '@/routes/access-control/roles';
-import {
-    index as urIndex,
-    store as urStore,
-} from '@/routes/access-control/user-roles';
-import type { Role } from '@/types';
+import { index as urIndex, store as urStore } from '@/routes/access-control/user-roles';
+import type { Outlet, OutletDepartment, Role, ScopeType, Warehouse } from '@/types';
 
 type User = { id: number; name: string; email: string };
-
 type AllowedScopes = { outlet: number[]; warehouse: number[] } | null;
 
 type Props = {
     users: User[];
     roles: Role[];
+    outlets: Outlet[];
+    departments: OutletDepartment[];
+    warehouses: Warehouse[];
     allowedScopes: AllowedScopes;
 };
 
-export default function UserRolesCreate({
-    users,
-    roles,
-    allowedScopes,
-}: Props) {
+const SCOPE_NEEDS: Record<string, { outlet: boolean; department: boolean; warehouse: boolean }> = {
+    global:               { outlet: false, department: false, warehouse: false },
+    central_warehouse:    { outlet: false, department: false, warehouse: true  },
+    outlet:               { outlet: true,  department: false, warehouse: false },
+    outlet_warehouse:     { outlet: true,  department: false, warehouse: true  },
+    outlet_department:    { outlet: true,  department: true,  warehouse: false },
+    department_warehouse: { outlet: true,  department: true,  warehouse: true  },
+};
+
+export default function UserRolesCreate({ users, roles, outlets, departments, warehouses, allowedScopes }: Props) {
     const { can } = useCan();
     const [modal, setModal] = useState<'user' | 'role' | null>(null);
+
     const { data, setData, post, processing, errors } = useForm({
         user_id: '',
         role_id: '',
-        scope_type: 'global',
-        scope_id: '',
+        scope_type: 'global' as ScopeType,
+        outlet_id: '',
+        outlet_department_id: '',
+        warehouse_id: '',
+        is_active: true,
+        starts_at: '',
+        ends_at: '',
     });
 
-    const selectedRole =
-        roles.find((r) => String(r.id) === data.role_id) ?? null;
+    const selectedRole = roles.find((r) => String(r.id) === data.role_id) ?? null;
+    const needs = SCOPE_NEEDS[data.scope_type] ?? SCOPE_NEEDS.global;
 
     function handleRoleChange(roleId: string) {
         const role = roles.find((r) => String(r.id) === roleId) ?? null;
         setData({
             ...data,
             role_id: roleId,
-            scope_type: role?.level ?? 'global',
-            scope_id: '',
+            scope_type: (role?.level ?? 'global') as ScopeType,
+            outlet_id: '',
+            outlet_department_id: '',
+            warehouse_id: '',
         });
     }
+
+    const allowedOutlets = useMemo(() => {
+        if (!allowedScopes) return outlets;
+        return outlets.filter((o) => allowedScopes.outlet.includes(o.id));
+    }, [outlets, allowedScopes]);
+
+    const filteredDepartments = useMemo(() => {
+        if (!data.outlet_id) return departments;
+        return departments.filter((d) => String(d.outlet_id) === data.outlet_id);
+    }, [departments, data.outlet_id]);
+
+    const filteredWarehouses = useMemo(() => {
+        let filtered = warehouses;
+        if (allowedScopes) {
+            filtered = filtered.filter((w) => allowedScopes.warehouse.includes(w.id));
+        }
+        if (data.scope_type === 'department_warehouse' && data.outlet_department_id) {
+            filtered = filtered.filter((w) => String(w.outlet_department_id) === data.outlet_department_id);
+        } else if (data.scope_type === 'outlet_warehouse' && data.outlet_id) {
+            filtered = filtered.filter((w) => String(w.outlet_id) === data.outlet_id);
+        } else if (data.scope_type === 'central_warehouse') {
+            filtered = filtered.filter((w) => w.type === 'central');
+        }
+        return filtered;
+    }, [warehouses, allowedScopes, data.scope_type, data.outlet_id, data.outlet_department_id]);
 
     function submit(e: React.FormEvent) {
         e.preventDefault();
@@ -78,76 +112,48 @@ export default function UserRolesCreate({
             <form onSubmit={submit} className="space-y-8 pb-6">
                 <FormSection
                     title="Role Assignment"
-                    description="Select the user and role. Scope is set automatically based on the role's level."
+                    description="Select the user and role. Scope fields appear based on the role's level."
                 >
                     <div className="grid grid-cols-1 gap-5 md:grid-cols-2">
-                        <FormField
-                            label="User"
-                            error={errors.user_id}
-                            className="md:col-span-2"
-                        >
+                        <FormField label="User" error={errors.user_id} className="md:col-span-2">
                             <SearchableSelect
                                 value={data.user_id}
-                                onChange={(e) =>
-                                    setData('user_id', e.target.value)
-                                }
-                                onAddNew={
-                                    can('users-manage')
-                                        ? () => setModal('user')
-                                        : undefined
-                                }
+                                onChange={(e) => setData('user_id', e.target.value)}
+                                onAddNew={can('users-manage') ? () => setModal('user') : undefined}
                                 addNewLabel="Add User"
                             >
                                 <option value="">Select a user...</option>
                                 {users.map((u) => (
-                                    <option key={u.id} value={String(u.id)}>
-                                        {u.name} ({u.email})
-                                    </option>
+                                    <option key={u.id} value={String(u.id)}>{u.name} ({u.email})</option>
                                 ))}
                             </SearchableSelect>
                         </FormField>
 
-                        <FormField
-                            label="Role"
-                            error={errors.role_id}
-                            className="md:col-span-2"
-                        >
+                        <FormField label="Role" error={errors.role_id} className="md:col-span-2">
                             <SearchableSelect
                                 value={data.role_id}
-                                onChange={(e) =>
-                                    handleRoleChange(e.target.value)
-                                }
-                                onAddNew={
-                                    can('roles-create')
-                                        ? () => setModal('role')
-                                        : undefined
-                                }
+                                onChange={(e) => handleRoleChange(e.target.value)}
+                                onAddNew={can('roles-create') ? () => setModal('role') : undefined}
                                 addNewLabel="Add Role"
                             >
                                 <option value="">Select a role...</option>
                                 {roles.map((r) => (
-                                    <option key={r.id} value={String(r.id)}>
-                                        {r.name} ({r.level})
-                                    </option>
+                                    <option key={r.id} value={String(r.id)}>{r.name} ({r.level.replace(/_/g, ' ')})</option>
                                 ))}
                             </SearchableSelect>
                         </FormField>
 
                         <FormField label="Scope" error={errors.scope_type}>
-                            <div
-                                className={cn(
-                                    'flex h-11 items-center rounded-lg border border-input bg-muted/40 px-3 text-sm',
-                                    !selectedRole && 'text-muted-foreground',
-                                )}
-                            >
+                            <div className={cn(
+                                'flex h-11 items-center rounded-lg border border-input bg-muted/40 px-3 text-sm',
+                                !selectedRole && 'text-muted-foreground',
+                            )}>
                                 {selectedRole ? (
                                     <>
                                         <span className="font-semibold text-foreground capitalize">
-                                            {selectedRole.level}
+                                            {selectedRole.level.replace(/_/g, ' ')}
                                         </span>
-                                        <span className="ml-1.5 text-muted-foreground">
-                                            - set by role level
-                                        </span>
+                                        <span className="ml-1.5 text-muted-foreground">— set by role level</span>
                                     </>
                                 ) : (
                                     'Select a role first'
@@ -155,35 +161,91 @@ export default function UserRolesCreate({
                             </div>
                         </FormField>
 
-                        {data.scope_type !== 'global' && selectedRole && (
-                            <FormField
-                                label="Scope Resource"
-                                error={errors.scope_id}
+                        <FormField label="Status" error={errors.is_active}>
+                            <SearchableSelect
+                                value={data.is_active ? 'true' : 'false'}
+                                onChange={(e) => setData('is_active', e.target.value === 'true')}
                             >
-                                <AsyncResourceSelect
-                                    resourceType={data.scope_type}
-                                    value={data.scope_id}
-                                    onChange={(val) => setData('scope_id', val)}
-                                    allowedIds={
-                                        allowedScopes
-                                            ? (allowedScopes[
-                                                  data.scope_type as
-                                                      | 'outlet'
-                                                      | 'warehouse'
-                                              ] ?? null)
-                                            : null
-                                    }
-                                    placeholder={`Select a ${data.scope_type}...`}
-                                />
+                                <option value="true">Active</option>
+                                <option value="false">Inactive</option>
+                            </SearchableSelect>
+                        </FormField>
+
+                        {needs.outlet && (
+                            <FormField label="Outlet" error={errors.outlet_id}>
+                                <SearchableSelect
+                                    value={data.outlet_id}
+                                    onChange={(e) => setData({
+                                        ...data,
+                                        outlet_id: e.target.value,
+                                        outlet_department_id: '',
+                                        warehouse_id: '',
+                                    })}
+                                >
+                                    <option value="">Select an outlet...</option>
+                                    {allowedOutlets.map((o) => (
+                                        <option key={o.id} value={String(o.id)}>{o.name}</option>
+                                    ))}
+                                </SearchableSelect>
                             </FormField>
                         )}
+
+                        {needs.department && (
+                            <FormField label="Department" error={errors.outlet_department_id}>
+                                <SearchableSelect
+                                    value={data.outlet_department_id}
+                                    disabled={!data.outlet_id}
+                                    onChange={(e) => setData({
+                                        ...data,
+                                        outlet_department_id: e.target.value,
+                                        warehouse_id: '',
+                                    })}
+                                >
+                                    <option value="">Select a department...</option>
+                                    {filteredDepartments.map((d) => (
+                                        <option key={d.id} value={String(d.id)}>{d.name}</option>
+                                    ))}
+                                </SearchableSelect>
+                            </FormField>
+                        )}
+
+                        {needs.warehouse && (
+                            <FormField label="Warehouse" error={errors.warehouse_id}>
+                                <SearchableSelect
+                                    value={data.warehouse_id}
+                                    disabled={needs.outlet && !data.outlet_id}
+                                    onChange={(e) => setData('warehouse_id', e.target.value)}
+                                >
+                                    <option value="">Select a warehouse...</option>
+                                    {filteredWarehouses.map((w) => (
+                                        <option key={w.id} value={String(w.id)}>{w.name}</option>
+                                    ))}
+                                </SearchableSelect>
+                            </FormField>
+                        )}
+
+                        <FormField label="Starts At" htmlFor="starts_at" error={errors.starts_at}>
+                            <Input
+                                id="starts_at"
+                                type="date"
+                                value={data.starts_at}
+                                onChange={(e) => setData('starts_at', e.target.value)}
+                            />
+                        </FormField>
+
+                        <FormField label="Ends At" htmlFor="ends_at" error={errors.ends_at}>
+                            <Input
+                                id="ends_at"
+                                type="date"
+                                value={data.ends_at}
+                                onChange={(e) => setData('ends_at', e.target.value)}
+                            />
+                        </FormField>
                     </div>
                 </FormSection>
 
                 <div className="flex flex-wrap items-center justify-end gap-4 border-t border-border/70 pt-8 dark:border-stone-700">
-                    <span className="hidden text-sm text-muted-foreground italic sm:inline">
-                        Unsaved changes will be lost.
-                    </span>
+                    <span className="hidden text-sm text-muted-foreground italic sm:inline">Unsaved changes will be lost.</span>
                     <Link
                         href={urIndex.url()}
                         className="rounded-lg px-6 py-2.5 text-sm font-semibold text-muted-foreground transition-colors hover:bg-secondary"
@@ -200,14 +262,8 @@ export default function UserRolesCreate({
                 </div>
             </form>
 
-            <QuickCreateUserModal
-                open={modal === 'user'}
-                onClose={() => setModal(null)}
-            />
-            <QuickCreateRoleModal
-                open={modal === 'role'}
-                onClose={() => setModal(null)}
-            />
+            <QuickCreateUserModal open={modal === 'user'} onClose={() => setModal(null)} />
+            <QuickCreateRoleModal open={modal === 'role'} onClose={() => setModal(null)} />
         </>
     );
 }

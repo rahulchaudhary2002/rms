@@ -2,9 +2,12 @@
 
 namespace App\Services;
 
+use App\Models\Outlet;
+use App\Models\OutletDepartment;
 use App\Models\Permission;
 use App\Models\Role;
 use App\Models\User;
+use App\Models\Warehouse;
 use App\Services\Concerns\InteractsWithScope;
 use App\Services\Concerns\PaginatesQuery;
 use Illuminate\Support\Facades\Hash;
@@ -45,11 +48,11 @@ class UserService
 
         $user->load([
             'roleAssignments' => function ($q) use ($scope) {
-                $q->with(['role', 'assignedBy']);
+                $q->with(['role', 'assignedBy', 'outlet', 'department', 'warehouse']);
                 $this->accessControl->applyScopeFilter($q, $scope);
             },
             'permissionOverrides' => function ($q) use ($actorPermissionIds, $scope) {
-                $q->with(['permission', 'assignedBy']);
+                $q->with(['permission', 'assignedBy', 'outlet', 'department', 'warehouse']);
                 if ($actorPermissionIds !== null) {
                     $q->whereIn('permission_id', $actorPermissionIds);
                 }
@@ -76,10 +79,10 @@ class UserService
                 if ($scope['type'] !== 'global') {
                     $q->where(function ($q2) use ($scope) {
                         if ($scope['type'] === 'outlet') {
-                            $q2->where(fn ($q3) => $q3->where('resource_type', 'outlet')->where('resource_id', $scope['scope_id']));
+                            $q2->where(fn ($q3) => $q3->where('resource_type', 'outlet')->where('resource_id', $scope['outlet_id']));
                             $q2->orWhereNotIn('resource_type', ['outlet', 'warehouse']);
                         } elseif ($scope['type'] === 'warehouse') {
-                            $q2->where(fn ($q3) => $q3->where('resource_type', 'warehouse')->where('resource_id', $scope['scope_id']));
+                            $q2->where(fn ($q3) => $q3->where('resource_type', 'warehouse')->where('resource_id', $scope['warehouse_id']));
                             if ($scope['outlet_id'] !== null) {
                                 $q2->orWhere(fn ($q3) => $q3->where('resource_type', 'outlet')->where('resource_id', $scope['outlet_id']));
                             }
@@ -91,9 +94,9 @@ class UserService
         ]);
 
         $allowedLevels = match ($scope['type']) {
-            'outlet'    => ['outlet', 'warehouse'],
-            'warehouse' => ['warehouse'],
-            default     => ['global', 'outlet', 'warehouse'],
+            'outlet'    => ['outlet', 'outlet_warehouse', 'outlet_department', 'department_warehouse'],
+            'warehouse' => ['outlet_warehouse', 'central_warehouse', 'department_warehouse'],
+            default     => array_keys(config('access_control.scope_types', [])),
         };
 
         $roles = Role::where('is_active', true)
@@ -105,10 +108,14 @@ class UserService
             ->when($actorPermissionIds !== null, fn ($q) => $q->whereIn('id', $actorPermissionIds))
             ->orderBy('module')->orderBy('action')->get(['id', 'name', 'slug', 'module', 'action']);
 
+        $outlets     = Outlet::orderBy('name')->get(['id', 'name']);
+        $departments = OutletDepartment::orderBy('name')->get(['id', 'outlet_id', 'name']);
+        $warehouses  = Warehouse::orderBy('name')->get(['id', 'outlet_id', 'outlet_department_id', 'name', 'type']);
+
         $allowedResourceIds = $this->resolveSessionConstrainedResourceIds($actorAssignedScopes, $scope);
 
         return array_merge(
-            compact('user', 'roles', 'permissions'),
+            compact('user', 'roles', 'permissions', 'outlets', 'departments', 'warehouses'),
             $this->resolveScopeProps($actor, $scope),
             $this->resolveResourceProps($actor, $allowedResourceIds),
         );

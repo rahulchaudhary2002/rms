@@ -2,9 +2,12 @@
 
 namespace App\Services;
 
+use App\Models\Outlet;
+use App\Models\OutletDepartment;
 use App\Models\Permission;
 use App\Models\User;
 use App\Models\UserPermissionOverride;
+use App\Models\Warehouse;
 use App\Services\Concerns\InteractsWithScope;
 use App\Services\Concerns\PaginatesQuery;
 use Illuminate\Support\Facades\Auth;
@@ -20,7 +23,7 @@ class UserPermissionOverrideService
     {
         $actorPermissionIds = $this->accessControl->getActorPermissionIds($actor);
 
-        $query = UserPermissionOverride::with(['user', 'permission', 'assignedBy'])
+        $query = UserPermissionOverride::with(['user', 'permission', 'outlet', 'department', 'warehouse', 'assignedBy'])
             ->where('user_id', '!=', $actor->id)
             ->whereHas('user', fn ($q) => $q->where('is_superadmin', false))
             ->when($actorPermissionIds !== null, fn ($b) => $b->whereIn('permission_id', $actorPermissionIds));
@@ -64,26 +67,41 @@ class UserPermissionOverrideService
             ->when($actorPermissionIds !== null, fn ($q) => $q->whereIn('id', $actorPermissionIds))
             ->orderBy('module')->orderBy('action')->get(['id', 'name', 'slug', 'module', 'action']);
 
-        return array_merge(compact('users', 'permissions'), $this->resolveScopeProps($actor, $scope));
+        $outlets     = Outlet::orderBy('name')->get(['id', 'name']);
+        $departments = OutletDepartment::orderBy('name')->get(['id', 'outlet_id', 'name']);
+        $warehouses  = Warehouse::orderBy('name')->get(['id', 'outlet_id', 'outlet_department_id', 'name', 'type']);
+
+        return array_merge(
+            compact('users', 'permissions', 'outlets', 'departments', 'warehouses'),
+            $this->resolveScopeProps($actor, $scope)
+        );
     }
 
     public function save(User $actor, array $data): void
     {
         $this->accessControl->assertActorCanManagePermission($actor, (int) $data['permission_id']);
 
-        DB::transaction(function () use ($actor, $data) {
+        $outletId           = !empty($data['outlet_id']) ? (int) $data['outlet_id'] : null;
+        $outletDepartmentId = !empty($data['outlet_department_id']) ? (int) $data['outlet_department_id'] : null;
+        $warehouseId        = !empty($data['warehouse_id']) ? (int) $data['warehouse_id'] : null;
+
+        DB::transaction(function () use ($actor, $data, $outletId, $outletDepartmentId, $warehouseId) {
             UserPermissionOverride::updateOrCreate(
                 [
-                    'user_id'       => $data['user_id'],
-                    'permission_id' => $data['permission_id'],
-                    'scope_type'    => $data['scope_type'],
-                    'scope_id'      => $data['scope_type'] === 'global' ? null : $data['scope_id'],
+                    'user_id'              => $data['user_id'],
+                    'permission_id'        => $data['permission_id'],
+                    'scope_type'           => $data['scope_type'],
+                    'outlet_id'            => $outletId,
+                    'outlet_department_id' => $outletDepartmentId,
+                    'warehouse_id'         => $warehouseId,
                 ],
                 [
                     'effect'      => $data['effect'],
                     'reason'      => $data['reason'] ?? null,
                     'is_active'   => $data['is_active'] ?? true,
                     'assigned_by' => $actor->id,
+                    'starts_at'   => !empty($data['starts_at']) ? $data['starts_at'] : null,
+                    'ends_at'     => !empty($data['ends_at']) ? $data['ends_at'] : null,
                 ]
             );
         });
@@ -94,9 +112,8 @@ class UserPermissionOverrideService
     public function toggleActive(UserPermissionOverride $override, bool $isActive): void
     {
         /** @var \App\Models\User $actor */
-        /** @var \App\Models\User $actor */
         $actor = Auth::user();
-        $this->accessControl->assertActorCanMutateScopedRecord($actor, $override->scope_type, $override->scope_id);
+        $this->accessControl->assertActorCanMutateScopedRecord($actor, $override->scope_type, $override->outlet_id, $override->warehouse_id);
         $override->update(['is_active' => $isActive]);
         /** @var \App\Models\User $overrideUser */
         $overrideUser = $override->user()->first();
@@ -106,9 +123,8 @@ class UserPermissionOverrideService
     public function remove(UserPermissionOverride $override): void
     {
         /** @var \App\Models\User $actor */
-        /** @var \App\Models\User $actor */
         $actor = Auth::user();
-        $this->accessControl->assertActorCanMutateScopedRecord($actor, $override->scope_type, $override->scope_id);
+        $this->accessControl->assertActorCanMutateScopedRecord($actor, $override->scope_type, $override->outlet_id, $override->warehouse_id);
         /** @var \App\Models\User $user */
         $user = $override->user()->first();
         $override->delete();

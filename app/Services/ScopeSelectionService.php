@@ -141,11 +141,11 @@ class ScopeSelectionService
     {
         $assignments = UserRoleAssignment::where('user_id', $actor->id)
             ->where('is_active', true)
-            ->whereIn('scope_type', ['outlet', 'warehouse'])
-            ->get(['scope_type', 'scope_id']);
+            ->where('scope_type', '!=', 'global')
+            ->get(['scope_type', 'outlet_id', 'warehouse_id']);
 
-        $allowedOutletIds    = $assignments->where('scope_type', 'outlet')->pluck('scope_id')->toArray();
-        $allowedWarehouseIds = $assignments->where('scope_type', 'warehouse')->pluck('scope_id')->toArray();
+        $allowedOutletIds    = $assignments->whereNotNull('outlet_id')->pluck('outlet_id')->toArray();
+        $allowedWarehouseIds = $assignments->whereNotNull('warehouse_id')->pluck('warehouse_id')->toArray();
 
         if ($data['scope_type'] === 'outlet') {
             if (! in_array((int) ($data['outlet_id'] ?? 0), $allowedOutletIds, true)) {

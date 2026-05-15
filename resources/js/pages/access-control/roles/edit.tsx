@@ -72,11 +72,14 @@ export default function RolesEdit({ role }: Props) {
                             <SearchableSelect
                                 value={data.level}
                                 disabled={role.is_system}
-                                onChange={(e) => setData('level', e.target.value as 'global' | 'outlet' | 'warehouse')}
+                                onChange={(e) => setData('level', e.target.value as Role['level'])}
                             >
                                 <option value="global">Global</option>
+                                <option value="central_warehouse">Central Warehouse</option>
                                 <option value="outlet">Outlet</option>
-                                <option value="warehouse">Warehouse</option>
+                                <option value="outlet_warehouse">Outlet Warehouse</option>
+                                <option value="outlet_department">Outlet Department</option>
+                                <option value="department_warehouse">Department Warehouse</option>
                             </SearchableSelect>
                         </FormField>
 

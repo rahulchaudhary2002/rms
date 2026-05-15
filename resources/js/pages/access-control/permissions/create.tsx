@@ -98,8 +98,11 @@ export default function PermissionsCreate() {
                         <FormField label="Level" error={errors.level}>
                             <SearchableSelect value={data.level} onChange={(e) => setData('level', e.target.value)}>
                                 <option value="global">Global</option>
+                                <option value="central_warehouse">Central Warehouse</option>
                                 <option value="outlet">Outlet</option>
-                                <option value="warehouse">Warehouse</option>
+                                <option value="outlet_warehouse">Outlet Warehouse</option>
+                                <option value="outlet_department">Outlet Department</option>
+                                <option value="department_warehouse">Department Warehouse</option>
                             </SearchableSelect>
                         </FormField>
 

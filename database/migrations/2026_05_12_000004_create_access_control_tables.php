@@ -16,19 +16,27 @@ return new class extends Migration
 
             $table->enum('level', [
                 'global',
+                'central_warehouse',
                 'outlet',
-                'warehouse',
-            ])->default('global');
+                'outlet_warehouse',
+                'outlet_department',
+                'department_warehouse',
+            ])->default('outlet');
+
             $table->unsignedInteger('rank')->default(100);
             $table->boolean('is_assignable')->default(true);
-
-            $table->text('description')->nullable();
             $table->boolean('is_system')->default(false);
             $table->boolean('is_active')->default(true);
 
+            $table->text('description')->nullable();
+
             $table->timestamps();
 
-            $table->index(['level', 'is_active']);
+            $table->index(['level']);
+            $table->index(['rank']);
+            $table->index(['is_assignable']);
+            $table->index(['is_system']);
+            $table->index(['is_active']);
         });
 
         Schema::create('permissions', function (Blueprint $table) {
@@ -42,18 +50,26 @@ return new class extends Migration
 
             $table->enum('level', [
                 'global',
+                'central_warehouse',
                 'outlet',
-                'warehouse',
-            ])->default('global');
+                'outlet_warehouse',
+                'outlet_department',
+                'department_warehouse',
+            ])->default('outlet');
 
-            $table->text('description')->nullable();
             $table->boolean('is_system')->default(false);
             $table->boolean('is_active')->default(true);
 
+            $table->text('description')->nullable();
+
             $table->timestamps();
 
+            $table->index(['module']);
+            $table->index(['action']);
             $table->index(['module', 'action']);
-            $table->index(['level', 'is_active']);
+            $table->index(['level']);
+            $table->index(['is_system']);
+            $table->index(['is_active']);
         });
 
         Schema::create('role_permissions', function (Blueprint $table) {
@@ -85,11 +101,27 @@ return new class extends Migration
 
             $table->enum('scope_type', [
                 'global',
+                'central_warehouse',
                 'outlet',
-                'warehouse',
-            ])->default('global');
+                'outlet_warehouse',
+                'outlet_department',
+                'department_warehouse',
+            ])->default('outlet');
 
-            $table->unsignedBigInteger('scope_id')->nullable();
+            $table->foreignId('outlet_id')
+                ->nullable()
+                ->constrained('outlets')
+                ->cascadeOnDelete();
+
+            $table->foreignId('outlet_department_id')
+                ->nullable()
+                ->constrained('outlet_departments')
+                ->cascadeOnDelete();
+
+            $table->foreignId('warehouse_id')
+                ->nullable()
+                ->constrained('warehouses')
+                ->cascadeOnDelete();
 
             $table->boolean('is_active')->default(true);
 
@@ -98,18 +130,28 @@ return new class extends Migration
                 ->constrained('users')
                 ->nullOnDelete();
 
+            $table->timestamp('starts_at')->nullable();
+            $table->timestamp('ends_at')->nullable();
+
             $table->timestamps();
 
             $table->unique([
                 'user_id',
                 'role_id',
                 'scope_type',
-                'scope_id',
+                'outlet_id',
+                'outlet_department_id',
+                'warehouse_id',
             ], 'unique_user_role_scope');
 
-            $table->index(['user_id', 'scope_type', 'scope_id'], 'idx_user_role_scope');
-            $table->index(['scope_type', 'scope_id'], 'idx_role_scope');
-            $table->index('is_active', 'idx_user_role_active');
+            $table->index(['user_id']);
+            $table->index(['role_id']);
+            $table->index(['scope_type']);
+            $table->index(['outlet_id']);
+            $table->index(['outlet_department_id']);
+            $table->index(['warehouse_id']);
+            $table->index(['is_active']);
+            $table->index(['starts_at', 'ends_at']);
         });
 
         Schema::create('user_permission_overrides', function (Blueprint $table) {
@@ -125,18 +167,33 @@ return new class extends Migration
 
             $table->enum('scope_type', [
                 'global',
+                'central_warehouse',
                 'outlet',
-                'warehouse',
-            ])->default('global');
+                'outlet_warehouse',
+                'outlet_department',
+                'department_warehouse',
+            ])->default('outlet');
 
-            $table->unsignedBigInteger('scope_id')->nullable();
+            $table->foreignId('outlet_id')
+                ->nullable()
+                ->constrained('outlets')
+                ->cascadeOnDelete();
+
+            $table->foreignId('outlet_department_id')
+                ->nullable()
+                ->constrained('outlet_departments')
+                ->cascadeOnDelete();
+
+            $table->foreignId('warehouse_id')
+                ->nullable()
+                ->constrained('warehouses')
+                ->cascadeOnDelete();
 
             $table->enum('effect', [
                 'allow',
                 'deny',
             ])->default('allow');
 
-            $table->text('reason')->nullable();
             $table->boolean('is_active')->default(true);
 
             $table->foreignId('assigned_by')
@@ -144,18 +201,31 @@ return new class extends Migration
                 ->constrained('users')
                 ->nullOnDelete();
 
+            $table->timestamp('starts_at')->nullable();
+            $table->timestamp('ends_at')->nullable();
+
+            $table->text('reason')->nullable();
+
             $table->timestamps();
 
             $table->unique([
                 'user_id',
                 'permission_id',
                 'scope_type',
-                'scope_id',
+                'outlet_id',
+                'outlet_department_id',
+                'warehouse_id',
             ], 'unique_user_permission_scope');
 
-            $table->index(['user_id', 'scope_type', 'scope_id'], 'idx_user_permission_scope');
-            $table->index(['scope_type', 'scope_id'], 'idx_permission_scope');
-            $table->index(['effect', 'is_active'], 'idx_permission_effect_active');
+            $table->index(['user_id']);
+            $table->index(['permission_id']);
+            $table->index(['scope_type']);
+            $table->index(['outlet_id']);
+            $table->index(['outlet_department_id']);
+            $table->index(['warehouse_id']);
+            $table->index(['effect']);
+            $table->index(['is_active']);
+            $table->index(['starts_at', 'ends_at']);
         });
 
         Schema::create('user_resource_permissions', function (Blueprint $table) {
@@ -177,13 +247,17 @@ return new class extends Migration
                 'deny',
             ])->default('allow');
 
-            $table->text('reason')->nullable();
             $table->boolean('is_active')->default(true);
 
             $table->foreignId('assigned_by')
                 ->nullable()
                 ->constrained('users')
                 ->nullOnDelete();
+
+            $table->timestamp('starts_at')->nullable();
+            $table->timestamp('ends_at')->nullable();
+
+            $table->text('reason')->nullable();
 
             $table->timestamps();
 
@@ -194,19 +268,12 @@ return new class extends Migration
                 'resource_id',
             ], 'unique_user_resource_permission');
 
-            $table->index([
-                'user_id',
-                'resource_type',
-                'resource_id',
-            ], 'idx_user_resource_permission');
-
-            $table->index([
-                'permission_id',
-                'resource_type',
-                'resource_id',
-            ], 'idx_permission_resource');
-
-            $table->index(['effect', 'is_active'], 'idx_resource_effect_active');
+            $table->index(['user_id']);
+            $table->index(['permission_id']);
+            $table->index(['resource_type', 'resource_id']);
+            $table->index(['effect']);
+            $table->index(['is_active']);
+            $table->index(['starts_at', 'ends_at']);
         });
     }
 

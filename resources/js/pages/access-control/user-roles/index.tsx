@@ -17,14 +17,22 @@ import { cn } from '@/lib/utils';
 import type { Role } from '@/types';
 
 type User = { id: number; name: string; email: string };
+type ScopeTarget = { id: number; name: string } | null;
 type Assignment = {
     id: number;
     user: User;
     role: Role;
     scope_type: string;
-    scope_id: number | null;
+    outlet_id: number | null;
+    outlet_department_id: number | null;
+    warehouse_id: number | null;
+    outlet: ScopeTarget;
+    department: ScopeTarget;
+    warehouse: ScopeTarget;
     is_active: boolean;
     assigned_by: User | null;
+    starts_at: string | null;
+    ends_at: string | null;
     created_at: string;
 };
 type PaginatedAssignments = {
@@ -204,8 +212,11 @@ export default function UserRolesIndex({ assignments, users, roles, filters }: P
                                         <SearchableSelect value={form.scope_type} onChange={(e) => setForm((c) => ({ ...c, scope_type: e.target.value }))}>
                                             <option value="">All Scopes</option>
                                             <option value="global">Global</option>
+                                            <option value="central_warehouse">Central Warehouse</option>
                                             <option value="outlet">Outlet</option>
-                                            <option value="warehouse">Warehouse</option>
+                                            <option value="outlet_warehouse">Outlet Warehouse</option>
+                                            <option value="outlet_department">Outlet Department</option>
+                                            <option value="department_warehouse">Department Warehouse</option>
                                         </SearchableSelect>
                                     </div>
                                     <div className="flex flex-col gap-1.5">
@@ -340,8 +351,12 @@ export default function UserRolesIndex({ assignments, users, roles, filters }: P
                                         </div>
                                     </td>
                                     <td className="px-6 py-4">
-                                        <span className="capitalize text-sm text-gray-700 dark:text-gray-300">{a.scope_type}</span>
-                                        {a.scope_id && <span className="ml-1 text-xs text-muted-foreground">#{a.scope_id}</span>}
+                                        <div className="flex flex-col gap-0.5">
+                                            <span className="capitalize text-sm text-gray-700 dark:text-gray-300">{a.scope_type.replace(/_/g, ' ')}</span>
+                                            {a.outlet && <span className="text-xs text-muted-foreground">{a.outlet.name}</span>}
+                                            {a.department && <span className="text-xs text-muted-foreground">{a.department.name}</span>}
+                                            {a.warehouse && <span className="text-xs text-muted-foreground">{a.warehouse.name}</span>}
+                                        </div>
                                     </td>
                                     <td className="px-6 py-4 text-sm text-muted-foreground dark:text-stone-400">
                                         {a.assigned_by?.name ?? '-'}

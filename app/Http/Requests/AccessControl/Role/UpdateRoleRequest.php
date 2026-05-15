@@ -19,7 +19,7 @@ class UpdateRoleRequest extends FormRequest
         return [
             'name'          => ['required', 'string', 'max:255'],
             'slug'          => ['required', 'string', 'max:255', Rule::unique('roles', 'slug')->ignore($roleId), 'regex:/^[a-z0-9\-]+$/'],
-            'level'         => ['required', 'in:global,outlet,warehouse'],
+            'level'         => ['required', 'in:global,central_warehouse,outlet,outlet_warehouse,outlet_department,department_warehouse'],
             'rank'          => ['required', 'integer', 'min:1', 'max:999'],
             'is_assignable' => ['boolean'],
             'description'   => ['nullable', 'string'],

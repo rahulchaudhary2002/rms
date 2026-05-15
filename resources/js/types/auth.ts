@@ -11,11 +11,13 @@ export type User = {
     [key: string]: unknown;
 };
 
+export type ScopeType = 'global' | 'central_warehouse' | 'outlet' | 'outlet_warehouse' | 'outlet_department' | 'department_warehouse';
+
 export type Role = {
     id: number;
     name: string;
     slug: string;
-    level: 'global' | 'outlet' | 'warehouse';
+    level: ScopeType;
     rank: number;
     description: string | null;
     is_system: boolean;
@@ -32,10 +34,51 @@ export type Permission = {
     slug: string;
     module: string;
     action: string;
-    level: 'global' | 'outlet' | 'warehouse';
+    level: ScopeType;
     description: string | null;
     is_system: boolean;
     is_active: boolean;
+    created_at: string;
+    updated_at: string;
+};
+
+export type UserRoleAssignment = {
+    id: number;
+    user_id: number;
+    role_id: number;
+    scope_type: ScopeType;
+    outlet_id: number | null;
+    outlet_department_id: number | null;
+    warehouse_id: number | null;
+    is_active: boolean;
+    assigned_by: number | null;
+    starts_at: string | null;
+    ends_at: string | null;
+    user?: User;
+    role?: Role;
+    outlet?: Outlet | null;
+    department?: OutletDepartment | null;
+    warehouse?: Warehouse | null;
+    created_at: string;
+    updated_at: string;
+};
+
+export type UserPermissionOverride = {
+    id: number;
+    user_id: number;
+    permission_id: number;
+    scope_type: ScopeType;
+    outlet_id: number | null;
+    outlet_department_id: number | null;
+    warehouse_id: number | null;
+    effect: 'allow' | 'deny';
+    reason: string | null;
+    is_active: boolean;
+    assigned_by: number | null;
+    starts_at: string | null;
+    ends_at: string | null;
+    user?: User;
+    permission?: Permission;
     created_at: string;
     updated_at: string;
 };

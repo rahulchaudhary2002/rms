@@ -2,9 +2,12 @@
 
 namespace App\Services;
 
+use App\Models\Outlet;
+use App\Models\OutletDepartment;
 use App\Models\Role;
 use App\Models\User;
 use App\Models\UserRoleAssignment;
+use App\Models\Warehouse;
 use App\Services\Concerns\InteractsWithScope;
 use App\Services\Concerns\PaginatesQuery;
 use Illuminate\Support\Facades\Auth;
@@ -20,7 +23,7 @@ class UserRoleAssignmentService
     {
         $actorMinRank = $this->accessControl->getActorMinRank($actor);
 
-        $query = UserRoleAssignment::with(['user', 'role', 'assignedBy'])
+        $query = UserRoleAssignment::with(['user', 'role', 'outlet', 'department', 'warehouse', 'assignedBy'])
             ->where('user_id', '!=', $actor->id)
             ->whereHas('user', fn ($q) => $q->where('is_superadmin', false))
             ->when($actorMinRank !== null, fn ($b) => $b->whereHas('role', fn ($q) => $q->where('rank', '>', $actorMinRank)));
@@ -60,9 +63,9 @@ class UserRoleAssignmentService
         )->orderBy('name')->get(['id', 'name', 'email']);
 
         $allowedLevels = match ($scope['type']) {
-            'outlet'    => ['outlet', 'warehouse'],
-            'warehouse' => ['warehouse'],
-            default     => ['global', 'outlet', 'warehouse'],
+            'outlet'    => ['outlet', 'outlet_warehouse', 'outlet_department', 'department_warehouse'],
+            'warehouse' => ['outlet_warehouse', 'central_warehouse', 'department_warehouse'],
+            default     => array_keys(config('access_control.scope_types', [])),
         };
 
         $roles = Role::where('is_active', true)
@@ -70,31 +73,45 @@ class UserRoleAssignmentService
             ->whereIn('level', $allowedLevels)
             ->orderBy('name')->get(['id', 'name', 'slug', 'level']);
 
-        return array_merge(compact('users', 'roles'), $this->resolveScopeProps($actor, $scope));
+        $outlets     = Outlet::orderBy('name')->get(['id', 'name']);
+        $departments = OutletDepartment::orderBy('name')->get(['id', 'outlet_id', 'name']);
+        $warehouses  = Warehouse::orderBy('name')->get(['id', 'outlet_id', 'outlet_department_id', 'name', 'type']);
+
+        return array_merge(
+            compact('users', 'roles', 'outlets', 'departments', 'warehouses'),
+            $this->resolveScopeProps($actor, $scope)
+        );
     }
 
     public function assign(User $actor, array $data): void
     {
-        $targetRole = Role::findOrFail($data['role_id']);
+        $targetRole  = Role::findOrFail($data['role_id']);
+        $outletId    = !empty($data['outlet_id']) ? (int) $data['outlet_id'] : null;
+        $warehouseId = !empty($data['warehouse_id']) ? (int) $data['warehouse_id'] : null;
 
         $this->accessControl->authorizeRoleAssignment(
             $actor,
             $targetRole,
             $data['scope_type'],
-            $data['scope_type'] === 'global' ? null : (int) $data['scope_id'],
+            $outletId,
+            $warehouseId,
         );
 
-        DB::transaction(function () use ($actor, $data) {
+        DB::transaction(function () use ($actor, $data, $outletId, $warehouseId) {
             UserRoleAssignment::firstOrCreate(
                 [
-                    'user_id'    => $data['user_id'],
-                    'role_id'    => $data['role_id'],
-                    'scope_type' => $data['scope_type'],
-                    'scope_id'   => $data['scope_type'] === 'global' ? null : $data['scope_id'],
+                    'user_id'              => $data['user_id'],
+                    'role_id'              => $data['role_id'],
+                    'scope_type'           => $data['scope_type'],
+                    'outlet_id'            => $outletId,
+                    'outlet_department_id' => !empty($data['outlet_department_id']) ? (int) $data['outlet_department_id'] : null,
+                    'warehouse_id'         => $warehouseId,
                 ],
                 [
                     'is_active'   => $data['is_active'] ?? true,
                     'assigned_by' => $actor->id,
+                    'starts_at'   => !empty($data['starts_at']) ? $data['starts_at'] : null,
+                    'ends_at'     => !empty($data['ends_at']) ? $data['ends_at'] : null,
                 ]
             );
         });
@@ -105,9 +122,8 @@ class UserRoleAssignmentService
     public function toggleActive(UserRoleAssignment $assignment, bool $isActive): void
     {
         /** @var \App\Models\User $actor */
-        /** @var \App\Models\User $actor */
         $actor = Auth::user();
-        $this->accessControl->assertActorCanMutateScopedRecord($actor, $assignment->scope_type, $assignment->scope_id);
+        $this->accessControl->assertActorCanMutateScopedRecord($actor, $assignment->scope_type, $assignment->outlet_id, $assignment->warehouse_id);
         $assignment->update(['is_active' => $isActive]);
         /** @var \App\Models\User $assignmentUser */
         $assignmentUser = $assignment->user()->first();
@@ -117,13 +133,11 @@ class UserRoleAssignmentService
     public function remove(UserRoleAssignment $assignment): void
     {
         /** @var \App\Models\User $actor */
-        /** @var \App\Models\User $actor */
         $actor = Auth::user();
-        $this->accessControl->assertActorCanMutateScopedRecord($actor, $assignment->scope_type, $assignment->scope_id);
+        $this->accessControl->assertActorCanMutateScopedRecord($actor, $assignment->scope_type, $assignment->outlet_id, $assignment->warehouse_id);
         /** @var \App\Models\User $user */
         $user = $assignment->user()->first();
         $assignment->delete();
         $this->accessControl->clearUserPermissionCache($user);
     }
-
 }

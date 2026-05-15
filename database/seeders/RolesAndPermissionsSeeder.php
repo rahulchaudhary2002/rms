@@ -69,7 +69,7 @@ class RolesAndPermissionsSeeder extends Seeder
         [
             'name'          => 'Warehouse Manager',
             'slug'          => 'warehouse-manager',
-            'level'         => 'warehouse',
+            'level'         => 'outlet_warehouse',
             'rank'          => 50,
             'description'   => 'Manages a specific warehouse.',
             'is_system'     => true,

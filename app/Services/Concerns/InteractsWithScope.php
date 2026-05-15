@@ -35,7 +35,7 @@ trait InteractsWithScope
     protected function resolveSessionConstrainedResourceIds(?array $actorAssignedScopes, array $scope): ?array
     {
         if ($scope['type'] === 'outlet') {
-            $outletId     = (int) $scope['scope_id'];
+            $outletId     = (int) $scope['outlet_id'];
             $warehouseIds = DB::table('warehouses')
                 ->where('outlet_id', $outletId)->pluck('id')->map(fn ($id) => (int) $id)->toArray();
 
@@ -50,7 +50,7 @@ trait InteractsWithScope
         }
 
         if ($scope['type'] === 'warehouse') {
-            $warehouseId = (int) $scope['scope_id'];
+            $warehouseId = (int) $scope['warehouse_id'];
 
             return [
                 'outlet_ids'    => [],

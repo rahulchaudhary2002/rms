@@ -11,16 +11,21 @@ class UserRoleAssignment extends Model
         'user_id',
         'role_id',
         'scope_type',
-        'scope_id',
+        'outlet_id',
+        'outlet_department_id',
+        'warehouse_id',
         'is_active',
         'assigned_by',
+        'starts_at',
+        'ends_at',
     ];
 
     protected function casts(): array
     {
         return [
-            'is_active' => 'boolean',
-            'scope_id' => 'integer',
+            'is_active'  => 'boolean',
+            'starts_at'  => 'datetime',
+            'ends_at'    => 'datetime',
         ];
     }
 
@@ -32,6 +37,21 @@ class UserRoleAssignment extends Model
     public function role(): BelongsTo
     {
         return $this->belongsTo(Role::class);
+    }
+
+    public function outlet(): BelongsTo
+    {
+        return $this->belongsTo(Outlet::class);
+    }
+
+    public function department(): BelongsTo
+    {
+        return $this->belongsTo(OutletDepartment::class, 'outlet_department_id');
+    }
+
+    public function warehouse(): BelongsTo
+    {
+        return $this->belongsTo(Warehouse::class);
     }
 
     public function assignedBy(): BelongsTo

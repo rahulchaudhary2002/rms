@@ -24,13 +24,18 @@ type Permission = { id: number; name: string; slug: string; module: string; acti
 type ScopeType = { type: string; label: string };
 type AssignedBy = { id: number; name: string } | null;
 
+type ScopeTarget = { id: number; name: string } | null;
 type RoleAssignment = {
-    id: number; scope_type: string; scope_id: number | null; is_active: boolean;
-    created_at: string; role: Role; assigned_by: AssignedBy;
+    id: number; scope_type: string;
+    outlet_id: number | null; outlet_department_id: number | null; warehouse_id: number | null;
+    outlet: ScopeTarget; department: ScopeTarget; warehouse: ScopeTarget;
+    is_active: boolean; created_at: string; role: Role; assigned_by: AssignedBy;
 };
 type PermissionOverride = {
-    id: number; scope_type: string; scope_id: number | null; effect: 'allow' | 'deny';
-    reason: string | null; is_active: boolean; created_at: string;
+    id: number; scope_type: string;
+    outlet_id: number | null; outlet_department_id: number | null; warehouse_id: number | null;
+    outlet: ScopeTarget; department: ScopeTarget; warehouse: ScopeTarget;
+    effect: 'allow' | 'deny'; reason: string | null; is_active: boolean; created_at: string;
     permission: Permission; assigned_by: AssignedBy;
 };
 type ResourcePermission = {
@@ -49,10 +54,17 @@ type User = {
 type AllowedScopes = { outlet: number[]; warehouse: number[] } | null;
 type AllowedResourceIds = { outlet_ids: number[]; warehouse_ids: number[] } | null;
 
+type Outlet = { id: number; name: string };
+type OutletDepartment = { id: number; outlet_id: number; name: string };
+type Warehouse = { id: number; outlet_id: number | null; outlet_department_id: number | null; name: string; type: string };
+
 type Props = {
     user: User;
     roles: Role[];
     permissions: Permission[];
+    outlets: Outlet[];
+    departments: OutletDepartment[];
+    warehouses: Warehouse[];
     scopeTypes: ScopeType[];
     resourceTypes: ScopeType[];
     allowedScopes: AllowedScopes;
@@ -92,81 +104,105 @@ function EmptyRow({ colSpan, label }: { colSpan: number; label: string }) {
 
 // ─── Modals ───────────────────────────────────────────────────────────────────
 
-function AssignRoleModal({ open, onClose, userId, roles, allowedScopes, returnUrl }: {
+const SCOPE_NEEDS: Record<string, { outlet: boolean; department: boolean; warehouse: boolean }> = {
+    global:               { outlet: false, department: false, warehouse: false },
+    central_warehouse:    { outlet: false, department: false, warehouse: true  },
+    outlet:               { outlet: true,  department: false, warehouse: false },
+    outlet_warehouse:     { outlet: true,  department: false, warehouse: true  },
+    outlet_department:    { outlet: true,  department: true,  warehouse: false },
+    department_warehouse: { outlet: true,  department: true,  warehouse: true  },
+};
+
+function AssignRoleModal({ open, onClose, userId, roles, outlets, departments, warehouses, allowedScopes, returnUrl }: {
     open: boolean; onClose: () => void;
-    userId: number; roles: Role[]; allowedScopes: AllowedScopes; returnUrl: string;
+    userId: number; roles: Role[];
+    outlets: Outlet[]; departments: OutletDepartment[]; warehouses: Warehouse[];
+    allowedScopes: AllowedScopes; returnUrl: string;
 }) {
     const { data, setData, post, processing, errors, reset } = useForm({
         user_id: String(userId),
         role_id: '',
         scope_type: 'global',
-        scope_id: '',
+        outlet_id: '',
+        outlet_department_id: '',
+        warehouse_id: '',
         _redirect: returnUrl,
     });
 
     const selectedRole = roles.find((r) => String(r.id) === data.role_id) ?? null;
+    const needs = SCOPE_NEEDS[data.scope_type] ?? SCOPE_NEEDS.global;
+
+    const allowedOutlets = allowedScopes ? outlets.filter((o) => allowedScopes.outlet.includes(o.id)) : outlets;
+    const filteredDepts = data.outlet_id ? departments.filter((d) => String(d.outlet_id) === data.outlet_id) : departments;
+    const filteredWhs = (() => {
+        let list = allowedScopes ? warehouses.filter((w) => allowedScopes.warehouse.includes(w.id)) : warehouses;
+        if (data.scope_type === 'central_warehouse') list = list.filter((w) => w.type === 'central');
+        else if (data.scope_type === 'department_warehouse' && data.outlet_department_id) list = list.filter((w) => String(w.outlet_department_id) === data.outlet_department_id);
+        else if (data.scope_type === 'outlet_warehouse' && data.outlet_id) list = list.filter((w) => String(w.outlet_id) === data.outlet_id);
+        return list;
+    })();
 
     function handleRoleChange(roleId: string) {
         const role = roles.find((r) => String(r.id) === roleId) ?? null;
-        setData({ ...data, role_id: roleId, scope_type: role?.level ?? 'global', scope_id: '' });
+        setData({ ...data, role_id: roleId, scope_type: role?.level ?? 'global', outlet_id: '', outlet_department_id: '', warehouse_id: '' });
     }
 
     function submit(e: { preventDefault(): void }) {
         e.preventDefault();
-        post(urStore.url(), {
-            onSuccess: () => { reset(); onClose(); },
-        });
+        post(urStore.url(), { onSuccess: () => { reset(); onClose(); } });
     }
 
     return (
         <Dialog open={open} onOpenChange={(o) => { if (!o) { reset(); onClose(); } }}>
             <DialogContent className="max-w-md bg-card">
-                <DialogHeader>
-                    <DialogTitle>Assign Role</DialogTitle>
-                </DialogHeader>
+                <DialogHeader><DialogTitle>Assign Role</DialogTitle></DialogHeader>
                 <form onSubmit={submit} className="space-y-4">
                     <FormField label="Role" error={errors.role_id}>
                         <SearchableSelect value={data.role_id} onChange={(e) => handleRoleChange(e.target.value)}>
                             <option value="">Select a role...</option>
-                            {roles.map((r) => (
-                                <option key={r.id} value={String(r.id)}>{r.name} ({r.level})</option>
-                            ))}
+                            {roles.map((r) => <option key={r.id} value={String(r.id)}>{r.name} ({r.level.replace(/_/g, ' ')})</option>)}
                         </SearchableSelect>
                     </FormField>
 
                     <FormField label="Scope" error={errors.scope_type}>
-                        <div className={cn(
-                            'flex h-11 items-center rounded-lg border border-input bg-muted/40 px-3 text-sm',
-                            !selectedRole && 'text-muted-foreground',
-                        )}>
+                        <div className={cn('flex h-11 items-center rounded-lg border border-input bg-muted/40 px-3 text-sm', !selectedRole && 'text-muted-foreground')}>
                             {selectedRole
-                                ? <><span className="font-semibold capitalize text-foreground">{selectedRole.level}</span><span className="ml-1.5 text-muted-foreground">- set by role level</span></>
+                                ? <><span className="font-semibold capitalize text-foreground">{selectedRole.level.replace(/_/g, ' ')}</span><span className="ml-1.5 text-muted-foreground">— set by role level</span></>
                                 : 'Select a role first'
                             }
                         </div>
                     </FormField>
 
-                    {data.scope_type !== 'global' && selectedRole && (
-                        <FormField label="Scope Resource" error={errors.scope_id}>
-                            <AsyncResourceSelect
-                                resourceType={data.scope_type}
-                                value={data.scope_id}
-                                onChange={(val) => setData('scope_id', val)}
-                                allowedIds={allowedScopes ? (allowedScopes[data.scope_type as 'outlet' | 'warehouse'] ?? null) : null}
-                                placeholder={`Select a ${data.scope_type}...`}
-                            />
+                    {needs.outlet && (
+                        <FormField label="Outlet" error={errors.outlet_id}>
+                            <SearchableSelect value={data.outlet_id} onChange={(e) => setData({ ...data, outlet_id: e.target.value, outlet_department_id: '', warehouse_id: '' })}>
+                                <option value="">Select an outlet...</option>
+                                {allowedOutlets.map((o) => <option key={o.id} value={String(o.id)}>{o.name}</option>)}
+                            </SearchableSelect>
+                        </FormField>
+                    )}
+
+                    {needs.department && (
+                        <FormField label="Department" error={errors.outlet_department_id}>
+                            <SearchableSelect value={data.outlet_department_id} disabled={!data.outlet_id} onChange={(e) => setData({ ...data, outlet_department_id: e.target.value, warehouse_id: '' })}>
+                                <option value="">Select a department...</option>
+                                {filteredDepts.map((d) => <option key={d.id} value={String(d.id)}>{d.name}</option>)}
+                            </SearchableSelect>
+                        </FormField>
+                    )}
+
+                    {needs.warehouse && (
+                        <FormField label="Warehouse" error={errors.warehouse_id}>
+                            <SearchableSelect value={data.warehouse_id} disabled={needs.outlet && !data.outlet_id} onChange={(e) => setData('warehouse_id', e.target.value)}>
+                                <option value="">Select a warehouse...</option>
+                                {filteredWhs.map((w) => <option key={w.id} value={String(w.id)}>{w.name}</option>)}
+                            </SearchableSelect>
                         </FormField>
                     )}
 
                     <DialogFooter>
-                        <button type="button" onClick={() => { reset(); onClose(); }}
-                            className="rounded-lg px-4 py-2 text-sm font-semibold text-muted-foreground transition-colors hover:bg-secondary">
-                            Cancel
-                        </button>
-                        <button type="submit" disabled={processing}
-                            className="rounded-lg bg-primary px-6 py-2 text-sm font-bold text-white transition-all hover:opacity-90 disabled:opacity-60">
-                            Assign Role
-                        </button>
+                        <button type="button" onClick={() => { reset(); onClose(); }} className="rounded-lg px-4 py-2 text-sm font-semibold text-muted-foreground transition-colors hover:bg-secondary">Cancel</button>
+                        <button type="submit" disabled={processing} className="rounded-lg bg-primary px-6 py-2 text-sm font-bold text-white transition-all hover:opacity-90 disabled:opacity-60">Assign Role</button>
                     </DialogFooter>
                 </form>
             </DialogContent>
@@ -174,42 +210,50 @@ function AssignRoleModal({ open, onClose, userId, roles, allowedScopes, returnUr
     );
 }
 
-function AddOverrideModal({ open, onClose, userId, permissions, scopeTypes, allowedScopes, allowedScopeTypes, returnUrl }: {
+function AddOverrideModal({ open, onClose, userId, permissions, outlets, departments, warehouses, scopeTypes, allowedScopes, allowedScopeTypes, returnUrl }: {
     open: boolean; onClose: () => void;
-    userId: number; permissions: Permission[]; scopeTypes: ScopeType[];
-    allowedScopes: AllowedScopes; allowedScopeTypes: string[]; returnUrl: string;
+    userId: number; permissions: Permission[];
+    outlets: Outlet[]; departments: OutletDepartment[]; warehouses: Warehouse[];
+    scopeTypes: ScopeType[]; allowedScopes: AllowedScopes; allowedScopeTypes: string[]; returnUrl: string;
 }) {
     const defaultScopeType = allowedScopeTypes[0] ?? 'global';
     const { data, setData, post, processing, errors, reset } = useForm({
         user_id: String(userId),
         permission_id: '',
         scope_type: defaultScopeType,
-        scope_id: '',
+        outlet_id: '',
+        outlet_department_id: '',
+        warehouse_id: '',
         effect: 'allow',
         reason: '',
         _redirect: returnUrl,
     });
 
+    const needs = SCOPE_NEEDS[data.scope_type] ?? SCOPE_NEEDS.global;
+    const allowedOutlets = allowedScopes ? outlets.filter((o) => allowedScopes.outlet.includes(o.id)) : outlets;
+    const filteredDepts = data.outlet_id ? departments.filter((d) => String(d.outlet_id) === data.outlet_id) : departments;
+    const filteredWhs = (() => {
+        let list = allowedScopes ? warehouses.filter((w) => allowedScopes.warehouse.includes(w.id)) : warehouses;
+        if (data.scope_type === 'central_warehouse') list = list.filter((w) => w.type === 'central');
+        else if (data.scope_type === 'department_warehouse' && data.outlet_department_id) list = list.filter((w) => String(w.outlet_department_id) === data.outlet_department_id);
+        else if (data.scope_type === 'outlet_warehouse' && data.outlet_id) list = list.filter((w) => String(w.outlet_id) === data.outlet_id);
+        return list;
+    })();
+
     function submit(e: { preventDefault(): void }) {
         e.preventDefault();
-        post(upoStore.url(), {
-            onSuccess: () => { reset(); onClose(); },
-        });
+        post(upoStore.url(), { onSuccess: () => { reset(); onClose(); } });
     }
 
     return (
         <Dialog open={open} onOpenChange={(o) => { if (!o) onClose(); }}>
             <DialogContent className="max-w-md bg-card">
-                <DialogHeader>
-                    <DialogTitle>Add Permission Override</DialogTitle>
-                </DialogHeader>
+                <DialogHeader><DialogTitle>Add Permission Override</DialogTitle></DialogHeader>
                 <form onSubmit={submit} className="space-y-4">
                     <FormField label="Permission" error={errors.permission_id}>
                         <SearchableSelect value={data.permission_id} onChange={(e) => setData('permission_id', e.target.value)}>
                             <option value="">Select a permission...</option>
-                            {permissions.map((p) => (
-                                <option key={p.id} value={String(p.id)}>{p.slug}</option>
-                            ))}
+                            {permissions.map((p) => <option key={p.id} value={String(p.id)}>{p.slug}</option>)}
                         </SearchableSelect>
                     </FormField>
 
@@ -221,26 +265,37 @@ function AddOverrideModal({ open, onClose, userId, permissions, scopeTypes, allo
                     </FormField>
 
                     <FormField label="Scope Type" error={errors.scope_type}>
-                        <SearchableSelect
-                            value={data.scope_type}
-                            onChange={(e) => { setData('scope_type', e.target.value); setData('scope_id', ''); }}
-                        >
-                            {allowedScopeTypes.includes('global') && <option value="global">Global</option>}
+                        <SearchableSelect value={data.scope_type} onChange={(e) => setData({ ...data, scope_type: e.target.value, outlet_id: '', outlet_department_id: '', warehouse_id: '' })}>
                             {scopeTypes.filter((st) => allowedScopeTypes.includes(st.type)).map((st) => (
                                 <option key={st.type} value={st.type}>{st.label}</option>
                             ))}
                         </SearchableSelect>
                     </FormField>
 
-                    {data.scope_type !== 'global' && (
-                        <FormField label="Scope Resource" error={errors.scope_id}>
-                            <AsyncResourceSelect
-                                resourceType={data.scope_type}
-                                value={data.scope_id}
-                                onChange={(val) => setData('scope_id', val)}
-                                allowedIds={allowedScopes ? (allowedScopes[data.scope_type as 'outlet' | 'warehouse'] ?? null) : null}
-                                placeholder="Select a resource..."
-                            />
+                    {needs.outlet && (
+                        <FormField label="Outlet" error={errors.outlet_id}>
+                            <SearchableSelect value={data.outlet_id} onChange={(e) => setData({ ...data, outlet_id: e.target.value, outlet_department_id: '', warehouse_id: '' })}>
+                                <option value="">Select an outlet...</option>
+                                {allowedOutlets.map((o) => <option key={o.id} value={String(o.id)}>{o.name}</option>)}
+                            </SearchableSelect>
+                        </FormField>
+                    )}
+
+                    {needs.department && (
+                        <FormField label="Department" error={errors.outlet_department_id}>
+                            <SearchableSelect value={data.outlet_department_id} disabled={!data.outlet_id} onChange={(e) => setData({ ...data, outlet_department_id: e.target.value, warehouse_id: '' })}>
+                                <option value="">Select a department...</option>
+                                {filteredDepts.map((d) => <option key={d.id} value={String(d.id)}>{d.name}</option>)}
+                            </SearchableSelect>
+                        </FormField>
+                    )}
+
+                    {needs.warehouse && (
+                        <FormField label="Warehouse" error={errors.warehouse_id}>
+                            <SearchableSelect value={data.warehouse_id} disabled={needs.outlet && !data.outlet_id} onChange={(e) => setData('warehouse_id', e.target.value)}>
+                                <option value="">Select a warehouse...</option>
+                                {filteredWhs.map((w) => <option key={w.id} value={String(w.id)}>{w.name}</option>)}
+                            </SearchableSelect>
                         </FormField>
                     )}
 
@@ -249,14 +304,8 @@ function AddOverrideModal({ open, onClose, userId, permissions, scopeTypes, allo
                     </FormField>
 
                     <DialogFooter>
-                        <button type="button" onClick={onClose}
-                            className="rounded-lg px-4 py-2 text-sm font-semibold text-muted-foreground transition-colors hover:bg-secondary">
-                            Cancel
-                        </button>
-                        <button type="submit" disabled={processing}
-                            className="rounded-lg bg-primary px-6 py-2 text-sm font-bold text-white transition-all hover:opacity-90 disabled:opacity-60">
-                            Save Override
-                        </button>
+                        <button type="button" onClick={onClose} className="rounded-lg px-4 py-2 text-sm font-semibold text-muted-foreground transition-colors hover:bg-secondary">Cancel</button>
+                        <button type="submit" disabled={processing} className="rounded-lg bg-primary px-6 py-2 text-sm font-bold text-white transition-all hover:opacity-90 disabled:opacity-60">Save Override</button>
                     </DialogFooter>
                 </form>
             </DialogContent>
@@ -365,7 +414,7 @@ const tabList: { id: Tab; label: string; icon: string }[] = [
     { id: 'resources',  label: 'Resource Permissions',  icon: 'rule' },
 ];
 
-export default function UserShow({ user, roles, permissions, scopeTypes, resourceTypes, allowedScopes, allowedResourceIds, allowedScopeTypes }: Props) {
+export default function UserShow({ user, roles, permissions, outlets, departments, warehouses, scopeTypes, resourceTypes, allowedScopes, allowedResourceIds, allowedScopeTypes }: Props) {
     const [activeTab, setActiveTab] = useState<Tab>('overview');
     const [modal, setModal] = useState<'role' | 'override' | 'resource' | null>(null);
     const returnUrl = usersShow.url(user.id);
@@ -513,7 +562,12 @@ export default function UserShow({ user, roles, permissions, scopeTypes, resourc
                                             </span>
                                         </td>
                                         <td className="px-6 py-3 text-sm text-muted-foreground">
-                                            {ra.scope_type === 'global' ? 'Global' : `${ra.scope_type} #${ra.scope_id}`}
+                                            <div className="flex flex-col gap-0.5">
+                                                <span>{ra.scope_type.replace(/_/g, ' ')}</span>
+                                                {ra.outlet && <span className="text-xs">{ra.outlet.name}</span>}
+                                                {ra.department && <span className="text-xs">{ra.department.name}</span>}
+                                                {ra.warehouse && <span className="text-xs">{ra.warehouse.name}</span>}
+                                            </div>
                                         </td>
                                         <td className="px-6 py-3"><ActiveBadge active={ra.is_active} /></td>
                                         <td className="px-6 py-3 text-sm text-muted-foreground">{ra.assigned_by?.name ?? '-'}</td>
@@ -561,7 +615,12 @@ export default function UserShow({ user, roles, permissions, scopeTypes, resourc
                                         <td className="px-6 py-3 font-mono text-xs text-foreground">{po.permission.slug}</td>
                                         <td className="px-6 py-3"><EffectBadge effect={po.effect} /></td>
                                         <td className="px-6 py-3 text-sm text-muted-foreground">
-                                            {po.scope_type === 'global' ? 'Global' : `${po.scope_type} #${po.scope_id}`}
+                                            <div className="flex flex-col gap-0.5">
+                                                <span>{po.scope_type.replace(/_/g, ' ')}</span>
+                                                {po.outlet && <span className="text-xs">{po.outlet.name}</span>}
+                                                {po.department && <span className="text-xs">{po.department.name}</span>}
+                                                {po.warehouse && <span className="text-xs">{po.warehouse.name}</span>}
+                                            </div>
                                         </td>
                                         <td className="px-6 py-3"><ActiveBadge active={po.is_active} /></td>
                                         <td className="px-6 py-3 text-sm text-muted-foreground">{po.reason ?? '-'}</td>
@@ -633,6 +692,9 @@ export default function UserShow({ user, roles, permissions, scopeTypes, resourc
                 onClose={() => setModal(null)}
                 userId={user.id}
                 roles={roles}
+                outlets={outlets}
+                departments={departments}
+                warehouses={warehouses}
                 allowedScopes={allowedScopes}
                 returnUrl={returnUrl}
             />
@@ -641,6 +703,9 @@ export default function UserShow({ user, roles, permissions, scopeTypes, resourc
                 onClose={() => setModal(null)}
                 userId={user.id}
                 permissions={permissions}
+                outlets={outlets}
+                departments={departments}
+                warehouses={warehouses}
                 scopeTypes={scopeTypes}
                 allowedScopes={allowedScopes}
                 allowedScopeTypes={allowedScopeTypes}

@@ -44,9 +44,7 @@ class LoyaltyPointRuleController extends Controller
         return Inertia::render('loyalty/point-rules/create', [
             'scopeOutlets'       => $this->outletsForScope($scope),
             'scopeType'          => $scope['type'],
-            'scopeOutletId'      => $scope['type'] !== 'global'
-                ? ($scope['type'] === 'outlet' ? (int) $scope['scope_id'] : (int) $scope['outlet_id'])
-                : null,
+            'scopeOutletId'      => $scope['outlet_id'] !== null ? (int) $scope['outlet_id'] : null,
         ]);
     }
 
@@ -73,9 +71,7 @@ class LoyaltyPointRuleController extends Controller
             'rule'          => $loyaltyPointRule->load(['outlet:id,name', 'slabs']),
             'scopeOutlets'  => $this->outletsForScope($scope),
             'scopeType'     => $scope['type'],
-            'scopeOutletId' => $scope['type'] !== 'global'
-                ? ($scope['type'] === 'outlet' ? (int) $scope['scope_id'] : (int) $scope['outlet_id'])
-                : null,
+            'scopeOutletId' => $scope['outlet_id'] !== null ? (int) $scope['outlet_id'] : null,
         ]);
     }
 
@@ -111,9 +107,7 @@ class LoyaltyPointRuleController extends Controller
             return Outlet::orderBy('name')->get(['id', 'name']);
         }
 
-        $outletId = $scope['type'] === 'outlet'
-            ? (int) $scope['scope_id']
-            : (int) $scope['outlet_id'];
+        $outletId = (int) $scope['outlet_id'];
 
         return Outlet::where('id', $outletId)->get(['id', 'name']);
     }

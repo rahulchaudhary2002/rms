@@ -150,7 +150,7 @@ class FoodService
     private function outletIdFromScope(array $scope): ?int
     {
         if ($scope['type'] === 'outlet') {
-            return (int) $scope['scope_id'];
+            return $scope['outlet_id'] !== null ? (int) $scope['outlet_id'] : null;
         }
 
         if ($scope['type'] === 'warehouse') {

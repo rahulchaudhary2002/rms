@@ -16,13 +16,17 @@ class UserResourcePermission extends Model
         'reason',
         'is_active',
         'assigned_by',
+        'starts_at',
+        'ends_at',
     ];
 
     protected function casts(): array
     {
         return [
-            'is_active' => 'boolean',
+            'is_active'   => 'boolean',
             'resource_id' => 'integer',
+            'starts_at'   => 'datetime',
+            'ends_at'     => 'datetime',
         ];
     }
 

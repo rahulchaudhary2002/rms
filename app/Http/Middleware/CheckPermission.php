@@ -20,9 +20,9 @@ class CheckPermission
             return $this->deny($request);
         }
 
-        [$scopeType, $scopeId] = $this->resolveScope($request);
+        [$scopeType, $outletId, $warehouseId] = $this->resolveScope($request);
 
-        if (! $this->accessControl->userHasPermission($user, $permission, $scopeType, $scopeId)) {
+        if (! $this->accessControl->userHasPermission($user, $permission, $scopeType, $outletId, $warehouseId)) {
             return $this->deny($request);
         }
 
@@ -31,27 +31,19 @@ class CheckPermission
 
     private function resolveScope(Request $request): array
     {
-        if ($request->has('outlet_id') && $request->input('outlet_id')) {
-            return ['outlet', (int) $request->input('outlet_id')];
-        }
-
-        if ($request->has('warehouse_id') && $request->input('warehouse_id')) {
-            return ['warehouse', (int) $request->input('warehouse_id')];
-        }
-
-        $outletId = $request->session()->get('current_outlet_id');
-        $nodeId = $request->session()->get('current_node_id');
-        $scopeType = $request->session()->get('current_scope_type', 'global');
+        $sessionOutletId = $request->session()->get('current_outlet_id');
+        $nodeId          = $request->session()->get('current_node_id');
+        $scopeType       = $request->session()->get('current_scope_type', 'global');
 
         if ($scopeType === 'warehouse' && $nodeId) {
-            return ['warehouse', (int) $nodeId];
+            return ['warehouse', $sessionOutletId ? (int) $sessionOutletId : null, (int) $nodeId];
         }
 
-        if ($scopeType === 'outlet' && $outletId) {
-            return ['outlet', (int) $outletId];
+        if ($scopeType === 'outlet' && $sessionOutletId) {
+            return ['outlet', (int) $sessionOutletId, null];
         }
 
-        return ['global', null];
+        return ['global', null, null];
     }
 
     private function deny(Request $request): Response

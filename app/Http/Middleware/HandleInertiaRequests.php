@@ -122,12 +122,12 @@ class HandleInertiaRequests extends Middleware
 
         $assignments = UserRoleAssignment::where('user_id', $user->id)
             ->where('is_active', true)
-            ->whereIn('scope_type', ['outlet', 'warehouse'])
-            ->get(['scope_type', 'scope_id']);
+            ->where('scope_type', '!=', 'global')
+            ->get(['scope_type', 'outlet_id', 'warehouse_id']);
 
         return [
-            'outlet'    => $assignments->where('scope_type', 'outlet')->pluck('scope_id')->unique()->filter()->values()->toArray(),
-            'warehouse' => $assignments->where('scope_type', 'warehouse')->pluck('scope_id')->unique()->filter()->values()->toArray(),
+            'outlet'    => $assignments->whereNotNull('outlet_id')->pluck('outlet_id')->unique()->filter()->values()->toArray(),
+            'warehouse' => $assignments->whereNotNull('warehouse_id')->pluck('warehouse_id')->unique()->filter()->values()->toArray(),
         ];
     }
 

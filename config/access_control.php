@@ -3,22 +3,30 @@
 return [
     /*
      * Scope types available for role assignments and permission overrides.
-     * These are the resource contexts a role/permission can be restricted to.
-     * "global" is always implicitly available and not listed here.
      */
     'scope_types' => [
+        'global' => [
+            'label' => 'Global',
+        ],
+        'central_warehouse' => [
+            'label' => 'Central Warehouse',
+        ],
         'outlet' => [
             'label' => 'Outlet',
         ],
-        'warehouse' => [
-            'label' => 'Warehouse',
+        'outlet_warehouse' => [
+            'label' => 'Outlet Warehouse',
+        ],
+        'outlet_department' => [
+            'label' => 'Outlet Department',
+        ],
+        'department_warehouse' => [
+            'label' => 'Department Warehouse',
         ],
     ],
 
     /*
      * Resource types available for resource-level permissions.
-     * Each entry maps a type key to its Eloquent model and display config,
-     * used by the async resource lookup endpoint.
      */
     'resource_types' => [
         'outlet' => [
@@ -30,6 +38,12 @@ return [
         'warehouse' => [
             'label'          => 'Warehouse',
             'model'          => \App\Models\Warehouse::class,
+            'label_column'   => 'name',
+            'search_columns' => ['name'],
+        ],
+        'outlet_department' => [
+            'label'          => 'Department',
+            'model'          => \App\Models\OutletDepartment::class,
             'label_column'   => 'name',
             'search_columns' => ['name'],
         ],

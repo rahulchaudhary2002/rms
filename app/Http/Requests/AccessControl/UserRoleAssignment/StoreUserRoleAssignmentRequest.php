@@ -14,18 +14,15 @@ class StoreUserRoleAssignmentRequest extends FormRequest
     public function rules(): array
     {
         return [
-            'user_id'    => ['required', 'integer', 'exists:users,id'],
-            'role_id'    => ['required', 'integer', 'exists:roles,id'],
-            'scope_type' => ['required', 'in:global,outlet,warehouse'],
-            'scope_id'   => ['nullable', 'integer', 'required_unless:scope_type,global'],
-            'is_active'  => ['boolean'],
-        ];
-    }
-
-    public function messages(): array
-    {
-        return [
-            'scope_id.required_unless' => 'Scope ID is required when scope type is outlet or warehouse.',
+            'user_id'              => ['required', 'integer', 'exists:users,id'],
+            'role_id'              => ['required', 'integer', 'exists:roles,id'],
+            'scope_type'           => ['required', 'in:global,central_warehouse,outlet,outlet_warehouse,outlet_department,department_warehouse'],
+            'outlet_id'            => ['nullable', 'integer', 'exists:outlets,id'],
+            'outlet_department_id' => ['nullable', 'integer', 'exists:outlet_departments,id'],
+            'warehouse_id'         => ['nullable', 'integer', 'exists:warehouses,id'],
+            'is_active'            => ['boolean'],
+            'starts_at'            => ['nullable', 'date'],
+            'ends_at'              => ['nullable', 'date', 'after_or_equal:starts_at'],
         ];
     }
 }
