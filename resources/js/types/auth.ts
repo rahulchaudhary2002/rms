@@ -82,6 +82,10 @@ export type IngredientCategory = {
     updated_at: string;
 };
 
+export type IngredientType = 'raw_material' | 'ready_product' | 'packaging' | 'consumable';
+
+export type CostingMethod = 'fifo' | 'lifo' | 'weighted_average' | 'moving_average' | 'specific_identification';
+
 export type Ingredient = {
     id: number;
     ingredient_category_id: number | null;
@@ -89,9 +93,13 @@ export type Ingredient = {
     slug: string;
     code: string;
     barcode: string | null;
+    type: IngredientType;
     base_unit_id: number;
     default_purchase_unit_id: number | null;
     default_usage_unit_id: number | null;
+    minimum_stock: string;
+    reorder_stock: string;
+    costing_method: CostingMethod;
     is_perishable: boolean;
     track_expiry: boolean;
     description: string | null;

@@ -25,9 +25,13 @@ class Ingredient extends Model
         'slug',
         'code',
         'barcode',
+        'type',
         'base_unit_id',
         'default_purchase_unit_id',
         'default_usage_unit_id',
+        'minimum_stock',
+        'reorder_stock',
+        'costing_method',
         'is_perishable',
         'track_expiry',
         'description',
@@ -37,6 +41,8 @@ class Ingredient extends Model
     protected function casts(): array
     {
         return [
+            'minimum_stock' => 'decimal:4',
+            'reorder_stock' => 'decimal:4',
             'is_perishable' => 'boolean',
             'track_expiry'  => 'boolean',
             'is_active'     => 'boolean',

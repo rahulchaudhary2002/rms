@@ -12,7 +12,14 @@ import { ActionDropdown } from '@/components/action-dropdown';
 import { tablePerPageOptions } from '@/hooks/use-client-pagination';
 import { useDebouncedInertiaSearch } from '@/hooks/use-debounced-inertia-search';
 import { cn } from '@/lib/utils';
-import type { Ingredient, IngredientCategory } from '@/types';
+import type { Ingredient, IngredientCategory, IngredientType } from '@/types';
+
+const INGREDIENT_TYPE_LABELS: Record<IngredientType, string> = {
+    raw_material:  'Raw Material',
+    ready_product: 'Ready Product',
+    packaging:     'Packaging',
+    consumable:    'Consumable',
+};
 
 type PaginatedIngredients = {
     data: Ingredient[];
@@ -210,6 +217,7 @@ export default function IngredientsIndex({ ingredients, categories, filters }: P
                             <tr className="bg-muted text-[11px] font-bold tracking-[0.1em] text-muted-foreground uppercase dark:bg-stone-900 dark:text-stone-400">
                                 <th className="border-b border-border/10 px-6 py-4">Name</th>
                                 <th className="border-b border-border/10 px-6 py-4">Code</th>
+                                <th className="border-b border-border/10 px-6 py-4">Type</th>
                                 <th className="border-b border-border/10 px-6 py-4">Category</th>
                                 <th className="border-b border-border/10 px-6 py-4">Base Unit</th>
                                 <th className="border-b border-border/10 px-6 py-4">Flags</th>
@@ -220,7 +228,7 @@ export default function IngredientsIndex({ ingredients, categories, filters }: P
                         <tbody className="divide-y divide-muted dark:divide-stone-800">
                             {ingredients.data.length === 0 && (
                                 <tr>
-                                    <td colSpan={7} className="px-6 py-12 text-center text-sm text-muted-foreground dark:text-stone-400">No ingredients found.</td>
+                                    <td colSpan={8} className="px-6 py-12 text-center text-sm text-muted-foreground dark:text-stone-400">No ingredients found.</td>
                                 </tr>
                             )}
                             {ingredients.data.map((ingredient) => (
@@ -241,6 +249,11 @@ export default function IngredientsIndex({ ingredients, categories, filters }: P
                                         </div>
                                     </td>
                                     <td className="px-6 py-4 font-mono text-xs text-gray-500 dark:text-gray-400">{ingredient.code}</td>
+                                    <td className="px-6 py-4">
+                                        <span className="rounded-full bg-blue-100 px-2.5 py-1 text-[10px] font-bold tracking-wide uppercase text-blue-700 ring-1 ring-blue-200 dark:bg-blue-900/30 dark:text-blue-300 dark:ring-blue-800">
+                                            {INGREDIENT_TYPE_LABELS[ingredient.type]}
+                                        </span>
+                                    </td>
                                     <td className="px-6 py-4 text-sm text-muted-foreground dark:text-stone-400">
                                         {ingredient.ingredient_category ? (
                                             <span className="rounded-full bg-slate-100 px-2.5 py-1 text-[10px] font-bold tracking-wide uppercase text-slate-600 ring-1 ring-slate-200 dark:bg-slate-800 dark:text-slate-300 dark:ring-slate-700">

@@ -17,6 +17,21 @@ import {
 } from '@/routes/ingredients';
 import type { IngredientCategory, Unit } from '@/types';
 
+const INGREDIENT_TYPE_LABELS: Record<string, string> = {
+    raw_material:   'Raw Material (e.g. Chicken, Rice, Oil)',
+    ready_product:  'Ready Product (e.g. Coke bottle, Chips)',
+    packaging:      'Packaging (e.g. Box, Cup, Spoon)',
+    consumable:     'Consumable (e.g. Gas, Tissue, Gloves)',
+};
+
+const COSTING_METHOD_LABELS: Record<string, string> = {
+    fifo:                    'FIFO – First In, First Out',
+    lifo:                    'LIFO – Last In, First Out',
+    weighted_average:        'Weighted Average',
+    moving_average:          'Moving Average',
+    specific_identification: 'Specific Identification',
+};
+
 type Props = {
     categories: Pick<IngredientCategory, 'id' | 'name' | 'slug'>[];
     units: Pick<Unit, 'id' | 'name' | 'short_name' | 'type'>[];
@@ -31,9 +46,13 @@ export default function IngredientsCreate({ categories, units }: Props) {
         slug: '',
         code: '',
         barcode: '',
+        type: 'raw_material',
         base_unit_id: '',
         default_purchase_unit_id: '',
         default_usage_unit_id: '',
+        minimum_stock: '0',
+        reorder_stock: '0',
+        costing_method: 'fifo',
         is_perishable: false,
         track_expiry: false,
         description: '',
@@ -153,6 +172,20 @@ export default function IngredientsCreate({ categories, units }: Props) {
                                 }
                                 placeholder="Optional barcode"
                             />
+                        </FormField>
+
+                        <FormField
+                            label="Type"
+                            error={errors.type}
+                        >
+                            <SearchableSelect
+                                value={data.type}
+                                onChange={(e) => setData('type', e.target.value)}
+                            >
+                                {Object.entries(INGREDIENT_TYPE_LABELS).map(([value, label]) => (
+                                    <option key={value} value={value}>{label}</option>
+                                ))}
+                            </SearchableSelect>
                         </FormField>
 
                         <FormField
@@ -284,6 +317,60 @@ export default function IngredientsCreate({ categories, units }: Props) {
                                     <option key={unit.id} value={unit.id}>
                                         {unit.name} ({unit.short_name})
                                     </option>
+                                ))}
+                            </SearchableSelect>
+                        </FormField>
+                    </div>
+                </FormSection>
+
+                <FormSection
+                    title="Stock & Costing"
+                    description="Set stock alert thresholds and the costing method used for valuation."
+                >
+                    <div className="grid grid-cols-1 gap-5 md:grid-cols-2">
+                        <FormField
+                            label="Minimum Stock"
+                            htmlFor="minimum_stock"
+                            error={errors.minimum_stock}
+                        >
+                            <Input
+                                id="minimum_stock"
+                                type="number"
+                                min="0"
+                                step="0.0001"
+                                value={data.minimum_stock}
+                                onChange={(e) => setData('minimum_stock', e.target.value)}
+                                placeholder="0"
+                            />
+                        </FormField>
+
+                        <FormField
+                            label="Reorder Stock"
+                            htmlFor="reorder_stock"
+                            error={errors.reorder_stock}
+                        >
+                            <Input
+                                id="reorder_stock"
+                                type="number"
+                                min="0"
+                                step="0.0001"
+                                value={data.reorder_stock}
+                                onChange={(e) => setData('reorder_stock', e.target.value)}
+                                placeholder="0"
+                            />
+                        </FormField>
+
+                        <FormField
+                            label="Costing Method"
+                            error={errors.costing_method}
+                            className="md:col-span-2"
+                        >
+                            <SearchableSelect
+                                value={data.costing_method}
+                                onChange={(e) => setData('costing_method', e.target.value)}
+                            >
+                                {Object.entries(COSTING_METHOD_LABELS).map(([value, label]) => (
+                                    <option key={value} value={value}>{label}</option>
                                 ))}
                             </SearchableSelect>
                         </FormField>
