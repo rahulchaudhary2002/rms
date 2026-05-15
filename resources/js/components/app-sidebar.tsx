@@ -18,6 +18,7 @@ import { index as unitConversionsIndex } from '@/routes/unit-conversions';
 import { index as ingredientCategoriesIndex } from '@/routes/ingredient-categories';
 import { index as ingredientsIndex } from '@/routes/ingredients';
 import { index as outletDepartmentsIndex } from '@/routes/outlet-departments';
+import { index as outletsIndex } from '@/routes/outlets';
 import { index as countriesIndex } from '@/routes/countries';
 import { index as statesIndex } from '@/routes/states';
 import { index as citiesIndex } from '@/routes/cities';
@@ -186,10 +187,11 @@ function buildDynamicGroups(auth: Auth): MenuGroup[] {
         groups.push({ id: 'ingredients', label: 'Master Data', title: 'Ingredients', icon: 'nutrition', items });
     }
 
-    if (can('outlet-departments-view')) {
-        groups.push({ id: 'outlets', label: 'Master Data', title: 'Outlets', icon: 'storefront', items: [
-            { title: 'Departments', href: outletDepartmentsIndex.url(), icon: 'door_open', activeMatch: [outletDepartmentsIndex.url()] },
-        ]});
+    if (canAny(['outlets-view', 'outlet-departments-view'])) {
+        const items: MenuItem[] = [];
+        if (can('outlets-view')) items.push({ title: 'Outlets', href: outletsIndex.url(), icon: 'store', activeMatch: [outletsIndex.url()] });
+        if (can('outlet-departments-view')) items.push({ title: 'Departments', href: outletDepartmentsIndex.url(), icon: 'door_open', activeMatch: [outletDepartmentsIndex.url()] });
+        groups.push({ id: 'outlets', label: 'Master Data', title: 'Outlets', icon: 'storefront', items });
     }
 
     if (canAny(['users-manage', 'roles-view', 'permissions-view', 'access-control-manage'])) {

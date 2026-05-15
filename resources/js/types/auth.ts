@@ -147,6 +147,9 @@ export type City = {
 export type Outlet = {
     id: number;
     name: string;
+    departments_count?: number;
+    created_at?: string;
+    updated_at?: string;
 };
 
 export type DepartmentType = 'kitchen' | 'bar' | 'counter' | 'store' | 'bakery' | 'housekeeping' | 'other';

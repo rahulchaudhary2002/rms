@@ -13,4 +13,9 @@ class Outlet extends Model
     {
         return $this->hasMany(Warehouse::class);
     }
+
+    public function departments(): HasMany
+    {
+        return $this->hasMany(OutletDepartment::class);
+    }
 }
