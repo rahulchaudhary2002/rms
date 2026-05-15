@@ -15,7 +15,7 @@ import { Input } from '@/components/ui/input';
 import { SearchableSelect } from '@/components/ui/searchable-select';
 import { cn } from '@/lib/utils';
 
-type SelectionScope = 'outlet' | 'warehouse';
+type SelectionScope = 'outlet' | 'warehouse' | 'global';
 
 type NodeItem = {
     id: string;
@@ -27,6 +27,7 @@ type NodeItem = {
 type NodeSelectionData = {
     setup_completed: boolean;
     selection_url: string | null;
+    can_select_global: boolean;
     current_scope_type: SelectionScope | null;
     current_outlet_id: string | null;
     current_node_id: string | null;
@@ -57,6 +58,7 @@ export function OutletNodeSwitcher() {
     const can = page.props.auth?.can ?? {};
     const canCreateWarehouse = can['warehouses-create'] ?? false;
     const canCreateOutlet = can['outlets-create'] ?? false;
+    const canSelectGlobal = nodeSelection?.can_select_global ?? false;
 
     const [open, setOpen] = useState(false);
     const [pendingScopeType, setPendingScopeType] =
@@ -250,12 +252,10 @@ export function OutletNodeSwitcher() {
             nodeSelection.selection_url,
             {
                 scope_type: pendingScopeType,
-                outlet_id:
-                    pendingScopeType === 'outlet' ? pendingOutletId : null,
-                warehouse_id:
-                    pendingScopeType === 'warehouse' ? pendingNodeId : null,
+                outlet_id: pendingScopeType === 'outlet' ? pendingOutletId : null,
+                warehouse_id: pendingScopeType === 'warehouse' ? pendingNodeId : null,
                 redirect_to: window.location.pathname,
-            },
+            } as Record<string, string | null>,
             {
                 preserveScroll: true,
                 onFinish: () => {
@@ -362,11 +362,13 @@ export function OutletNodeSwitcher() {
               ?? nodeSelection.items.find((n) => n.outlet_id === (nodeSelection.current_outlet_id ?? ''))?.outlet
             : null;
     const currentLabel =
-        nodeSelection.current_scope_type === 'outlet' && currentOutletName
-            ? currentOutletName
-            : selectedNode
-              ? `${selectedNode.outlet} / ${selectedNode.node}`
-              : null;
+        nodeSelection.current_scope_type === 'global'
+            ? 'Global'
+            : nodeSelection.current_scope_type === 'outlet' && currentOutletName
+              ? currentOutletName
+              : selectedNode
+                ? `${selectedNode.outlet} / ${selectedNode.node}`
+                : null;
     const selectionUnchanged =
         pendingScopeType === nodeSelection.current_scope_type &&
         pendingOutletId === nodeSelection.current_outlet_id &&
@@ -402,7 +404,7 @@ export function OutletNodeSwitcher() {
                         Current Scope
                     </p>
                     <p className="truncate text-sm font-bold text-foreground">
-                        {currentLabel ?? 'Select outlet or warehouse'}
+                        {currentLabel ?? 'Select scope'}
                     </p>
                 </div>
                 <span
@@ -439,6 +441,37 @@ export function OutletNodeSwitcher() {
                 </div>
 
                 <div className="max-h-[420px] space-y-1 overflow-y-auto p-2">
+                    {canSelectGlobal && (
+                        <>
+                            <button
+                                type="button"
+                                className={cn(
+                                    'flex w-full items-center gap-2 rounded-lg p-2 text-left transition-colors',
+                                    pendingScopeType === 'global'
+                                        ? 'bg-primary text-primary-foreground shadow-sm'
+                                        : 'hover:bg-muted',
+                                )}
+                                onClick={() => {
+                                    setPendingScopeType('global');
+                                    setPendingOutletId(null);
+                                    setPendingNodeId(null);
+                                }}
+                            >
+                                <span className={cn('material-symbols-outlined text-sm', pendingScopeType === 'global' ? '' : 'text-muted-foreground')}>
+                                    public
+                                </span>
+                                <span className="min-w-0 flex-1 text-sm font-semibold">Global</span>
+                                <span className={cn('text-xs', pendingScopeType === 'global' ? 'text-primary-foreground/70' : 'text-muted-foreground')}>
+                                    All outlets &amp; warehouses
+                                </span>
+                                {pendingScopeType === 'global' && (
+                                    <span className="material-symbols-outlined text-sm">check_circle</span>
+                                )}
+                            </button>
+                            {hierarchy.length > 0 && <div className="my-1 h-px bg-border" />}
+                        </>
+                    )}
+
                     {hierarchy.length === 0 ? (
                         <p className="p-3 text-sm text-muted-foreground">
                             No warehouses are available.

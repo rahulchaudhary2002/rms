@@ -14,7 +14,7 @@ class SelectScopeRequest extends FormRequest
     public function rules(): array
     {
         return [
-            'scope_type'   => ['required', 'string', 'in:outlet,warehouse'],
+            'scope_type'   => ['required', 'string', 'in:outlet,warehouse,global'],
             'outlet_id'    => ['nullable', 'required_if:scope_type,outlet'],
             'warehouse_id' => ['nullable', 'required_if:scope_type,warehouse'],
             'redirect_to'  => ['nullable', 'string'],

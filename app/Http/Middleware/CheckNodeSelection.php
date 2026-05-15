@@ -51,6 +51,10 @@ class CheckNodeSelection
         $outletId = (string) $request->session()->get('current_outlet_id', '');
         $nodeId = (string) $request->session()->get('current_node_id', '');
 
+        if ($scopeType === 'global') {
+            return true;
+        }
+
         if ($scopeType === 'outlet') {
             return $outletId !== '';
         }

@@ -469,6 +469,24 @@ class AccessControlService
             ->exists();
     }
 
+    /**
+     * Returns true when the user is a superadmin (is_superadmin flag or super-admin role)
+     * or holds any role with level = 'global' assigned at scope_type = 'global'.
+     * These users may operate in any outlet or warehouse.
+     */
+    public function hasGlobalScopeRole(User $user): bool
+    {
+        if ($user->is_superadmin || $this->isSuperAdmin($user)) {
+            return true;
+        }
+
+        return UserRoleAssignment::where('user_id', $user->id)
+            ->where('scope_type', 'global')
+            ->where('is_active', true)
+            ->whereHas('role', fn ($q) => $q->where('level', 'global')->where('is_active', true))
+            ->exists();
+    }
+
     private function resolveUserPermissions(
         User $user,
         string $scopeType,

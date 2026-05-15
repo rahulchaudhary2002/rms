@@ -18,8 +18,20 @@ class ScopeSelectionService
     {
         $redirectTo = (string) ($data['redirect_to'] ?? '/dashboard');
 
-        if (! $this->accessControl->isSuperAdmin($actor)) {
+        if (! $this->accessControl->hasGlobalScopeRole($actor)) {
             $this->assertActorCanAccessScope($actor, $data);
+        }
+
+        if ($data['scope_type'] === 'global') {
+            if (! $this->accessControl->hasGlobalScopeRole($actor)) {
+                throw ValidationException::withMessages(['scope_type' => 'You do not have permission to use global scope.']);
+            }
+
+            $request->session()->put('current_scope_type', 'global');
+            $request->session()->forget('current_outlet_id');
+            $request->session()->forget('current_node_id');
+
+            return $redirectTo;
         }
 
         if ($data['scope_type'] === 'outlet') {

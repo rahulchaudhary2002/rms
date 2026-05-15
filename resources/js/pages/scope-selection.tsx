@@ -17,7 +17,7 @@ import {
 } from '@/components/ui/dialog';
 import { cn } from '@/lib/utils';
 
-type SelectionScope = 'outlet' | 'warehouse';
+type SelectionScope = 'outlet' | 'warehouse' | 'global';
 
 type NodeItem = {
     id: string;
@@ -30,6 +30,7 @@ type NodeSelectionData = {
     current_scope_type: SelectionScope | null;
     current_outlet_id: string | null;
     current_node_id: string | null;
+    can_select_global: boolean;
     items: NodeItem[];
 };
 
@@ -59,6 +60,7 @@ export default function ScopeSelection() {
     const can = page.props.auth?.can ?? {};
     const canCreateOutlet = can['outlets-create'] ?? false;
     const canCreateWarehouse = can['warehouses-create'] ?? false;
+    const canSelectGlobal = nodeSelection?.can_select_global ?? false;
     const nodes = nodeSelection?.items ?? [];
 
     const initialNode =
@@ -91,6 +93,7 @@ export default function ScopeSelection() {
     const [creationError, setCreationError] = useState('');
 
     const canSubmit =
+        selectedScopeType === 'global' ||
         (selectedScopeType === 'outlet' && selectedOutletId !== '') ||
         (selectedScopeType === 'warehouse' && selectedNodeId !== '');
 
@@ -229,7 +232,7 @@ export default function ScopeSelection() {
                 outlet_id: selectedScopeType === 'outlet' ? selectedOutletId : null,
                 warehouse_id: selectedScopeType === 'warehouse' ? selectedNodeId : null,
                 redirect_to: dashboard.url(),
-            },
+            } as Record<string, string | null>,
             {
                 preserveScroll: false,
                 onFinish: () => setProcessing(false),
@@ -252,6 +255,36 @@ export default function ScopeSelection() {
                     onSubmit={onSubmit}
                     className="space-y-4 rounded-xl border border-amber-200/70 bg-white p-6 shadow-sm dark:border-border dark:bg-card"
                 >
+                    {canSelectGlobal && (
+                        <div className="rounded-xl border border-border/40 bg-card p-3 dark:border-border dark:bg-background">
+                            <button
+                                type="button"
+                                className={cn(
+                                    'flex w-full items-center gap-2 rounded-lg p-2 text-left transition-colors',
+                                    selectedScopeType === 'global'
+                                        ? 'bg-primary text-white shadow-sm'
+                                        : 'hover:bg-muted',
+                                )}
+                                onClick={() => {
+                                    setSelectedScopeType('global');
+                                    setSelectedOutletId('');
+                                    setSelectedNodeId('');
+                                }}
+                            >
+                                <span className={cn('material-symbols-outlined text-sm', selectedScopeType === 'global' ? '' : 'text-muted-foreground')}>
+                                    public
+                                </span>
+                                <span className="min-w-0 flex-1 text-sm font-semibold">Global</span>
+                                <span className={cn('text-xs', selectedScopeType === 'global' ? 'text-white' : 'text-muted-foreground')}>
+                                    All outlets &amp; warehouses
+                                </span>
+                                {selectedScopeType === 'global' && (
+                                    <span className="material-symbols-outlined text-xs">check_circle</span>
+                                )}
+                            </button>
+                        </div>
+                    )}
+
                     {hierarchy.length === 0 ? (
                         <p className="text-sm text-muted-foreground">
                             No outlets or warehouses are available yet. Please complete setup first.

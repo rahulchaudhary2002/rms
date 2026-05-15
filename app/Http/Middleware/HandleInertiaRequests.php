@@ -115,18 +115,8 @@ class HandleInertiaRequests extends Middleware
             return null;
         }
 
-        // Super admin or any global-scope role → unrestricted, show everything.
-        if ($this->accessControl->isSuperAdmin($user)) {
-            return null;
-        }
-
-        $hasGlobalRole = UserRoleAssignment::where('user_id', $user->id)
-            ->where('is_active', true)
-            ->where('scope_type', 'global')
-            ->whereHas('role', fn ($q) => $q->where('is_active', true))
-            ->exists();
-
-        if ($hasGlobalRole) {
+        // Global-scope role users (super-admin, admin, etc.) → unrestricted, show everything.
+        if ($this->accessControl->hasGlobalScopeRole($user)) {
             return null;
         }
 
@@ -268,9 +258,28 @@ class HandleInertiaRequests extends Middleware
             ->values()
             ->all();
 
-        $currentScopeType = (string) $request->session()->get('current_scope_type', 'warehouse');
+        $user = $request->user();
+        $canSelectGlobal = $user && $this->accessControl->hasGlobalScopeRole($user);
+
+        $sessionScopeType = $request->session()->get('current_scope_type');
+        $currentScopeType = (string) ($sessionScopeType ?? 'warehouse');
         $currentNodeId = (string) $request->session()->get('current_node_id', '');
         $currentOutletId = (string) $request->session()->get('current_outlet_id', '');
+
+        if ($sessionScopeType === 'global') {
+            return [
+                'setup_completed'      => true,
+                'selection_url'        => '/scope-selection',
+                'setup_url'            => null,
+                'can_select_global'    => $canSelectGlobal,
+                'current_scope_type'   => 'global',
+                'current_outlet_id'    => null,
+                'current_outlet_label' => null,
+                'current_node_id'      => null,
+                'current_node_label'   => null,
+                'items'                => $items,
+            ];
+        }
 
         $currentNode = $warehouses->first(fn ($warehouse) => (string) ($warehouse->id ?? '') === $currentNodeId);
         $currentOutlet = null;
@@ -293,14 +302,15 @@ class HandleInertiaRequests extends Middleware
         }
 
         return [
-            'setup_completed' => true,
-            'selection_url' => '/scope-selection',
-            'setup_url' => null,
-            'current_scope_type' => $currentOutlet !== null ? $currentScopeType : null,
-            'current_outlet_id' => $currentOutlet !== null ? (string) ($currentOutlet->id ?? '') : null,
+            'setup_completed'      => true,
+            'selection_url'        => '/scope-selection',
+            'setup_url'            => null,
+            'can_select_global'    => $canSelectGlobal,
+            'current_scope_type'   => $currentOutlet !== null ? $currentScopeType : null,
+            'current_outlet_id'    => $currentOutlet !== null ? (string) ($currentOutlet->id ?? '') : null,
             'current_outlet_label' => $currentOutlet !== null ? (string) ($currentOutlet->name ?? '') : null,
-            'current_node_id' => $currentNode !== null ? (string) ($currentNode->id ?? '') : null,
-            'current_node_label' => $currentNode !== null
+            'current_node_id'      => $currentNode !== null ? (string) ($currentNode->id ?? '') : null,
+            'current_node_label'   => $currentNode !== null
                 ? trim(implode(' / ', array_filter([
                     (string) ($currentNode->outlet ?? ''),
                     (string) ($currentNode->node ?? ''),
