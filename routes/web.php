@@ -1,6 +1,7 @@
 <?php
 
 use App\Http\Controllers\OutletController;
+use App\Http\Controllers\MediaController;
 use App\Http\Controllers\ScopeSelectionController;
 use App\Http\Controllers\UserController;
 use App\Http\Controllers\WarehouseController;
@@ -10,6 +11,10 @@ use Laravel\Fortify\Features;
 Route::inertia('/', 'welcome', [
     'canRegister' => Features::enabled(Features::registration()),
 ])->name('home');
+
+Route::get('media/{path}', [MediaController::class, 'show'])
+    ->where('path', '.*')
+    ->name('media.show');
 
 Route::middleware(['auth', 'verified', 'node.selected'])->group(function () {
     Route::inertia('dashboard', 'dashboard')->name('dashboard');
@@ -30,3 +35,4 @@ require __DIR__.'/ingredients.php';
 require __DIR__.'/locations.php';
 require __DIR__.'/customers.php';
 require __DIR__.'/loyalty.php';
+require __DIR__.'/food.php';

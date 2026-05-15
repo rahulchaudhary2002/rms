@@ -73,7 +73,7 @@ export default function UnitsCreate() {
                                 onChange={(e) => setData('is_base', e.target.value === 'true')}
                             >
                                 <option value="false">No</option>
-                                <option value="true">Yes — this is the base unit for its type</option>
+                                <option value="true">Yes - this is the base unit for its type</option>
                             </SearchableSelect>
                         </FormField>
 

@@ -14,7 +14,7 @@ function DetailItem({ label, value }: { label: string; value: React.ReactNode })
         <div className="rounded-xl border border-border bg-card p-4">
             <p className="mb-1 text-[11px] font-bold tracking-wider text-muted-foreground/60 uppercase">{label}</p>
             <div className="text-sm font-semibold text-foreground">
-                {value ?? <span className="text-muted-foreground">—</span>}
+                {value ?? <span className="text-muted-foreground">-</span>}
             </div>
         </div>
     );
@@ -149,7 +149,7 @@ export default function LoyaltyPointRulesShow({ rule }: Props) {
                     {rule.type === 'campaign' && (
                         <DetailItem
                             label="Campaign Dates"
-                            value={rule.starts_at && rule.ends_at ? `${rule.starts_at} – ${rule.ends_at}` : '—'}
+                            value={rule.starts_at && rule.ends_at ? `${rule.starts_at} – ${rule.ends_at}` : '-'}
                         />
                     )}
                 </section>

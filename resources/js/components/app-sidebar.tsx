@@ -22,6 +22,10 @@ import { index as statesIndex } from '@/routes/states';
 import { index as citiesIndex } from '@/routes/cities';
 import { index as customersIndex } from '@/routes/customers';
 import { index as loyaltyPointRulesIndex } from '@/routes/loyalty-point-rules';
+import { index as foodsIndex } from '@/routes/foods';
+import { index as foodCategoriesIndex } from '@/routes/food-categories';
+import { index as addonGroupsIndex } from '@/routes/addon-groups';
+import { index as addonsIndex } from '@/routes/addons';
 import type { Auth } from '@/types';
 
 type ViewportMode = 'mobile' | 'medium' | 'large';
@@ -36,6 +40,7 @@ type MenuItem = {
     href: string;
     icon: string;
     activeMatch?: string[];
+    subItems?: MenuItem[];
 };
 
 type MenuGroup = {
@@ -102,6 +107,11 @@ function isPathActive(currentUrl: string, href: string, activeMatch?: string[]) 
     );
 }
 
+function isItemActive(currentUrl: string, item: MenuItem): boolean {
+    if (isPathActive(currentUrl, item.href, item.activeMatch)) return true;
+    return item.subItems?.some((sub) => isPathActive(currentUrl, sub.href, sub.activeMatch)) ?? false;
+}
+
 function buildDynamicItemGroups(auth: Auth): MenuItemGroup[] {
     const isSuperAdmin = auth.user?.is_superadmin === true;
     const can = (slug: string) => isSuperAdmin || auth.can?.[slug] === true;
@@ -122,6 +132,25 @@ function buildDynamicGroups(auth: Auth): MenuGroup[] {
     const can = (slug: string) => isSuperAdmin || auth.can?.[slug] === true;
     const canAny = (slugs: string[]) => slugs.some((slug) => can(slug));
     const groups: MenuGroup[] = [];
+
+    if (canAny(['food-categories-view', 'foods-view', 'addon-groups-view'])) {
+        const items: MenuItem[] = [];
+        if (can('foods-view')) items.push({ title: 'Foods & Menu', href: foodsIndex.url(), icon: 'restaurant_menu', activeMatch: [foodsIndex.url()] });
+        if (can('food-categories-view')) items.push({ title: 'Food Categories', href: foodCategoriesIndex.url(), icon: 'category', activeMatch: [foodCategoriesIndex.url()] });
+        if (can('addon-groups-view')) {
+            items.push({
+                title: 'Add-ons',
+                href: addonsIndex.url(),
+                icon: 'extension',
+                activeMatch: [addonGroupsIndex.url(), addonsIndex.url()],
+                subItems: [
+                    { title: 'Groups', href: addonGroupsIndex.url(), icon: 'layers', activeMatch: [addonGroupsIndex.url()] },
+                    { title: 'Add-ons', href: addonsIndex.url(), icon: 'extension', activeMatch: [addonsIndex.url()] },
+                ],
+            });
+        }
+        groups.push({ id: 'food-menu', label: 'Food & Menu', title: 'Food & Menu', icon: 'restaurant_menu', items });
+    }
 
     if (canAny(['units-view', 'unit-conversions-view'])) {
         const items: MenuItem[] = [];
@@ -177,7 +206,13 @@ export function getSearchItems(auth: Auth): SearchItem[] {
     }
     for (const group of buildDynamicGroups(auth)) {
         for (const item of group.items) {
-            items.push({ title: item.title, href: item.href, group: group.title, groupIcon: group.icon });
+            if (item.subItems && item.subItems.length > 0) {
+                for (const sub of item.subItems) {
+                    items.push({ title: sub.title, href: sub.href, group: group.title, groupIcon: group.icon });
+                }
+            } else {
+                items.push({ title: item.title, href: item.href, group: group.title, groupIcon: group.icon });
+            }
         }
     }
     return items;
@@ -209,10 +244,21 @@ export function AppSidebar() {
     const initialOpenGroup = useMemo(
         () =>
             buildDynamicGroups(auth).find((group) =>
-                group.items.some((item) => isPathActive(currentUrl, item.href, item.activeMatch)),
+                group.items.some((item) => isItemActive(currentUrl, item)),
             )?.id ?? '',
         [currentUrl, auth],
     );
+
+    const initialOpenSubItem = useMemo(() => {
+        for (const group of buildDynamicGroups(auth)) {
+            for (const item of group.items) {
+                if (item.subItems?.some((sub) => isPathActive(currentUrl, sub.href, sub.activeMatch))) {
+                    return item.href;
+                }
+            }
+        }
+        return '';
+    }, [currentUrl, auth]);
 
     const [viewportMode, setViewportMode] = useState<ViewportMode>('large');
     const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false);
@@ -222,6 +268,7 @@ export function AppSidebar() {
         return saved !== null ? Boolean(JSON.parse(saved)) : false;
     });
     const [openGroupOverride, setOpenGroupOverride] = useState<OpenGroupOverride | null>(null);
+    const [openSubItem, setOpenSubItem] = useState<string>(() => initialOpenSubItem);
     const [openDropRight, setOpenDropRight] = useState<string | null>(null);
     const [dropRightTop, setDropRightTop] = useState(120);
     const [userMenuOpen, setUserMenuOpen] = useState(false);
@@ -240,6 +287,10 @@ export function AppSidebar() {
     useEffect(() => {
         localStorage.setItem('sidebar-mini', JSON.stringify(isMini));
     }, [isMini]);
+
+    useEffect(() => {
+        if (initialOpenSubItem) setOpenSubItem(initialOpenSubItem);
+    }, [initialOpenSubItem]);
 
     useEffect(() => {
         const apply = () => {
@@ -382,7 +433,7 @@ export function AppSidebar() {
                     })}
 
                     {dynamicGroups.map((group, index) => {
-                        const groupActive = group.items.some((item) => isPathActive(currentUrl, item.href, item.activeMatch));
+                        const groupActive = group.items.some((item) => isItemActive(currentUrl, item));
                         const isAccordionOpen = openGroup === group.id;
                         const isDropRightOpen = openDropRight === group.id;
                         const prevGroup = index > 0 ? dynamicGroups[index - 1] : null;
@@ -477,7 +528,51 @@ export function AppSidebar() {
                                             <div className="relative mt-1 ml-10 space-y-1">
                                                 <div className="absolute top-0 bottom-4 left-[-18px] w-px bg-border" />
                                                 {group.items.map((item) => {
-                                                    const active = isPathActive(currentUrl, item.href, item.activeMatch);
+                                                    const active = isItemActive(currentUrl, item);
+                                                    if (item.subItems && item.subItems.length > 0) {
+                                                        const isSubOpen = openSubItem === item.href;
+                                                        return (
+                                                            <div key={item.title}>
+                                                                <button
+                                                                    type="button"
+                                                                    onClick={() => setOpenSubItem(isSubOpen ? '' : item.href)}
+                                                                    className={cn(
+                                                                        'relative flex w-full items-center justify-between px-3 py-2 text-sm transition-colors',
+                                                                        active ? 'font-medium text-primary' : 'font-medium text-muted-foreground hover:text-primary',
+                                                                    )}
+                                                                >
+                                                                    <span className="absolute top-1/2 left-[-18px] h-px w-3 -translate-y-px bg-border" />
+                                                                    {item.title}
+                                                                    <span className={cn('material-symbols-outlined text-[14px] transition-transform', isSubOpen && 'rotate-180')}>
+                                                                        expand_more
+                                                                    </span>
+                                                                </button>
+                                                                <div className={cn('grid transition-[grid-template-rows] duration-200 ease-in-out', isSubOpen ? 'grid-rows-[1fr]' : 'grid-rows-[0fr]')}>
+                                                                    <div className="overflow-hidden">
+                                                                        <div className="relative ml-3 space-y-0.5 pb-1 pl-3">
+                                                                            <div className="absolute top-0 bottom-2 left-0 w-px bg-border" />
+                                                                            {item.subItems.map((sub) => {
+                                                                                const subActive = isPathActive(currentUrl, sub.href, sub.activeMatch);
+                                                                                return (
+                                                                                    <Link
+                                                                                        key={sub.title}
+                                                                                        href={sub.href}
+                                                                                        className={cn(
+                                                                                            'relative flex items-center px-3 py-1.5 text-sm transition-colors',
+                                                                                            subActive ? 'font-medium text-primary' : 'font-medium text-muted-foreground hover:text-primary',
+                                                                                        )}
+                                                                                    >
+                                                                                        <span className="absolute top-1/2 left-0 h-px w-3 -translate-y-px bg-border" />
+                                                                                        {sub.title}
+                                                                                    </Link>
+                                                                                );
+                                                                            })}
+                                                                        </div>
+                                                                    </div>
+                                                                </div>
+                                                            </div>
+                                                        );
+                                                    }
                                                     return (
                                                         <Link
                                                             key={item.title}
@@ -502,9 +597,33 @@ export function AppSidebar() {
                                         className="fixed left-[4.5rem] z-50 min-w-56 rounded-xl border border-border bg-popover p-3 text-popover-foreground shadow-xl"
                                         style={{ top: `${dropRightTop}px` }}
                                     >
-                                        {group.items.map((item) => {
+                                        {group.items.flatMap((item) => {
+                                            if (item.subItems && item.subItems.length > 0) {
+                                                return [
+                                                    <p key={`${item.title}-header`} className="mb-1 mt-2 px-4 text-[10px] font-bold tracking-wider text-muted-foreground/60 uppercase first:mt-0">
+                                                        {item.title}
+                                                    </p>,
+                                                    ...item.subItems.map((sub) => {
+                                                        const subActive = isPathActive(currentUrl, sub.href, sub.activeMatch);
+                                                        return (
+                                                            <Link
+                                                                key={sub.title}
+                                                                href={sub.href}
+                                                                className={cn(
+                                                                    'mb-1 flex w-full items-center rounded-lg px-4 py-2 text-left text-sm',
+                                                                    subActive
+                                                                        ? 'bg-primary/10 font-semibold text-primary'
+                                                                        : 'text-muted-foreground hover:bg-accent hover:text-accent-foreground',
+                                                                )}
+                                                            >
+                                                                {sub.title}
+                                                            </Link>
+                                                        );
+                                                    }),
+                                                ];
+                                            }
                                             const active = isPathActive(currentUrl, item.href, item.activeMatch);
-                                            return (
+                                            return [
                                                 <Link
                                                     key={item.title}
                                                     href={item.href}
@@ -516,8 +635,8 @@ export function AppSidebar() {
                                                     )}
                                                 >
                                                     {item.title}
-                                                </Link>
-                                            );
+                                                </Link>,
+                                            ];
                                         })}
                                     </div>
                                 )}

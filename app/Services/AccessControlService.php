@@ -253,7 +253,7 @@ class AccessControlService
 
     /**
      * Returns permission IDs that are assigned to the actor via their roles.
-     * Returns null for superadmin (no restriction — all permissions visible).
+     * Returns null for superadmin (no restriction - all permissions visible).
      */
     public function getActorPermissionIds(User $actor): ?array
     {
@@ -595,7 +595,7 @@ class AccessControlService
             }
         }
 
-        // Apply overrides — inherits outlet-level overrides when in warehouse scope
+        // Apply overrides - inherits outlet-level overrides when in warehouse scope
         $overrides = $user->permissionOverrides()
             ->with('permission')
             ->where('is_active', true)

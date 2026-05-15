@@ -229,7 +229,7 @@ export default function CountriesIndex({ countries, filters }: Props) {
                                             <span className="font-bold text-gray-900 dark:text-gray-100">{country.name}</span>
                                         </div>
                                     </td>
-                                    <td className="px-6 py-4 font-mono text-sm text-gray-600 dark:text-gray-400">{country.code ?? '—'}</td>
+                                    <td className="px-6 py-4 font-mono text-sm text-gray-600 dark:text-gray-400">{country.code ?? '-'}</td>
                                     <td className="px-6 py-4">
                                         <span className={cn('inline-flex rounded-full px-3 py-1 text-[11px] font-bold tracking-wider uppercase', country.is_active ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400' : 'bg-stone-100 text-stone-500 dark:bg-stone-800 dark:text-stone-400')}>
                                             {country.is_active ? 'Active' : 'Inactive'}

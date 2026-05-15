@@ -324,7 +324,7 @@ export default function ScopeSelection() {
                                                 )}
 
                                                 {!hasWarehouses ? (
-                                                    /* Outlet with no warehouses — direct selectable row */
+                                                    /* Outlet with no warehouses - direct selectable row */
                                                     <button
                                                         type="button"
                                                         className={cn(
@@ -350,7 +350,7 @@ export default function ScopeSelection() {
                                                         )}
                                                     </button>
                                                 ) : (
-                                                    /* Outlet with warehouses — selectable header + collapsible warehouse list */
+                                                    /* Outlet with warehouses - selectable header + collapsible warehouse list */
                                                     <>
                                                         <button
                                                             type="button"

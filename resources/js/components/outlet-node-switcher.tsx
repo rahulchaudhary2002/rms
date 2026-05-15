@@ -502,7 +502,7 @@ export function OutletNodeSwitcher() {
                                         <div className="my-2 h-px bg-border" />
                                     )}
 
-                                    {/* Outlet with no warehouses — show as a direct selectable row */}
+                                    {/* Outlet with no warehouses - show as a direct selectable row */}
                                     {!hasWarehouses ? (
                                         <button
                                             type="button"
@@ -525,7 +525,7 @@ export function OutletNodeSwitcher() {
                                             )}
                                         </button>
                                     ) : (
-                                        /* Outlet with warehouses — selectable header + collapsible warehouse list */
+                                        /* Outlet with warehouses - selectable header + collapsible warehouse list */
                                         <>
                                             <button
                                                 type="button"

@@ -233,13 +233,13 @@ export default function IngredientCategoriesIndex({ categories, parents, filters
                                         </div>
                                     </td>
                                     <td className="px-6 py-4 font-mono text-xs text-gray-500 dark:text-gray-400">{category.slug}</td>
-                                    <td className="px-6 py-4 font-mono text-xs text-gray-500 dark:text-gray-400">{category.code ?? '—'}</td>
+                                    <td className="px-6 py-4 font-mono text-xs text-gray-500 dark:text-gray-400">{category.code ?? '-'}</td>
                                     <td className="px-6 py-4 text-sm text-muted-foreground dark:text-stone-400">
                                         {category.parent ? (
                                             <span className="rounded-full bg-slate-100 px-2.5 py-1 text-[10px] font-bold tracking-wide uppercase text-slate-600 ring-1 ring-slate-200 dark:bg-slate-800 dark:text-slate-300 dark:ring-slate-700">
                                                 {category.parent.name}
                                             </span>
-                                        ) : '—'}
+                                        ) : '-'}
                                     </td>
                                     <td className="px-6 py-4">
                                         <span className={cn('inline-flex rounded-full px-3 py-1 text-[11px] font-bold tracking-wider uppercase', category.is_active ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400' : 'bg-stone-100 text-stone-500 dark:bg-stone-800 dark:text-stone-400')}>

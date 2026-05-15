@@ -428,13 +428,13 @@ export default function CustomersIndex({ customers, filters }: Props) {
                                         </div>
                                     </td>
                                     <td className="px-6 py-4 text-sm text-muted-foreground dark:text-stone-400">
-                                        {customer.phone ?? '—'}
+                                        {customer.phone ?? '-'}
                                     </td>
                                     <td className="px-6 py-4 text-sm text-muted-foreground dark:text-stone-400">
-                                        {customer.email ?? '—'}
+                                        {customer.email ?? '-'}
                                     </td>
                                     <td className="max-w-xs truncate px-6 py-4 text-sm text-muted-foreground dark:text-stone-400">
-                                        {customer.address ?? '—'}
+                                        {customer.address ?? '-'}
                                     </td>
                                     <td className="px-6 py-4">
                                         <StatusBadge

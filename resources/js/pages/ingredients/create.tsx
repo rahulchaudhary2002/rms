@@ -309,7 +309,7 @@ export default function IngredientsCreate({ categories, units }: Props) {
                             >
                                 <option value="false">No</option>
                                 <option value="true">
-                                    Yes — this ingredient is perishable
+                                    Yes - this ingredient is perishable
                                 </option>
                             </SearchableSelect>
                         </FormField>
@@ -328,7 +328,7 @@ export default function IngredientsCreate({ categories, units }: Props) {
                             >
                                 <option value="false">No</option>
                                 <option value="true">
-                                    Yes — track expiry dates
+                                    Yes - track expiry dates
                                 </option>
                             </SearchableSelect>
                             {data.track_expiry && (

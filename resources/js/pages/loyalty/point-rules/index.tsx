@@ -403,7 +403,7 @@ export default function LoyaltyPointRulesIndex({ rules, scopeOutlets, filters }:
                                         <TypeBadge type={rule.type} />
                                     </td>
                                     <td className="px-6 py-4 text-sm text-muted-foreground dark:text-stone-400">
-                                        {rule.outlet?.name ?? '—'}
+                                        {rule.outlet?.name ?? '-'}
                                     </td>
                                     <td className="px-6 py-4 text-sm text-muted-foreground dark:text-stone-400">
                                         {rule.earning_type === 'fixed_rate' ? 'Fixed Rate' : 'Fixed Slab'}
@@ -417,7 +417,7 @@ export default function LoyaltyPointRulesIndex({ rules, scopeOutlets, filters }:
                                     <td className="px-6 py-4 text-sm text-muted-foreground dark:text-stone-400">
                                         {rule.starts_at && rule.ends_at
                                             ? `${rule.starts_at} – ${rule.ends_at}`
-                                            : '—'}
+                                            : '-'}
                                     </td>
                                     <td className="px-6 py-4 text-sm font-semibold text-foreground dark:text-stone-200">
                                         {rule.priority}

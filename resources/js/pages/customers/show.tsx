@@ -12,7 +12,7 @@ type Props = { customer: Customer };
 
 function formatDateTime(value: string | null) {
     if (!value) {
-        return '—';
+        return '-';
     }
 
     return new Intl.DateTimeFormat(undefined, {
@@ -37,7 +37,7 @@ function DetailItem({
                 {label}
             </p>
             <div className="mt-2 text-sm font-semibold text-foreground">
-                {value || '—'}
+                {value || '-'}
             </div>
         </div>
     );

@@ -246,10 +246,10 @@ export default function IngredientsIndex({ ingredients, categories, filters }: P
                                             <span className="rounded-full bg-slate-100 px-2.5 py-1 text-[10px] font-bold tracking-wide uppercase text-slate-600 ring-1 ring-slate-200 dark:bg-slate-800 dark:text-slate-300 dark:ring-slate-700">
                                                 {ingredient.ingredient_category.name}
                                             </span>
-                                        ) : '—'}
+                                        ) : '-'}
                                     </td>
                                     <td className="px-6 py-4 text-sm text-muted-foreground dark:text-stone-400">
-                                        {ingredient.base_unit ? `${ingredient.base_unit.name} (${ingredient.base_unit.short_name})` : '—'}
+                                        {ingredient.base_unit ? `${ingredient.base_unit.name} (${ingredient.base_unit.short_name})` : '-'}
                                     </td>
                                     <td className="px-6 py-4">
                                         <div className="flex flex-wrap gap-1">
