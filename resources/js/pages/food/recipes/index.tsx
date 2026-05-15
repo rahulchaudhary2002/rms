@@ -11,6 +11,7 @@ import { tablePerPageOptions } from '@/hooks/use-client-pagination';
 import { useDebouncedInertiaSearch } from '@/hooks/use-debounced-inertia-search';
 import { cn } from '@/lib/utils';
 import { dashboard } from '@/routes';
+import { create as recipesCreate, destroy as recipesDestroy, edit as recipesEdit, index as recipesIndex } from '@/routes/recipes/food';
 import type { FoodRecipe } from '@/types';
 
 type PaginatedRecipes = {
@@ -28,11 +29,6 @@ type Props = {
     recipes: PaginatedRecipes;
     filters: { search?: string; is_active?: string; per_page?: string };
 };
-
-const indexUrl = '/recipes/food';
-const createUrl = '/recipes/food/create';
-const editUrl = (id: number) => `/recipes/food/${id}/edit`;
-const destroyUrl = (id: number) => `/recipes/food/${id}`;
 
 function cleanPaginationLabel(label: string): string {
     return label.replaceAll('&laquo;', '').replaceAll('&raquo;', '').replaceAll('Previous', '').replaceAll('Next', '').trim();
@@ -83,25 +79,25 @@ export default function FoodRecipesIndex({ recipes, filters }: Props) {
     useDebouncedInertiaSearch({
         value: form.search,
         onSearch: (value, { onCancelToken }) => {
-            router.get(indexUrl, { ...form, search: value, page: '1' }, { preserveState: true, preserveScroll: true, replace: true, onCancelToken });
+            router.get(recipesIndex.url(), { ...form, search: value, page: '1' }, { preserveState: true, preserveScroll: true, replace: true, onCancelToken });
         },
     });
 
     const applyFilters = () => {
         filterPopoverRef.current?.removeAttribute('open');
-        router.get(indexUrl, form, { preserveState: true, preserveScroll: true, replace: true });
+        router.get(recipesIndex.url(), form, { preserveState: true, preserveScroll: true, replace: true });
     };
 
     const clearFilters = () => {
         const reset = { search: '', is_active: '', per_page: '10' };
         setForm(reset);
         filterPopoverRef.current?.removeAttribute('open');
-        router.get(indexUrl, {}, { preserveState: true, preserveScroll: true, replace: true });
+        router.get(recipesIndex.url(), {}, { preserveState: true, preserveScroll: true, replace: true });
     };
 
     const updatePerPage = (nextValue: string) => {
         setForm((cur) => ({ ...cur, per_page: nextValue }));
-        router.get(indexUrl, { ...form, per_page: nextValue, page: '1' }, { preserveState: true, preserveScroll: true, replace: true });
+        router.get(recipesIndex.url(), { ...form, per_page: nextValue, page: '1' }, { preserveState: true, preserveScroll: true, replace: true });
     };
 
     return (
@@ -113,7 +109,7 @@ export default function FoodRecipesIndex({ recipes, filters }: Props) {
                 description="Manage ingredient recipe lines for foods and food variants."
                 actions={
                     <Can permission="foods-update">
-                        <Link href={createUrl} className="inline-flex items-center gap-2 rounded-lg bg-primary px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition-colors hover:bg-primary/90">
+                        <Link href={recipesCreate.url()} className="inline-flex items-center gap-2 rounded-lg bg-primary px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition-colors hover:bg-primary/90">
                             <span className="material-symbols-outlined text-[18px]">add_circle</span>
                             New Food Recipe
                         </Link>
@@ -224,7 +220,7 @@ export default function FoodRecipesIndex({ recipes, filters }: Props) {
                                             itemLabel={recipe.ingredient?.name ?? 'Recipe line'}
                                             onToggle={(id) => setOpenActionId((cur) => id === null ? null : cur === id ? null : (id as number))}
                                             actions={[
-                                                { id: `edit-${recipe.id}`, label: 'Edit recipe', icon: 'edit', href: editUrl(recipe.id) },
+                                                { id: `edit-${recipe.id}`, label: 'Edit recipe', icon: 'edit', href: recipesEdit.url(recipe.id) },
                                                 {
                                                     id: `delete-${recipe.id}`,
                                                     label: 'Delete recipe',
@@ -232,7 +228,7 @@ export default function FoodRecipesIndex({ recipes, filters }: Props) {
                                                     variant: 'danger' as const,
                                                     onClick: () => {
                                                         if (confirm('Delete this food recipe line?')) {
-                                                            router.delete(destroyUrl(recipe.id));
+                                                            router.delete(recipesDestroy.url(recipe.id));
                                                         }
                                                     },
                                                 },

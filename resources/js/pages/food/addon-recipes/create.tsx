@@ -5,6 +5,7 @@ import { FormField } from '@/components/ui/form-field';
 import { Input } from '@/components/ui/input';
 import { SearchableSelect } from '@/components/ui/searchable-select';
 import { dashboard } from '@/routes';
+import { index as recipesIndex, store as recipesStore } from '@/routes/recipes/addons';
 import type { Addon, AddonGroup, Ingredient, Unit } from '@/types';
 
 type AddonOption = Pick<Addon, 'id' | 'name' | 'addon_group_id'> & { group?: Pick<AddonGroup, 'id' | 'name'> | null };
@@ -14,9 +15,6 @@ type Props = {
     ingredients: Pick<Ingredient, 'id' | 'name'>[];
     units: Pick<Unit, 'id' | 'name' | 'short_name'>[];
 };
-
-const indexUrl = '/recipes/addons';
-const storeUrl = '/recipes/addons';
 
 export default function AddonRecipeCreate({ addons, ingredients, units }: Props) {
     const { data, setData, post, processing, errors } = useForm({
@@ -30,7 +28,7 @@ export default function AddonRecipeCreate({ addons, ingredients, units }: Props)
 
     function submit(e: React.FormEvent) {
         e.preventDefault();
-        post(storeUrl);
+        post(recipesStore.url());
     }
 
     return (
@@ -39,7 +37,7 @@ export default function AddonRecipeCreate({ addons, ingredients, units }: Props)
             <PageHeader
                 breadcrumbs={[
                     { label: 'Home', href: dashboard.url() },
-                    { label: 'Add-on Recipes', href: indexUrl },
+                    { label: 'Add-on Recipes', href: recipesIndex.url() },
                     { label: 'Create' },
                 ]}
                 title="Create Add-on Recipe"
@@ -92,7 +90,7 @@ export default function AddonRecipeCreate({ addons, ingredients, units }: Props)
                 </FormSection>
 
                 <div className="flex flex-wrap items-center justify-end gap-4 border-t border-border/70 pt-8">
-                    <Link href={indexUrl} className="rounded-lg px-6 py-2.5 text-sm font-semibold text-muted-foreground transition-colors hover:bg-secondary">Discard</Link>
+                    <Link href={recipesIndex.url()} className="rounded-lg px-6 py-2.5 text-sm font-semibold text-muted-foreground transition-colors hover:bg-secondary">Discard</Link>
                     <button type="submit" disabled={processing} className="rounded-lg bg-primary px-10 py-3 text-sm font-bold text-white shadow-lg transition-all hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-60">
                         Create Recipe
                     </button>

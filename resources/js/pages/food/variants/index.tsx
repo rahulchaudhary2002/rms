@@ -11,6 +11,7 @@ import { tablePerPageOptions } from '@/hooks/use-client-pagination';
 import { useDebouncedInertiaSearch } from '@/hooks/use-debounced-inertia-search';
 import { cn } from '@/lib/utils';
 import { dashboard } from '@/routes';
+import { create as variantsCreate, destroy as variantsDestroy, edit as variantsEdit, index as variantsIndex, toggleStatus as variantsToggleStatus } from '@/routes/variants';
 import type { FoodVariant } from '@/types';
 
 type PaginatedVariants = {
@@ -29,11 +30,6 @@ type Props = {
     filters: { search?: string; is_active?: string; per_page?: string };
 };
 
-const indexUrl = '/food-variants';
-const createUrl = '/food-variants/create';
-const editUrl = (id: number) => `/food-variants/${id}/edit`;
-const destroyUrl = (id: number) => `/food-variants/${id}`;
-const toggleStatusUrl = (id: number) => `/food-variants/${id}/toggle-status`;
 const foodShowUrl = (id: number) => `/foods/${id}`;
 
 function cleanPaginationLabel(label: string): string {
@@ -91,25 +87,25 @@ export default function FoodVariantsIndex({ variants, filters }: Props) {
     useDebouncedInertiaSearch({
         value: form.search,
         onSearch: (value, { onCancelToken }) => {
-            router.get(indexUrl, { ...form, search: value, page: '1' }, { preserveState: true, preserveScroll: true, replace: true, onCancelToken });
+            router.get(variantsIndex.url(), { ...form, search: value, page: '1' }, { preserveState: true, preserveScroll: true, replace: true, onCancelToken });
         },
     });
 
     const applyFilters = () => {
         filterPopoverRef.current?.removeAttribute('open');
-        router.get(indexUrl, form, { preserveState: true, preserveScroll: true, replace: true });
+        router.get(variantsIndex.url(), form, { preserveState: true, preserveScroll: true, replace: true });
     };
 
     const clearFilters = () => {
         const reset = { search: '', is_active: '', per_page: '10' };
         setForm(reset);
         filterPopoverRef.current?.removeAttribute('open');
-        router.get(indexUrl, {}, { preserveState: true, preserveScroll: true, replace: true });
+        router.get(variantsIndex.url(), {}, { preserveState: true, preserveScroll: true, replace: true });
     };
 
     const updatePerPage = (nextValue: string) => {
         setForm((cur) => ({ ...cur, per_page: nextValue }));
-        router.get(indexUrl, { ...form, per_page: nextValue, page: '1' }, { preserveState: true, preserveScroll: true, replace: true });
+        router.get(variantsIndex.url(), { ...form, per_page: nextValue, page: '1' }, { preserveState: true, preserveScroll: true, replace: true });
     };
 
     return (
@@ -121,7 +117,7 @@ export default function FoodVariantsIndex({ variants, filters }: Props) {
                 description="Manage all food variants from one place."
                 actions={
                     <Can permission="foods-update">
-                        <Link href={createUrl} className="inline-flex items-center gap-2 rounded-lg bg-primary px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition-colors hover:bg-primary/90">
+                        <Link href={variantsCreate.url()} className="inline-flex items-center gap-2 rounded-lg bg-primary px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition-colors hover:bg-primary/90">
                             <span className="material-symbols-outlined text-[18px]">add_circle</span>
                             New Variant
                         </Link>
@@ -240,12 +236,12 @@ export default function FoodVariantsIndex({ variants, filters }: Props) {
                                             itemLabel={variant.name}
                                             onToggle={(id) => setOpenActionId((cur) => id === null ? null : cur === id ? null : (id as number))}
                                             actions={[
-                                                { id: `edit-${variant.id}`, label: 'Edit variant', icon: 'edit', href: editUrl(variant.id) },
+                                                { id: `edit-${variant.id}`, label: 'Edit variant', icon: 'edit', href: variantsEdit.url(variant.id) },
                                                 {
                                                     id: `toggle-${variant.id}`,
                                                     label: variant.is_active ? 'Deactivate' : 'Activate',
                                                     icon: variant.is_active ? 'toggle_off' : 'toggle_on',
-                                                    onClick: () => router.patch(toggleStatusUrl(variant.id), {}, { preserveScroll: true }),
+                                                    onClick: () => router.patch(variantsToggleStatus.url(variant.id), {}, { preserveScroll: true }),
                                                 },
                                                 {
                                                     id: `delete-${variant.id}`,
@@ -254,7 +250,7 @@ export default function FoodVariantsIndex({ variants, filters }: Props) {
                                                     variant: 'danger' as const,
                                                     onClick: () => {
                                                         if (confirm('Delete this food variant?')) {
-                                                            router.delete(destroyUrl(variant.id));
+                                                            router.delete(variantsDestroy.url(variant.id));
                                                         }
                                                     },
                                                 },

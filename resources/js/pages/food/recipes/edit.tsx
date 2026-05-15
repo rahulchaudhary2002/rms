@@ -6,6 +6,7 @@ import { FormField } from '@/components/ui/form-field';
 import { Input } from '@/components/ui/input';
 import { SearchableSelect } from '@/components/ui/searchable-select';
 import { dashboard } from '@/routes';
+import { index as recipesIndex, update as recipesUpdate } from '@/routes/recipes/food';
 import type { Food, FoodRecipe, FoodVariant, Ingredient, Unit } from '@/types';
 
 type FoodOption = Pick<Food, 'id' | 'name'> & { variants?: Pick<FoodVariant, 'id' | 'name' | 'food_id'>[] };
@@ -16,9 +17,6 @@ type Props = {
     ingredients: Pick<Ingredient, 'id' | 'name'>[];
     units: Pick<Unit, 'id' | 'name' | 'short_name'>[];
 };
-
-const indexUrl = '/recipes/food';
-const updateUrl = (id: number) => `/recipes/food/${id}`;
 
 export default function FoodRecipeEdit({ recipe, foods, ingredients, units }: Props) {
     const { data, setData, put, processing, errors } = useForm({
@@ -39,7 +37,7 @@ export default function FoodRecipeEdit({ recipe, foods, ingredients, units }: Pr
 
     function submit(e: React.FormEvent) {
         e.preventDefault();
-        put(updateUrl(recipe.id));
+        put(recipesUpdate.url(recipe.id));
     }
 
     return (
@@ -48,7 +46,7 @@ export default function FoodRecipeEdit({ recipe, foods, ingredients, units }: Pr
             <PageHeader
                 breadcrumbs={[
                     { label: 'Home', href: dashboard.url() },
-                    { label: 'Food Recipes', href: indexUrl },
+                    { label: 'Food Recipes', href: recipesIndex.url() },
                     { label: 'Edit' },
                 ]}
                 title="Edit Food Recipe"
@@ -106,7 +104,7 @@ export default function FoodRecipeEdit({ recipe, foods, ingredients, units }: Pr
                 </FormSection>
 
                 <div className="flex flex-wrap items-center justify-end gap-4 border-t border-border/70 pt-8">
-                    <Link href={indexUrl} className="rounded-lg px-6 py-2.5 text-sm font-semibold text-muted-foreground transition-colors hover:bg-secondary">Discard</Link>
+                    <Link href={recipesIndex.url()} className="rounded-lg px-6 py-2.5 text-sm font-semibold text-muted-foreground transition-colors hover:bg-secondary">Discard</Link>
                     <button type="submit" disabled={processing} className="rounded-lg bg-primary px-10 py-3 text-sm font-bold text-white shadow-lg transition-all hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-60">
                         Update Recipe
                     </button>

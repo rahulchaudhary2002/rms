@@ -35,6 +35,7 @@ class FoodRecipeController extends Controller
                 'ingredient:id,name',
                 'unit:id,name,short_name',
             ])
+            ->whereHas('food', fn ($food) => $food->where('is_recipe_enabled', true))
             ->latest();
 
         if ($filters['search'] !== '') {
@@ -108,6 +109,8 @@ class FoodRecipeController extends Controller
 
     public function upsert(StoreFoodRecipeRequest $request, Food $food): RedirectResponse
     {
+        abort_unless($food->is_recipe_enabled, 404);
+
         $data      = $request->validated();
         $variantId = isset($data['food_variant_id']) ? (int) $data['food_variant_id'] : null;
 
@@ -119,6 +122,7 @@ class FoodRecipeController extends Controller
 
     public function destroy(Food $food, FoodRecipe $foodRecipe): RedirectResponse
     {
+        abort_unless($food->is_recipe_enabled, 404);
         abort_unless($foodRecipe->food_id === $food->id, 404);
 
         $this->service->deleteFoodRecipe($foodRecipe);
@@ -138,6 +142,7 @@ class FoodRecipeController extends Controller
     {
         return [
             'foods' => Food::with(['variants:id,food_id,name'])
+                ->where('is_recipe_enabled', true)
                 ->orderBy('name')
                 ->get(['id', 'name']),
             'ingredients' => Ingredient::where('is_active', true)->orderBy('name')->get(['id', 'name']),
@@ -148,7 +153,7 @@ class FoodRecipeController extends Controller
     private function validateStandalone(Request $request): array
     {
         return $request->validate([
-            'food_id'          => ['required', 'integer', Rule::exists('foods', 'id')],
+            'food_id'          => ['required', 'integer', Rule::exists('foods', 'id')->where('is_recipe_enabled', true)],
             'food_variant_id'  => ['nullable', 'integer', Rule::exists('food_variants', 'id')],
             'ingredient_id'    => ['required', 'integer', Rule::exists('ingredients', 'id')],
             'unit_id'          => ['required', 'integer', Rule::exists('units', 'id')],

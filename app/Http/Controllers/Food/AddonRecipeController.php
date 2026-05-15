@@ -36,6 +36,7 @@ class AddonRecipeController extends Controller
                 'ingredient:id,name',
                 'unit:id,name,short_name',
             ])
+            ->whereHas('addon', fn ($addon) => $addon->where('is_recipe_enabled', true))
             ->latest();
 
         if ($filters['search'] !== '') {
@@ -104,6 +105,7 @@ class AddonRecipeController extends Controller
     public function upsert(StoreAddonRecipeRequest $request, AddonGroup $addonGroup, Addon $addon): RedirectResponse
     {
         abort_unless($addon->addon_group_id === $addonGroup->id, 404);
+        abort_unless($addon->is_recipe_enabled, 404);
 
         $this->service->upsertAddonRecipe($addon, $request->validated());
 
@@ -113,6 +115,7 @@ class AddonRecipeController extends Controller
     public function destroy(AddonGroup $addonGroup, Addon $addon, AddonRecipe $addonRecipe): RedirectResponse
     {
         abort_unless($addon->addon_group_id === $addonGroup->id, 404);
+        abort_unless($addon->is_recipe_enabled, 404);
         abort_unless($addonRecipe->addon_id === $addon->id, 404);
 
         $this->service->deleteAddonRecipe($addonRecipe);
@@ -122,6 +125,8 @@ class AddonRecipeController extends Controller
 
     public function upsertForAddon(StoreAddonRecipeRequest $request, Addon $addon): RedirectResponse
     {
+        abort_unless($addon->is_recipe_enabled, 404);
+
         $this->service->upsertAddonRecipe($addon, $request->validated());
 
         return back()->with('success', 'Recipe saved.');
@@ -129,6 +134,7 @@ class AddonRecipeController extends Controller
 
     public function destroyForAddon(Addon $addon, AddonRecipe $addonRecipe): RedirectResponse
     {
+        abort_unless($addon->is_recipe_enabled, 404);
         abort_unless($addonRecipe->addon_id === $addon->id, 404);
 
         $this->service->deleteAddonRecipe($addonRecipe);
@@ -148,6 +154,7 @@ class AddonRecipeController extends Controller
     {
         return [
             'addons' => Addon::with('group:id,name')
+                ->where('is_recipe_enabled', true)
                 ->orderBy('name')
                 ->get(['id', 'addon_group_id', 'name']),
             'ingredients' => Ingredient::where('is_active', true)->orderBy('name')->get(['id', 'name']),
@@ -158,7 +165,7 @@ class AddonRecipeController extends Controller
     private function validateStandalone(Request $request): array
     {
         return $request->validate([
-            'addon_id'         => ['required', 'integer', Rule::exists('addons', 'id')],
+            'addon_id'         => ['required', 'integer', Rule::exists('addons', 'id')->where('is_recipe_enabled', true)],
             'ingredient_id'    => ['required', 'integer', Rule::exists('ingredients', 'id')],
             'unit_id'          => ['required', 'integer', Rule::exists('units', 'id')],
             'quantity'         => ['required', 'numeric', 'min:0.0001'],

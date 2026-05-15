@@ -29,6 +29,7 @@ class FoodVariantController extends Controller
         $query = FoodVariant::query()
             ->with('food:id,name')
             ->withCount(['recipes', 'outletSettings'])
+            ->whereHas('food', fn ($food) => $food->where('has_variants', true))
             ->when($filters['search'] !== '', fn ($builder) => $builder->where(fn ($q) => $q
                 ->where('name', 'like', '%'.$filters['search'].'%')
                 ->orWhere('sku', 'like', '%'.$filters['search'].'%')
@@ -50,7 +51,7 @@ class FoodVariantController extends Controller
     public function create(): Response
     {
         return Inertia::render('food/variants/create', [
-            'foods' => Food::orderBy('name')->get(['id', 'name']),
+            'foods' => Food::where('has_variants', true)->orderBy('name')->get(['id', 'name']),
         ]);
     }
 
@@ -70,7 +71,7 @@ class FoodVariantController extends Controller
     {
         return Inertia::render('food/variants/edit', [
             'variant' => $foodVariant->load('food:id,name'),
-            'foods' => Food::orderBy('name')->get(['id', 'name']),
+            'foods' => Food::where('has_variants', true)->orderBy('name')->get(['id', 'name']),
         ]);
     }
 
@@ -96,6 +97,8 @@ class FoodVariantController extends Controller
 
     public function store(StoreFoodVariantRequest $request, Food $food): RedirectResponse
     {
+        abort_unless($food->has_variants, 404);
+
         $this->service->create($food, $request->validated());
 
         return back()->with('success', 'Variant added successfully.');
@@ -103,6 +106,7 @@ class FoodVariantController extends Controller
 
     public function update(UpdateFoodVariantRequest $request, Food $food, FoodVariant $foodVariant): RedirectResponse
     {
+        abort_unless($food->has_variants, 404);
         abort_unless($foodVariant->food_id === $food->id, 404);
 
         $this->service->update($foodVariant, $request->validated());
@@ -112,6 +116,7 @@ class FoodVariantController extends Controller
 
     public function destroy(Food $food, FoodVariant $foodVariant): RedirectResponse
     {
+        abort_unless($food->has_variants, 404);
         abort_unless($foodVariant->food_id === $food->id, 404);
 
         $this->service->delete($foodVariant);
@@ -121,6 +126,7 @@ class FoodVariantController extends Controller
 
     public function toggleStatus(Food $food, FoodVariant $foodVariant): RedirectResponse
     {
+        abort_unless($food->has_variants, 404);
         abort_unless($foodVariant->food_id === $food->id, 404);
 
         $this->service->toggleStatus($foodVariant);
@@ -146,7 +152,7 @@ class FoodVariantController extends Controller
     private function validateStandalone(Request $request, ?FoodVariant $variant = null): array
     {
         return $request->validate([
-            'food_id'    => ['required', 'integer', Rule::exists('foods', 'id')],
+            'food_id'    => ['required', 'integer', Rule::exists('foods', 'id')->where('has_variants', true)],
             'name'       => ['required', 'string', 'max:255'],
             'sku'        => ['nullable', 'string', 'max:100', Rule::unique('food_variants', 'sku')->ignore($variant?->id)],
             'price'      => ['nullable', 'numeric', 'min:0'],

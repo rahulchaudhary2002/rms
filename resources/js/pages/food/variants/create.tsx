@@ -5,14 +5,12 @@ import { FormField } from '@/components/ui/form-field';
 import { Input } from '@/components/ui/input';
 import { SearchableSelect } from '@/components/ui/searchable-select';
 import { dashboard } from '@/routes';
+import { index as variantsIndex, store as variantsStore } from '@/routes/variants';
 import type { Food } from '@/types';
 
 type Props = {
     foods: Pick<Food, 'id' | 'name'>[];
 };
-
-const indexUrl = '/food-variants';
-const storeUrl = '/food-variants';
 
 export default function FoodVariantCreate({ foods }: Props) {
     const { data, setData, post, processing, errors } = useForm({
@@ -27,7 +25,7 @@ export default function FoodVariantCreate({ foods }: Props) {
 
     function submit(e: React.FormEvent) {
         e.preventDefault();
-        post(storeUrl);
+        post(variantsStore.url());
     }
 
     return (
@@ -36,7 +34,7 @@ export default function FoodVariantCreate({ foods }: Props) {
             <PageHeader
                 breadcrumbs={[
                     { label: 'Home', href: dashboard.url() },
-                    { label: 'Food Variants', href: indexUrl },
+                    { label: 'Food Variants', href: variantsIndex.url() },
                     { label: 'Create' },
                 ]}
                 title="Create Food Variant"
@@ -86,7 +84,7 @@ export default function FoodVariantCreate({ foods }: Props) {
                 </FormSection>
 
                 <div className="flex flex-wrap items-center justify-end gap-4 border-t border-border/70 pt-8">
-                    <Link href={indexUrl} className="rounded-lg px-6 py-2.5 text-sm font-semibold text-muted-foreground transition-colors hover:bg-secondary">Discard</Link>
+                    <Link href={variantsIndex.url()} className="rounded-lg px-6 py-2.5 text-sm font-semibold text-muted-foreground transition-colors hover:bg-secondary">Discard</Link>
                     <button type="submit" disabled={processing} className="rounded-lg bg-primary px-10 py-3 text-sm font-bold text-white shadow-lg transition-all hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-60">
                         Create Variant
                     </button>

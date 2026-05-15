@@ -26,6 +26,9 @@ import { index as foodsIndex } from '@/routes/foods';
 import { index as foodCategoriesIndex } from '@/routes/food-categories';
 import { index as addonGroupsIndex } from '@/routes/addon-groups';
 import { index as addonsIndex } from '@/routes/addons';
+import { index as foodRecipesIndex } from '@/routes/recipes/food';
+import { index as addonRecipesIndex } from '@/routes/recipes/addons';
+import { index as variantsIndex } from '@/routes/variants';
 import type { Auth } from '@/types';
 
 type ViewportMode = 'mobile' | 'medium' | 'large';
@@ -97,10 +100,6 @@ const settingsGroup: MenuGroup = {
     ],
 };
 
-const foodRecipesUrl = '/recipes/food';
-const addonRecipesUrl = '/recipes/addons';
-const foodVariantsUrl = '/food-variants';
-
 function isPathActive(currentUrl: string, href: string, activeMatch?: string[]) {
     const candidates = activeMatch && activeMatch.length > 0 ? activeMatch : [href];
     return candidates.some(
@@ -141,7 +140,7 @@ function buildDynamicGroups(auth: Auth): MenuGroup[] {
         const items: MenuItem[] = [];
         if (can('food-categories-view')) items.push({ title: 'Food Categories', href: foodCategoriesIndex.url(), icon: 'category', activeMatch: [foodCategoriesIndex.url()] });
         if (can('foods-view')) items.push({ title: 'Foods & Menu', href: foodsIndex.url(), icon: 'restaurant_menu', activeMatch: [foodsIndex.url()] });
-        if (can('foods-view')) items.push({ title: 'Food Variants', href: foodVariantsUrl, icon: 'layers', activeMatch: [foodVariantsUrl] });
+        if (can('foods-view')) items.push({ title: 'Food Variants', href: variantsIndex.url(), icon: 'layers', activeMatch: [variantsIndex.url()] });
         if (can('addon-groups-view')) {
             items.push({
                 title: 'Add-ons',
@@ -159,8 +158,8 @@ function buildDynamicGroups(auth: Auth): MenuGroup[] {
 
     if (canAny(['foods-view', 'addon-groups-view'])) {
         const recipeItems: MenuItem[] = [];
-        if (can('foods-view')) recipeItems.push({ title: 'Food Recipes', href: foodRecipesUrl, icon: 'restaurant', activeMatch: [foodRecipesUrl] });
-        if (can('addon-groups-view')) recipeItems.push({ title: 'Add-on Recipes', href: addonRecipesUrl, icon: 'receipt_long', activeMatch: [addonRecipesUrl] });
+        if (can('foods-view')) recipeItems.push({ title: 'Food Recipes', href: foodRecipesIndex.url(), icon: 'restaurant', activeMatch: [foodRecipesIndex.url()] });
+        if (can('addon-groups-view')) recipeItems.push({ title: 'Add-on Recipes', href: addonRecipesIndex.url(), icon: 'receipt_long', activeMatch: [addonRecipesIndex.url()] });
         groups.push({ id: 'recipe', label: 'Food & Menu', title: 'Recipe', icon: 'receipt_long', items: recipeItems });
     }
 

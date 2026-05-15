@@ -5,15 +5,13 @@ import { FormField } from '@/components/ui/form-field';
 import { Input } from '@/components/ui/input';
 import { SearchableSelect } from '@/components/ui/searchable-select';
 import { dashboard } from '@/routes';
+import { index as variantsIndex, update as variantsUpdate } from '@/routes/variants';
 import type { Food, FoodVariant } from '@/types';
 
 type Props = {
     variant: FoodVariant;
     foods: Pick<Food, 'id' | 'name'>[];
 };
-
-const indexUrl = '/food-variants';
-const updateUrl = (id: number) => `/food-variants/${id}`;
 
 export default function FoodVariantEdit({ variant, foods }: Props) {
     const { data, setData, put, processing, errors } = useForm({
@@ -28,7 +26,7 @@ export default function FoodVariantEdit({ variant, foods }: Props) {
 
     function submit(e: React.FormEvent) {
         e.preventDefault();
-        put(updateUrl(variant.id));
+        put(variantsUpdate.url(variant.id));
     }
 
     return (
@@ -37,7 +35,7 @@ export default function FoodVariantEdit({ variant, foods }: Props) {
             <PageHeader
                 breadcrumbs={[
                     { label: 'Home', href: dashboard.url() },
-                    { label: 'Food Variants', href: indexUrl },
+                    { label: 'Food Variants', href: variantsIndex.url() },
                     { label: 'Edit' },
                 ]}
                 title={`Edit Variant: ${variant.name}`}
@@ -87,7 +85,7 @@ export default function FoodVariantEdit({ variant, foods }: Props) {
                 </FormSection>
 
                 <div className="flex flex-wrap items-center justify-end gap-4 border-t border-border/70 pt-8">
-                    <Link href={indexUrl} className="rounded-lg px-6 py-2.5 text-sm font-semibold text-muted-foreground transition-colors hover:bg-secondary">Discard</Link>
+                    <Link href={variantsIndex.url()} className="rounded-lg px-6 py-2.5 text-sm font-semibold text-muted-foreground transition-colors hover:bg-secondary">Discard</Link>
                     <button type="submit" disabled={processing} className="rounded-lg bg-primary px-10 py-3 text-sm font-bold text-white shadow-lg transition-all hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-60">
                         Update Variant
                     </button>
