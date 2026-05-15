@@ -7,6 +7,7 @@ use App\Models\User;
 use App\Models\UserResourcePermission;
 use App\Services\Concerns\InteractsWithScope;
 use App\Services\Concerns\PaginatesQuery;
+use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 
 class UserResourcePermissionService
@@ -99,10 +100,11 @@ class UserResourcePermissionService
             ->when($actorPermissionIds !== null, fn ($q) => $q->whereIn('id', $actorPermissionIds))
             ->orderBy('module')->orderBy('action')->get(['id', 'name', 'slug', 'module', 'action']);
 
+        $allowedResourceIds = $this->resolveSessionConstrainedResourceIds($actorAssignedScopes, $scope);
+
         return array_merge(
             compact('users', 'permissions'),
-            ['allowedScopes' => $this->accessControl->resolveAllowedScopes($actor)],
-            $this->resolveResourceProps($actor, $actorAssignedScopes),
+            $this->resolveResourceProps($actor, $allowedResourceIds),
         );
     }
 
@@ -132,13 +134,30 @@ class UserResourcePermissionService
 
     public function toggleActive(UserResourcePermission $resourcePermission, bool $isActive): void
     {
+        /** @var \App\Models\User $actor */
+        /** @var \App\Models\User $actor */
+        $actor = Auth::user();
+        $scopeType = in_array($resourcePermission->resource_type, ['outlet', 'warehouse'])
+            ? $resourcePermission->resource_type
+            : 'global';
+        $this->accessControl->assertActorCanMutateScopedRecord($actor, $scopeType, (int) $resourcePermission->resource_id);
         $resourcePermission->update(['is_active' => $isActive]);
-        $this->accessControl->clearUserPermissionCache($resourcePermission->user);
+        /** @var \App\Models\User $resourceUser */
+        $resourceUser = $resourcePermission->user()->first();
+        $this->accessControl->clearUserPermissionCache($resourceUser);
     }
 
     public function remove(UserResourcePermission $resourcePermission): void
     {
-        $user = $resourcePermission->user;
+        /** @var \App\Models\User $actor */
+        /** @var \App\Models\User $actor */
+        $actor = Auth::user();
+        $scopeType = in_array($resourcePermission->resource_type, ['outlet', 'warehouse'])
+            ? $resourcePermission->resource_type
+            : 'global';
+        $this->accessControl->assertActorCanMutateScopedRecord($actor, $scopeType, (int) $resourcePermission->resource_id);
+        /** @var \App\Models\User $user */
+        $user = $resourcePermission->user()->first();
         $resourcePermission->delete();
         $this->accessControl->clearUserPermissionCache($user);
     }

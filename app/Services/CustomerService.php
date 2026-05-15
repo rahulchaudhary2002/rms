@@ -11,10 +11,13 @@ class CustomerService
 {
     use PaginatesQuery;
 
-    public function list(array $filters): array
+    public function list(array $filters, array $scope): array
     {
+        $outletId = $this->outletIdFromScope($scope);
+
         $query = Customer::query()
             ->withCount('customerOutlets')
+            ->when($outletId !== null, fn ($b) => $b->whereHas('customerOutlets', fn ($q) => $q->where('outlet_id', $outletId)))
             ->when($filters['search'] !== '', function ($b) use ($filters) {
                 $search = '%'.$filters['search'].'%';
 
@@ -32,11 +35,37 @@ class CustomerService
         return compact('customers', 'filters');
     }
 
-    public function find(int $id): Customer
+    public function find(int $id, array $scope): Customer
     {
-        return Customer::with(['customerOutlets.outlet:id,name'])
+        $outletId = $this->outletIdFromScope($scope);
+
+        $query = Customer::with(['customerOutlets.outlet:id,name'])
             ->withCount('customerOutlets')
-            ->findOrFail($id);
+            ->when($outletId !== null, fn ($b) => $b->whereHas('customerOutlets', fn ($q) => $q->where('outlet_id', $outletId)));
+
+        return $query->findOrFail($id);
+    }
+
+    public function assertInScope(Customer $customer, array $scope): void
+    {
+        $outletId = $this->outletIdFromScope($scope);
+
+        if ($outletId !== null && ! $customer->customerOutlets()->where('outlet_id', $outletId)->exists()) {
+            abort(403, 'Customer is not in your current scope.');
+        }
+    }
+
+    private function outletIdFromScope(array $scope): ?int
+    {
+        if ($scope['type'] === 'outlet') {
+            return $scope['scope_id'];
+        }
+
+        if ($scope['type'] === 'warehouse') {
+            return $scope['outlet_id'];
+        }
+
+        return null;
     }
 
     public function create(array $data): Customer

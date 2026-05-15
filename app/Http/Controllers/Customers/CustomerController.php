@@ -7,6 +7,7 @@ use App\Http\Controllers\Controller;
 use App\Http\Requests\Customers\Customer\StoreCustomerRequest;
 use App\Http\Requests\Customers\Customer\UpdateCustomerRequest;
 use App\Models\Customer;
+use App\Services\AccessControlService;
 use App\Services\CustomerService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -17,15 +18,19 @@ class CustomerController extends Controller
 {
     use ExtractsFilters;
 
-    public function __construct(private CustomerService $customerService) {}
+    public function __construct(
+        private AccessControlService $accessControl,
+        private CustomerService $customerService,
+    ) {}
 
     public function index(Request $request): Response
     {
         $filters = $this->extractFilters($request, ['search', 'status', 'per_page']);
         $filters['status'] = $filters['status'] ?: 'all';
+        $scope = $this->accessControl->resolveSessionScope($request);
 
         return Inertia::render('customers/index',
-            $this->customerService->list($filters));
+            $this->customerService->list($filters, $scope));
     }
 
     public function create(): Response
@@ -41,36 +46,50 @@ class CustomerController extends Controller
             ->with('success', 'Customer created successfully.');
     }
 
-    public function show(Customer $customer): Response
+    public function show(Request $request, Customer $customer): Response
     {
+        $scope = $this->accessControl->resolveSessionScope($request);
+
         return Inertia::render('customers/show', [
-            'customer' => $this->customerService->find($customer->id),
+            'customer' => $this->customerService->find($customer->id, $scope),
         ]);
     }
 
-    public function edit(Customer $customer): Response
+    public function edit(Request $request, Customer $customer): Response
     {
+        $scope = $this->accessControl->resolveSessionScope($request);
+        $this->customerService->assertInScope($customer, $scope);
+
         return Inertia::render('customers/edit', ['customer' => $customer]);
     }
 
     public function update(UpdateCustomerRequest $request, Customer $customer): RedirectResponse
     {
+        $scope = $this->accessControl->resolveSessionScope($request);
+        $this->customerService->assertInScope($customer, $scope);
+
         $this->customerService->update($customer, $request->validated());
 
         return redirect()->route('customers.index')
             ->with('success', 'Customer updated successfully.');
     }
 
-    public function destroy(Customer $customer): RedirectResponse
+    public function destroy(Request $request, Customer $customer): RedirectResponse
     {
+        $scope = $this->accessControl->resolveSessionScope($request);
+        $this->customerService->assertInScope($customer, $scope);
+
         $this->customerService->delete($customer);
 
         return redirect()->route('customers.index')
             ->with('success', 'Customer deleted successfully.');
     }
 
-    public function toggleStatus(Customer $customer): RedirectResponse
+    public function toggleStatus(Request $request, Customer $customer): RedirectResponse
     {
+        $scope = $this->accessControl->resolveSessionScope($request);
+        $this->customerService->assertInScope($customer, $scope);
+
         $this->customerService->toggleStatus($customer);
 
         return redirect()->route('customers.index')

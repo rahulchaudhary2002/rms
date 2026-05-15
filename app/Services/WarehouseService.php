@@ -15,6 +15,14 @@ class WarehouseService
             abort(403, 'You do not have permission to create warehouses.');
         }
 
+        if (! $this->accessControl->hasGlobalScopeRole($actor)) {
+            $allowedScopes = $this->accessControl->resolveAllowedScopes($actor);
+
+            if ($allowedScopes !== null && ! in_array((int) $data['outlet_id'], $allowedScopes['outlet'], true)) {
+                abort(403, 'You cannot create a warehouse in this outlet.');
+            }
+        }
+
         return Warehouse::create([
             'outlet_id' => $data['outlet_id'],
             'name'      => $data['name'],

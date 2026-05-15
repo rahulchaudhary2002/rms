@@ -90,18 +90,27 @@ class UserService
             },
         ]);
 
+        $allowedLevels = match ($scope['type']) {
+            'outlet'    => ['outlet', 'warehouse'],
+            'warehouse' => ['warehouse'],
+            default     => ['global', 'outlet', 'warehouse'],
+        };
+
         $roles = Role::where('is_active', true)
             ->when($actorMinRank !== null, fn ($q) => $q->where('rank', '>', $actorMinRank))
+            ->whereIn('level', $allowedLevels)
             ->orderBy('name')->get(['id', 'name', 'slug', 'level']);
 
         $permissions = Permission::where('is_active', true)
             ->when($actorPermissionIds !== null, fn ($q) => $q->whereIn('id', $actorPermissionIds))
             ->orderBy('module')->orderBy('action')->get(['id', 'name', 'slug', 'module', 'action']);
 
+        $allowedResourceIds = $this->resolveSessionConstrainedResourceIds($actorAssignedScopes, $scope);
+
         return array_merge(
             compact('user', 'roles', 'permissions'),
-            $this->resolveScopeProps($actor),
-            $this->resolveResourceProps($actor, $actorAssignedScopes),
+            $this->resolveScopeProps($actor, $scope),
+            $this->resolveResourceProps($actor, $allowedResourceIds),
         );
     }
 

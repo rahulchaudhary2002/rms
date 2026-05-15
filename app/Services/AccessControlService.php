@@ -470,6 +470,96 @@ class AccessControlService
     }
 
     /**
+     * Returns scope props (allowedScopeTypes, allowedScopes, scopeTypes) constrained
+     * to the user's current session scope so forms only offer valid choices.
+     *
+     * - global session → actor's full role-based limits
+     * - outlet session → restricts to that outlet and its warehouses
+     * - warehouse session → restricts to that warehouse only
+     */
+    public function resolveSessionConstrainedScopeProps(User $actor, array $sessionScope): array
+    {
+        $baseScopeTypes = $this->resolveAllowedScopeTypes($actor);
+        $baseScopes     = $this->resolveAllowedScopes($actor);
+
+        if ($sessionScope['type'] === 'outlet') {
+            $outletId = (int) $sessionScope['scope_id'];
+
+            $allowedScopeTypes = array_values(array_intersect($baseScopeTypes, ['outlet', 'warehouse']));
+
+            $warehouseIds = DB::table('warehouses')
+                ->where('outlet_id', $outletId)
+                ->pluck('id')
+                ->map(fn ($id) => (int) $id)
+                ->toArray();
+
+            $allowedScopes = $baseScopes === null
+                ? ['outlet' => [$outletId], 'warehouse' => $warehouseIds]
+                : [
+                    'outlet'    => in_array($outletId, $baseScopes['outlet'], true) ? [$outletId] : [],
+                    'warehouse' => array_values(array_intersect($warehouseIds, $baseScopes['warehouse'])),
+                ];
+        } elseif ($sessionScope['type'] === 'warehouse') {
+            $warehouseId = (int) $sessionScope['scope_id'];
+
+            $allowedScopeTypes = array_values(array_intersect($baseScopeTypes, ['warehouse']));
+            $allowedScopes     = ['outlet' => [], 'warehouse' => [$warehouseId]];
+        } else {
+            $allowedScopeTypes = $baseScopeTypes;
+            $allowedScopes     = $baseScopes;
+        }
+
+        return [
+            'allowedScopes'     => $allowedScopes,
+            'allowedScopeTypes' => $allowedScopeTypes,
+            'scopeTypes'        => $this->getScopeTypesConfig(),
+        ];
+    }
+
+    /**
+     * Aborts 403 when the actor is not allowed to mutate a record that carries
+     * scope_type/scope_id (e.g. UserRoleAssignment, UserPermissionOverride).
+     */
+    public function assertActorCanMutateScopedRecord(User $actor, string $scopeType, ?int $scopeId): void
+    {
+        if ($this->hasGlobalScopeRole($actor)) {
+            return;
+        }
+
+        $allowedScopes = $this->resolveAllowedScopes($actor);
+
+        if ($allowedScopes === null) {
+            return;
+        }
+
+        if ($scopeType === 'global') {
+            abort(403, 'You cannot manage global-scope records.');
+        }
+
+        if ($scopeType === 'outlet') {
+            if (! in_array($scopeId, $allowedScopes['outlet'], true)) {
+                abort(403, 'This record is outside your scope.');
+            }
+
+            return;
+        }
+
+        if ($scopeType === 'warehouse') {
+            if (in_array($scopeId, $allowedScopes['warehouse'], true)) {
+                return;
+            }
+
+            $warehouseOutletId = DB::table('warehouses')->where('id', $scopeId)->value('outlet_id');
+
+            if ($warehouseOutletId !== null && in_array((int) $warehouseOutletId, $allowedScopes['outlet'], true)) {
+                return;
+            }
+
+            abort(403, 'This record is outside your scope.');
+        }
+    }
+
+    /**
      * Returns true when the user is a superadmin (is_superadmin flag or super-admin role)
      * or holds any role with level = 'global' assigned at scope_type = 'global'.
      * These users may operate in any outlet or warehouse.

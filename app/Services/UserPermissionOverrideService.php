@@ -7,6 +7,7 @@ use App\Models\User;
 use App\Models\UserPermissionOverride;
 use App\Services\Concerns\InteractsWithScope;
 use App\Services\Concerns\PaginatesQuery;
+use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 
 class UserPermissionOverrideService
@@ -63,7 +64,7 @@ class UserPermissionOverrideService
             ->when($actorPermissionIds !== null, fn ($q) => $q->whereIn('id', $actorPermissionIds))
             ->orderBy('module')->orderBy('action')->get(['id', 'name', 'slug', 'module', 'action']);
 
-        return array_merge(compact('users', 'permissions'), $this->resolveScopeProps($actor));
+        return array_merge(compact('users', 'permissions'), $this->resolveScopeProps($actor, $scope));
     }
 
     public function save(User $actor, array $data): void
@@ -92,13 +93,24 @@ class UserPermissionOverrideService
 
     public function toggleActive(UserPermissionOverride $override, bool $isActive): void
     {
+        /** @var \App\Models\User $actor */
+        /** @var \App\Models\User $actor */
+        $actor = Auth::user();
+        $this->accessControl->assertActorCanMutateScopedRecord($actor, $override->scope_type, $override->scope_id);
         $override->update(['is_active' => $isActive]);
-        $this->accessControl->clearUserPermissionCache($override->user);
+        /** @var \App\Models\User $overrideUser */
+        $overrideUser = $override->user()->first();
+        $this->accessControl->clearUserPermissionCache($overrideUser);
     }
 
     public function remove(UserPermissionOverride $override): void
     {
-        $user = $override->user;
+        /** @var \App\Models\User $actor */
+        /** @var \App\Models\User $actor */
+        $actor = Auth::user();
+        $this->accessControl->assertActorCanMutateScopedRecord($actor, $override->scope_type, $override->scope_id);
+        /** @var \App\Models\User $user */
+        $user = $override->user()->first();
         $override->delete();
         $this->accessControl->clearUserPermissionCache($user);
     }

@@ -7,6 +7,7 @@ use App\Models\User;
 use App\Models\UserRoleAssignment;
 use App\Services\Concerns\InteractsWithScope;
 use App\Services\Concerns\PaginatesQuery;
+use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 
 class UserRoleAssignmentService
@@ -58,11 +59,18 @@ class UserRoleAssignmentService
             $scope
         )->orderBy('name')->get(['id', 'name', 'email']);
 
+        $allowedLevels = match ($scope['type']) {
+            'outlet'    => ['outlet', 'warehouse'],
+            'warehouse' => ['warehouse'],
+            default     => ['global', 'outlet', 'warehouse'],
+        };
+
         $roles = Role::where('is_active', true)
             ->when($actorMinRank !== null, fn ($q) => $q->where('rank', '>', $actorMinRank))
+            ->whereIn('level', $allowedLevels)
             ->orderBy('name')->get(['id', 'name', 'slug', 'level']);
 
-        return array_merge(compact('users', 'roles'), $this->resolveScopeProps($actor));
+        return array_merge(compact('users', 'roles'), $this->resolveScopeProps($actor, $scope));
     }
 
     public function assign(User $actor, array $data): void
@@ -96,13 +104,24 @@ class UserRoleAssignmentService
 
     public function toggleActive(UserRoleAssignment $assignment, bool $isActive): void
     {
+        /** @var \App\Models\User $actor */
+        /** @var \App\Models\User $actor */
+        $actor = Auth::user();
+        $this->accessControl->assertActorCanMutateScopedRecord($actor, $assignment->scope_type, $assignment->scope_id);
         $assignment->update(['is_active' => $isActive]);
-        $this->accessControl->clearUserPermissionCache($assignment->user);
+        /** @var \App\Models\User $assignmentUser */
+        $assignmentUser = $assignment->user()->first();
+        $this->accessControl->clearUserPermissionCache($assignmentUser);
     }
 
     public function remove(UserRoleAssignment $assignment): void
     {
-        $user = $assignment->user;
+        /** @var \App\Models\User $actor */
+        /** @var \App\Models\User $actor */
+        $actor = Auth::user();
+        $this->accessControl->assertActorCanMutateScopedRecord($actor, $assignment->scope_type, $assignment->scope_id);
+        /** @var \App\Models\User $user */
+        $user = $assignment->user()->first();
         $assignment->delete();
         $this->accessControl->clearUserPermissionCache($user);
     }
