@@ -267,6 +267,7 @@ export type AddonRecipe = {
     quantity: string;
     wastage_quantity: string;
     is_active: boolean;
+    addon?: (Addon & { group?: Pick<AddonGroup, 'id' | 'name'> | null });
     ingredient?: { id: number; name: string };
     unit?: { id: number; name: string; short_name: string };
     created_at: string;
@@ -309,6 +310,7 @@ export type FoodRecipe = {
     quantity: string;
     wastage_quantity: string;
     is_active: boolean;
+    food?: { id: number; name: string };
     ingredient?: { id: number; name: string };
     unit?: { id: number; name: string; short_name: string };
     variant?: { id: number; name: string } | null;

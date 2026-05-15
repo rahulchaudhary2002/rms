@@ -81,6 +81,55 @@ Route::middleware(['auth', 'verified', 'node.selected'])->group(function () {
         ->middleware('permission:foods-update')
         ->name('foods.toggle-featured');
 
+    // ── Recipe Management ────────────────────────────────────────────────────
+    Route::get('recipes/food', [FoodRecipeController::class, 'index'])
+        ->middleware('permission:foods-view')
+        ->name('recipes.food.index');
+
+    Route::get('recipes/food/create', [FoodRecipeController::class, 'create'])
+        ->middleware('permission:foods-update')
+        ->name('recipes.food.create');
+
+    Route::post('recipes/food', [FoodRecipeController::class, 'store'])
+        ->middleware('permission:foods-update')
+        ->name('recipes.food.store');
+
+    Route::get('recipes/food/{food_recipe}/edit', [FoodRecipeController::class, 'edit'])
+        ->middleware('permission:foods-update')
+        ->name('recipes.food.edit');
+
+    Route::put('recipes/food/{food_recipe}', [FoodRecipeController::class, 'update'])
+        ->middleware('permission:foods-update')
+        ->name('recipes.food.update');
+
+    Route::delete('recipes/food/{food_recipe}', [FoodRecipeController::class, 'destroyStandalone'])
+        ->middleware('permission:foods-update')
+        ->name('recipes.food.destroy');
+
+    Route::get('recipes/addons', [AddonRecipeController::class, 'index'])
+        ->middleware('permission:addon-groups-view')
+        ->name('recipes.addons.index');
+
+    Route::get('recipes/addons/create', [AddonRecipeController::class, 'create'])
+        ->middleware('permission:addon-groups-update')
+        ->name('recipes.addons.create');
+
+    Route::post('recipes/addons', [AddonRecipeController::class, 'store'])
+        ->middleware('permission:addon-groups-update')
+        ->name('recipes.addons.store');
+
+    Route::get('recipes/addons/{addon_recipe}/edit', [AddonRecipeController::class, 'edit'])
+        ->middleware('permission:addon-groups-update')
+        ->name('recipes.addons.edit');
+
+    Route::put('recipes/addons/{addon_recipe}', [AddonRecipeController::class, 'update'])
+        ->middleware('permission:addon-groups-update')
+        ->name('recipes.addons.update');
+
+    Route::delete('recipes/addons/{addon_recipe}', [AddonRecipeController::class, 'destroyStandalone'])
+        ->middleware('permission:addon-groups-update')
+        ->name('recipes.addons.destroy');
+
     // ── Food Variants ─────────────────────────────────────────────────────────
     Route::post('foods/{food}/variants', [FoodVariantController::class, 'store'])
         ->middleware('permission:foods-update')
