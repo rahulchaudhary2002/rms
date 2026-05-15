@@ -30,7 +30,9 @@ type NodeSelectionData = {
     can_select_global: boolean;
     current_scope_type: SelectionScope | null;
     current_outlet_id: string | null;
+    current_outlet_label: string | null;
     current_node_id: string | null;
+    current_node_label: string | null;
     items: NodeItem[];
 };
 
@@ -205,28 +207,34 @@ export function OutletNodeSwitcher() {
     }, [open]);
 
     const handleSwitcherToggle = () => {
-        setOpen((value) => {
-            const nextOpen = !value;
+        if (!open) {
+            const currentScopeType = nodeSelection?.current_scope_type ?? null;
+            const currentOutletId  = nodeSelection?.current_outlet_id ?? null;
+            const currentNodeId    = nodeSelection?.current_node_id ?? null;
 
-            if (nextOpen) {
-                setSearchQuery('');
-                setPendingScopeType(nodeSelection?.current_scope_type ?? null);
-                setPendingOutletId(nodeSelection?.current_outlet_id ?? null);
-                setPendingNodeId(nodeSelection?.current_node_id ?? null);
+            setSearchQuery('');
+            setPendingScopeType(currentScopeType);
+            setPendingOutletId(currentOutletId);
+            setPendingNodeId(currentNodeId);
 
-                if (hierarchy.length > 0) {
-                    const hasOpenOutlet =
-                        openOutlet !== null &&
-                        hierarchy.some((outlet) => outlet.key === openOutlet);
+            // Auto-expand the outlet that contains the active scope
+            if (hierarchy.length > 0) {
+                let targetKey: string | null = null;
 
-                    if (!hasOpenOutlet) {
-                        setOpenOutlet(hierarchy[0].key);
+                if (currentScopeType === 'outlet' && currentOutletId !== null) {
+                    targetKey = hierarchy.find((o) => o.id === currentOutletId)?.key ?? null;
+                } else if (currentScopeType === 'warehouse' && currentNodeId !== null) {
+                    const node = nodeSelection?.items.find((n) => n.id === currentNodeId);
+                    if (node) {
+                        targetKey = hierarchy.find((o) => o.id === node.outlet_id)?.key ?? null;
                     }
                 }
-            }
 
-            return nextOpen;
-        });
+                setOpenOutlet(targetKey ?? hierarchy[0].key);
+            }
+        }
+
+        setOpen((v) => !v);
     };
 
     const handleOutletToggle = (outletKey: string) => {
@@ -356,19 +364,16 @@ export function OutletNodeSwitcher() {
     const selectedNode = nodeSelection.items.find(
         (node) => node.id === (nodeSelection.current_node_id ?? ''),
     );
-    const currentOutletName =
-        nodeSelection.current_scope_type === 'outlet'
-            ? (page.props.outlets ?? []).find((o) => o.id === (nodeSelection.current_outlet_id ?? ''))?.name
-              ?? nodeSelection.items.find((n) => n.outlet_id === (nodeSelection.current_outlet_id ?? ''))?.outlet
-            : null;
     const currentLabel =
         nodeSelection.current_scope_type === 'global'
             ? 'Global'
-            : nodeSelection.current_scope_type === 'outlet' && currentOutletName
-              ? currentOutletName
-              : selectedNode
-                ? `${selectedNode.outlet} / ${selectedNode.node}`
-                : null;
+            : nodeSelection.current_node_label
+              ? nodeSelection.current_node_label
+              : nodeSelection.current_outlet_label
+                ? nodeSelection.current_outlet_label
+                : selectedNode
+                  ? `${selectedNode.outlet} / ${selectedNode.node}`
+                  : null;
     const selectionUnchanged =
         pendingScopeType === nodeSelection.current_scope_type &&
         pendingOutletId === nodeSelection.current_outlet_id &&

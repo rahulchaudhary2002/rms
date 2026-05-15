@@ -25,6 +25,7 @@ class RolesAndPermissionsSeeder extends Seeder
         'states',
         'cities',
         'customers',
+        'loyalty-point-rules',
         'inventory',
         'purchases',
         'sales',

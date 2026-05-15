@@ -167,6 +167,42 @@ export type Customer = {
     updated_at: string;
 };
 
+export type LoyaltyPointRuleSlab = {
+    id: number;
+    loyalty_point_rule_id: number;
+    min_amount: string;
+    max_amount: string | null;
+    points: number;
+    sort_order: number;
+    is_active: boolean;
+    created_at: string;
+    updated_at: string;
+};
+
+export type LoyaltyPointRule = {
+    id: number;
+    outlet_id: number | null;
+    name: string;
+    type: 'global' | 'outlet' | 'campaign';
+    earning_type: 'fixed_rate' | 'fixed_slab';
+    earn_amount: string | null;
+    earn_points: number | null;
+    redeem_point_value: string;
+    minimum_redeem_points: number;
+    maximum_redeem_points: number | null;
+    maximum_redeem_percent: string | null;
+    points_expiry_days: number | null;
+    starts_at: string | null;
+    ends_at: string | null;
+    is_active: boolean;
+    priority: number;
+    slabs_count?: number;
+    outlet?: Outlet | null;
+    slabs?: LoyaltyPointRuleSlab[];
+    created_at: string;
+    updated_at: string;
+};
+
 export type TwoFactorSetupData = {
     svg: string;
     url: string;

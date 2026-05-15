@@ -29,3 +29,4 @@ require __DIR__.'/units.php';
 require __DIR__.'/ingredients.php';
 require __DIR__.'/locations.php';
 require __DIR__.'/customers.php';
+require __DIR__.'/loyalty.php';

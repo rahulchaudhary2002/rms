@@ -21,6 +21,7 @@ import { index as countriesIndex } from '@/routes/countries';
 import { index as statesIndex } from '@/routes/states';
 import { index as citiesIndex } from '@/routes/cities';
 import { index as customersIndex } from '@/routes/customers';
+import { index as loyaltyPointRulesIndex } from '@/routes/loyalty-point-rules';
 import type { Auth } from '@/types';
 
 type ViewportMode = 'mobile' | 'medium' | 'large';
@@ -106,13 +107,11 @@ function buildDynamicItemGroups(auth: Auth): MenuItemGroup[] {
     const can = (slug: string) => isSuperAdmin || auth.can?.[slug] === true;
     const groups: MenuItemGroup[] = [];
 
-    if (can('customers-view')) {
-        groups.push({
-            label: 'CRM',
-            items: [
-                { title: 'Customers', href: customersIndex.url(), icon: 'groups', activeMatch: [customersIndex.url()] },
-            ],
-        });
+    const crmItems: MenuItem[] = [];
+    if (can('customers-view')) crmItems.push({ title: 'Customers', href: customersIndex.url(), icon: 'groups', activeMatch: [customersIndex.url()] });
+    if (can('loyalty-point-rules-view')) crmItems.push({ title: 'Point Rules', href: loyaltyPointRulesIndex.url(), icon: 'loyalty', activeMatch: [loyaltyPointRulesIndex.url()] });
+    if (crmItems.length > 0) {
+        groups.push({ label: 'CRM', items: crmItems });
     }
 
     return groups;
