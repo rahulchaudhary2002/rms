@@ -149,6 +149,21 @@ export type Outlet = {
     name: string;
 };
 
+export type DepartmentType = 'kitchen' | 'bar' | 'counter' | 'store' | 'bakery' | 'housekeeping' | 'other';
+
+export type OutletDepartment = {
+    id: number;
+    outlet_id: number;
+    name: string;
+    code: string | null;
+    type: DepartmentType;
+    description: string | null;
+    is_active: boolean;
+    outlet?: Outlet;
+    created_at: string;
+    updated_at: string;
+};
+
 export type CustomerOutlet = {
     id: number;
     customer_id: number;

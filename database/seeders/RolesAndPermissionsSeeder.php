@@ -21,6 +21,7 @@ class RolesAndPermissionsSeeder extends Seeder
         'unit-conversions',
         'ingredient-categories',
         'ingredients',
+        'outlet-departments',
         'countries',
         'states',
         'cities',
