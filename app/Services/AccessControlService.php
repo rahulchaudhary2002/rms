@@ -480,6 +480,24 @@ class AccessControlService
         }
     }
 
+    /**
+     * Returns the role levels visible/manageable within the given session scope type.
+     * Returns null for global scope (no restriction).
+     *
+     * @return string[]|null
+     */
+    public function resolveAllowedLevelsForScope(string $scopeType): ?array
+    {
+        return match ($scopeType) {
+            'central_warehouse'    => ['central_warehouse'],
+            'outlet'               => ['outlet', 'outlet_warehouse', 'outlet_department', 'department_warehouse'],
+            'outlet_warehouse'     => ['outlet_warehouse'],
+            'outlet_department'    => ['outlet_department', 'department_warehouse'],
+            'department_warehouse' => ['department_warehouse'],
+            default                => null,
+        };
+    }
+
     public function getScopeTypesConfig(): array
     {
         return collect(config('access_control.scope_types', []))

@@ -7,11 +7,16 @@ import { FormField } from '@/components/ui/form-field';
 import { Input } from '@/components/ui/input';
 import { SearchableSelect } from '@/components/ui/searchable-select';
 
-export default function RolesCreate() {
+type LevelOption = { type: string; label: string };
+type Props = { levelOptions: LevelOption[] };
+
+export default function RolesCreate({ levelOptions }: Props) {
+    const defaultLevel = levelOptions[0]?.type ?? 'global';
+
     const { data, setData, post, processing, errors } = useForm({
         name: '',
         slug: '',
-        level: 'global',
+        level: defaultLevel,
         rank: 100,
         is_assignable: true,
         description: '',
@@ -69,13 +74,14 @@ export default function RolesCreate() {
                         </FormField>
 
                         <FormField label="Level" error={errors.level}>
-                            <SearchableSelect value={data.level} onChange={(e) => setData('level', e.target.value)}>
-                                <option value="global">Global</option>
-                                <option value="central_warehouse">Central Warehouse</option>
-                                <option value="outlet">Outlet</option>
-                                <option value="outlet_warehouse">Outlet Warehouse</option>
-                                <option value="outlet_department">Outlet Department</option>
-                                <option value="department_warehouse">Department Warehouse</option>
+                            <SearchableSelect
+                                value={data.level}
+                                disabled={levelOptions.length <= 1}
+                                onChange={(e) => setData('level', e.target.value)}
+                            >
+                                {levelOptions.map((opt) => (
+                                    <option key={opt.type} value={opt.type}>{opt.label}</option>
+                                ))}
                             </SearchableSelect>
                         </FormField>
 

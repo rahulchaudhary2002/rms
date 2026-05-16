@@ -8,9 +8,10 @@ import { Input } from '@/components/ui/input';
 import { SearchableSelect } from '@/components/ui/searchable-select';
 import type { Role } from '@/types';
 
-type Props = { role: Role };
+type LevelOption = { type: string; label: string };
+type Props = { role: Role; levelOptions: LevelOption[] };
 
-export default function RolesEdit({ role }: Props) {
+export default function RolesEdit({ role, levelOptions }: Props) {
     const { data, setData, put, processing, errors } = useForm({
         name: role.name,
         slug: role.slug,
@@ -71,15 +72,12 @@ export default function RolesEdit({ role }: Props) {
                         <FormField label="Level" error={errors.level}>
                             <SearchableSelect
                                 value={data.level}
-                                disabled={role.is_system}
+                                disabled={role.is_system || levelOptions.length <= 1}
                                 onChange={(e) => setData('level', e.target.value as Role['level'])}
                             >
-                                <option value="global">Global</option>
-                                <option value="central_warehouse">Central Warehouse</option>
-                                <option value="outlet">Outlet</option>
-                                <option value="outlet_warehouse">Outlet Warehouse</option>
-                                <option value="outlet_department">Outlet Department</option>
-                                <option value="department_warehouse">Department Warehouse</option>
+                                {levelOptions.map((opt) => (
+                                    <option key={opt.type} value={opt.type}>{opt.label}</option>
+                                ))}
                             </SearchableSelect>
                         </FormField>
 

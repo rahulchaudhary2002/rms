@@ -16,13 +16,15 @@ class RoleService
 
     // ─── Roles ────────────────────────────────────────────────────────────────
 
-    public function getRolesIndexData(User $actor, array $filters): array
+    public function getRolesIndexData(User $actor, array $filters, string $currentScopeType = 'global'): array
     {
-        $actorMinRank = $this->accessControl->getActorMinRank($actor);
+        $actorMinRank  = $this->accessControl->getActorMinRank($actor);
+        $allowedLevels = $this->accessControl->resolveAllowedLevelsForScope($currentScopeType);
 
         $query = Role::query()
             ->withCount(['permissions', 'userRoleAssignments'])
             ->when($actorMinRank !== null, fn ($b) => $b->where('rank', '>', $actorMinRank))
+            ->when($allowedLevels !== null, fn ($b) => $b->whereIn('level', $allowedLevels))
             ->when($filters['search'] !== '', function ($b) use ($filters) {
                 $search = '%'.$filters['search'].'%';
                 $b->where(fn ($q) => $q->where('name', 'like', $search)->orWhere('slug', 'like', $search));
@@ -36,9 +38,14 @@ class RoleService
         return compact('roles', 'filters');
     }
 
-    public function getRoleShowData(User $actor, Role $role): array
+    public function getRoleShowData(User $actor, Role $role, string $currentScopeType = 'global'): array
     {
         $this->accessControl->assertActorCanManageRole($actor, $role);
+
+        $allowedLevels = $this->accessControl->resolveAllowedLevelsForScope($currentScopeType);
+        if ($allowedLevels !== null && ! in_array($role->level, $allowedLevels, true)) {
+            abort(403, 'This role is outside your current scope.');
+        }
 
         $role->load('permissions');
 
@@ -70,10 +77,11 @@ class RoleService
 
     // ─── Role Permissions ─────────────────────────────────────────────────────
 
-    public function getRolePermissionsIndexData(User $actor, array $filters): array
+    public function getRolePermissionsIndexData(User $actor, array $filters, string $currentScopeType = 'global'): array
     {
         $actorMinRank       = $this->accessControl->getActorMinRank($actor);
         $actorPermissionIds = $this->accessControl->getActorPermissionIds($actor);
+        $allowedLevels      = $this->accessControl->resolveAllowedLevelsForScope($currentScopeType);
 
         $query = Role::with(['permissions' => function ($q) use ($actorPermissionIds) {
             $q->when($actorPermissionIds !== null, fn ($q2) => $q2->whereIn('permissions.id', $actorPermissionIds))
@@ -84,6 +92,7 @@ class RoleService
                 fn ($q2) => $q2->whereIn('permissions.id', $actorPermissionIds)
             )])
             ->when($actorMinRank !== null, fn ($b) => $b->where('rank', '>', $actorMinRank))
+            ->when($allowedLevels !== null, fn ($b) => $b->whereIn('level', $allowedLevels))
             ->when($filters['search'] !== '', function ($b) use ($filters) {
                 $search = '%'.$filters['search'].'%';
                 $b->where(fn ($q) => $q->where('name', 'like', $search)->orWhere('slug', 'like', $search));

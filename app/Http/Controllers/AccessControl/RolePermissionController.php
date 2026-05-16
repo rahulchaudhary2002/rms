@@ -7,6 +7,7 @@ use App\Http\Controllers\Controller;
 use App\Http\Requests\AccessControl\RolePermission\DestroyRolePermissionRequest;
 use App\Http\Requests\AccessControl\RolePermission\StoreRolePermissionRequest;
 use App\Models\Role;
+use App\Services\AccessControlService;
 use App\Services\RoleService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -17,14 +18,18 @@ class RolePermissionController extends Controller
 {
     use ExtractsFilters;
 
-    public function __construct(private RoleService $roleService) {}
+    public function __construct(
+        private RoleService $roleService,
+        private AccessControlService $accessControl,
+    ) {}
 
     public function index(Request $request): Response
     {
         $filters = $this->extractFilters($request, ['search', 'level', 'per_page']);
+        $scope   = $this->accessControl->resolveSessionScope($request);
 
         return Inertia::render('access-control/role-permissions/index',
-            $this->roleService->getRolePermissionsIndexData($request->user(), $filters));
+            $this->roleService->getRolePermissionsIndexData($request->user(), $filters, $scope['type']));
     }
 
     public function store(StoreRolePermissionRequest $request): RedirectResponse

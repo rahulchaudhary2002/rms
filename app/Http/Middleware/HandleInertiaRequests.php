@@ -258,17 +258,16 @@ class HandleInertiaRequests extends Middleware
                 ->unique()->values()->toArray();
         }
 
-        // --- Central warehouses (global users only) ---
-        $centralWarehouses = $canSelectGlobal
-            ? DB::table('warehouses')
-                ->where('type', 'central')
-                ->whereNull('deleted_at')
-                ->orderBy('name')
-                ->get(['id', 'name'])
-                ->map(fn ($w) => ['id' => (string) $w->id, 'name' => (string) $w->name])
-                ->values()
-                ->all()
-            : [];
+        // --- Central warehouses ---
+        $centralWarehouses = DB::table('warehouses')
+            ->where('type', 'central')
+            ->whereNull('deleted_at')
+            ->when($allowed !== null, fn ($q) => $q->whereIn('id', $allowed['warehouse']))
+            ->orderBy('name')
+            ->get(['id', 'name'])
+            ->map(fn ($w) => ['id' => (string) $w->id, 'name' => (string) $w->name])
+            ->values()
+            ->all();
 
         // --- Outlets ---
         $outlets = DB::table('outlets')

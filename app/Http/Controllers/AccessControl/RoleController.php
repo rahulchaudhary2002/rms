@@ -26,41 +26,79 @@ class RoleController extends Controller
     public function index(Request $request): Response
     {
         $filters = $this->extractFilters($request, ['search', 'level', 'is_active', 'per_page']);
+        $scope   = $this->accessControl->resolveSessionScope($request);
 
         return Inertia::render('access-control/roles/index',
-            $this->roleService->getRolesIndexData($request->user(), $filters));
+            $this->roleService->getRolesIndexData($request->user(), $filters, $scope['type']));
     }
 
     public function show(Request $request, Role $role): Response
     {
+        $scope = $this->accessControl->resolveSessionScope($request);
+
         return Inertia::render('access-control/roles/show',
-            $this->roleService->getRoleShowData($request->user(), $role));
+            $this->roleService->getRoleShowData($request->user(), $role, $scope['type']));
     }
 
-    public function create(): Response
+    public function create(Request $request): Response
     {
-        return Inertia::render('access-control/roles/create');
+        $scope        = $this->accessControl->resolveSessionScope($request);
+        $levelOptions = $this->resolveLevelOptions($scope['type']);
+
+        return Inertia::render('access-control/roles/create', compact('levelOptions'));
     }
 
     public function store(StoreRoleRequest $request): RedirectResponse
     {
+        $scope         = $this->accessControl->resolveSessionScope($request);
+        $allowedLevels = $this->accessControl->resolveAllowedLevelsForScope($scope['type']);
+
+        if ($allowedLevels !== null && ! in_array($request->input('level'), $allowedLevels, true)) {
+            abort(403, 'You cannot create a role at this level.');
+        }
+
         Role::create($request->validated());
 
         return redirect($request->input('_redirect', route('access-control.roles.index')))
             ->with('success', 'Role created successfully.');
     }
 
-    public function edit(Role $role): Response
+    public function edit(Request $request, Role $role): Response
     {
-        return Inertia::render('access-control/roles/edit', ['role' => $role]);
+        $scope        = $this->accessControl->resolveSessionScope($request);
+        $levelOptions = $this->resolveLevelOptions($scope['type']);
+
+        return Inertia::render('access-control/roles/edit', compact('role', 'levelOptions'));
     }
 
     public function update(UpdateRoleRequest $request, Role $role): RedirectResponse
     {
+        $scope         = $this->accessControl->resolveSessionScope($request);
+        $allowedLevels = $this->accessControl->resolveAllowedLevelsForScope($scope['type']);
+
+        if ($allowedLevels !== null && ! in_array($request->input('level'), $allowedLevels, true)) {
+            abort(403, 'You cannot set a role to this level.');
+        }
+
         $this->roleService->updateRole($role, $request->validated());
 
         return redirect()->route('access-control.roles.index')
             ->with('success', 'Role updated successfully.');
+    }
+
+    /**
+     * @return array<int, array{type: string, label: string}>
+     */
+    private function resolveLevelOptions(string $scopeType): array
+    {
+        $allowedLevels = $this->accessControl->resolveAllowedLevelsForScope($scopeType);
+        $allOptions    = $this->accessControl->getScopeTypesConfig();
+
+        if ($allowedLevels === null) {
+            return $allOptions;
+        }
+
+        return array_values(array_filter($allOptions, fn ($opt) => in_array($opt['type'], $allowedLevels, true)));
     }
 
     public function destroy(Role $role): RedirectResponse
