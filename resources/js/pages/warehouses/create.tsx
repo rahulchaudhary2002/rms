@@ -35,6 +35,9 @@ export default function WarehousesCreate({ outlets, departments }: Props) {
         is_active:            true,
     });
 
+    const needsOutlet = data.type === 'outlet' || data.type === 'department';
+    const needsDepartment = data.type === 'department';
+
     const filteredDepartments = useMemo(
         () => data.outlet_id ? departments.filter((d) => String(d.outlet_id) === String(data.outlet_id)) : departments,
         [departments, data.outlet_id],
@@ -85,7 +88,16 @@ export default function WarehousesCreate({ outlets, departments }: Props) {
                         <FormField label="Type" error={errors.type}>
                             <SearchableSelect
                                 value={data.type}
-                                onChange={(e) => setData('type', e.target.value as WarehouseType)}
+                                onChange={(e) => {
+                                    const type = e.target.value as WarehouseType;
+                                    setData('type', type);
+                                    if (type === 'central') {
+                                        setData('outlet_id', '');
+                                        setData('outlet_department_id', '');
+                                    } else if (type === 'outlet') {
+                                        setData('outlet_department_id', '');
+                                    }
+                                }}
                             >
                                 {Object.entries(WAREHOUSE_TYPE_LABELS).map(([value, label]) => (
                                     <option key={value} value={value}>{label}</option>
@@ -93,33 +105,37 @@ export default function WarehousesCreate({ outlets, departments }: Props) {
                             </SearchableSelect>
                         </FormField>
 
-                        <FormField label="Outlet" error={errors.outlet_id}>
-                            <SearchableSelect
-                                value={data.outlet_id}
-                                onChange={(e) => {
-                                    setData('outlet_id', e.target.value);
-                                    setData('outlet_department_id', '');
-                                }}
-                            >
-                                <option value="">No outlet (central)</option>
-                                {outlets.map((o) => (
-                                    <option key={o.id} value={o.id}>{o.name}</option>
-                                ))}
-                            </SearchableSelect>
-                        </FormField>
+                        {needsOutlet && (
+                            <FormField label="Outlet" error={errors.outlet_id}>
+                                <SearchableSelect
+                                    value={data.outlet_id}
+                                    onChange={(e) => {
+                                        setData('outlet_id', e.target.value);
+                                        setData('outlet_department_id', '');
+                                    }}
+                                >
+                                    <option value="">Select outlet</option>
+                                    {outlets.map((o) => (
+                                        <option key={o.id} value={o.id}>{o.name}</option>
+                                    ))}
+                                </SearchableSelect>
+                            </FormField>
+                        )}
 
-                        <FormField label="Department" error={errors.outlet_department_id}>
-                            <SearchableSelect
-                                value={data.outlet_department_id}
-                                onChange={(e) => setData('outlet_department_id', e.target.value)}
-                                disabled={filteredDepartments.length === 0}
-                            >
-                                <option value="">No department</option>
-                                {filteredDepartments.map((d) => (
-                                    <option key={d.id} value={d.id}>{d.name}</option>
-                                ))}
-                            </SearchableSelect>
-                        </FormField>
+                        {needsDepartment && (
+                            <FormField label="Department" error={errors.outlet_department_id}>
+                                <SearchableSelect
+                                    value={data.outlet_department_id}
+                                    onChange={(e) => setData('outlet_department_id', e.target.value)}
+                                    disabled={!data.outlet_id || filteredDepartments.length === 0}
+                                >
+                                    <option value="">Select department</option>
+                                    {filteredDepartments.map((d) => (
+                                        <option key={d.id} value={d.id}>{d.name}</option>
+                                    ))}
+                                </SearchableSelect>
+                            </FormField>
+                        )}
 
                         <FormField label="Address" htmlFor="address" error={errors.address} className="md:col-span-2">
                             <Input
