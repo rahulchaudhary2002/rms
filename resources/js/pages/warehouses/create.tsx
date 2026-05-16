@@ -1,10 +1,12 @@
 import { Head, Link, useForm } from '@inertiajs/react';
-import { useMemo } from 'react';
+import { useMemo, useState } from 'react';
 import { FormSection } from '@/components/form-section';
 import { PageHeader } from '@/components/page-header';
+import { QuickCreateOutletDepartmentModal, QuickCreateOutletModal } from '@/components/quick-create-modals';
 import { FormField } from '@/components/ui/form-field';
 import { Input } from '@/components/ui/input';
 import { SearchableSelect } from '@/components/ui/searchable-select';
+import { useCan } from '@/hooks/use-can';
 import { dashboard } from '@/routes';
 import {
     index as warehousesIndex,
@@ -24,6 +26,8 @@ type Props = {
 };
 
 export default function WarehousesCreate({ outlets, departments }: Props) {
+    const { can } = useCan();
+    const [modal, setModal] = useState<'outlet' | 'dept' | null>(null);
     const { data, setData, post, processing, errors } = useForm({
         outlet_id:            '',
         outlet_department_id: '',
@@ -113,6 +117,8 @@ export default function WarehousesCreate({ outlets, departments }: Props) {
                                         setData('outlet_id', e.target.value);
                                         setData('outlet_department_id', '');
                                     }}
+                                    onAddNew={can('outlets-create') ? () => setModal('outlet') : undefined}
+                                    addNewLabel="Add Outlet"
                                 >
                                     <option value="">Select outlet</option>
                                     {outlets.map((o) => (
@@ -128,6 +134,8 @@ export default function WarehousesCreate({ outlets, departments }: Props) {
                                     value={data.outlet_department_id}
                                     onChange={(e) => setData('outlet_department_id', e.target.value)}
                                     disabled={!data.outlet_id || filteredDepartments.length === 0}
+                                    onAddNew={can('outlet-departments-create') ? () => setModal('dept') : undefined}
+                                    addNewLabel="Add Department"
                                 >
                                     <option value="">Select department</option>
                                     {filteredDepartments.map((d) => (
@@ -194,6 +202,14 @@ export default function WarehousesCreate({ outlets, departments }: Props) {
                     </button>
                 </div>
             </form>
+
+            <QuickCreateOutletModal open={modal === 'outlet'} onClose={() => setModal(null)} />
+            <QuickCreateOutletDepartmentModal
+                open={modal === 'dept'}
+                onClose={() => setModal(null)}
+                outlets={outlets}
+                defaultOutletId={data.outlet_id}
+            />
         </>
     );
 }

@@ -1,21 +1,23 @@
 import { Head, Link, useForm, router } from '@inertiajs/react';
-import { dashboard } from '@/routes';
-import { index as rolesIndex } from '@/routes/access-control/roles';
-import { index as usersIndex, show as usersShow, edit as usersEdit } from '@/routes/users';
-import { store as urStore } from '@/routes/access-control/user-roles';
-import { destroy as urDestroy } from '@/routes/access-control/user-roles';
-import { store as upoStore, destroy as upoDestroy } from '@/routes/access-control/user-permission-overrides';
-import { store as urpStore, destroy as urpDestroy } from '@/routes/access-control/user-resource-permissions';
 import { useState } from 'react';
 import { PageHeader } from '@/components/page-header';
-import { FormField } from '@/components/ui/form-field';
-import { Input } from '@/components/ui/input';
-import { SearchableSelect } from '@/components/ui/searchable-select';
+import { QuickCreateOutletDepartmentModal, QuickCreateOutletModal, QuickCreateWarehouseModal } from '@/components/quick-create-modals';
 import { AsyncResourceSelect } from '@/components/ui/async-resource-select';
 import {
     Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter,
 } from '@/components/ui/dialog';
+import { FormField } from '@/components/ui/form-field';
+import { Input } from '@/components/ui/input';
+import { SearchableSelect } from '@/components/ui/searchable-select';
+import { useCan } from '@/hooks/use-can';
 import { cn } from '@/lib/utils';
+import { dashboard } from '@/routes';
+import { index as rolesIndex } from '@/routes/access-control/roles';
+import { store as urStore } from '@/routes/access-control/user-roles';
+import { destroy as urDestroy } from '@/routes/access-control/user-roles';
+import { store as upoStore, destroy as upoDestroy } from '@/routes/access-control/user-permission-overrides';
+import { store as urpStore, destroy as urpDestroy } from '@/routes/access-control/user-resource-permissions';
+import { index as usersIndex, show as usersShow, edit as usersEdit } from '@/routes/users';
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -121,6 +123,8 @@ function AssignRoleModal({ open, onClose, userId, roles, outlets, departments, w
     outlets: Outlet[]; departments: OutletDepartment[]; warehouses: Warehouse[];
     allowedScopes: AllowedScopes; currentScope: CurrentScope; returnUrl: string;
 }) {
+    const { can } = useCan();
+    const [quickModal, setQuickModal] = useState<'outlet' | 'dept' | 'warehouse' | null>(null);
     const locked = {
         outlet:     ['outlet', 'outlet_warehouse', 'outlet_department', 'department_warehouse'].includes(currentScope.type),
         department: ['outlet_department', 'department_warehouse'].includes(currentScope.type),
@@ -181,6 +185,7 @@ function AssignRoleModal({ open, onClose, userId, roles, outlets, departments, w
     }
 
     return (
+        <>
         <Dialog open={open} onOpenChange={(o) => { if (!o) { reset(); onClose(); } }}>
             <DialogContent className="max-w-md bg-card">
                 <DialogHeader><DialogTitle>Assign Role</DialogTitle></DialogHeader>
@@ -203,7 +208,13 @@ function AssignRoleModal({ open, onClose, userId, roles, outlets, departments, w
 
                     {needs.outlet && (
                         <FormField label="Outlet" error={errors.outlet_id}>
-                            <SearchableSelect value={data.outlet_id} disabled={locked.outlet} onChange={(e) => setData({ ...data, outlet_id: e.target.value, outlet_department_id: locked.department ? currentScope.outlet_department_id : '', warehouse_id: locked.warehouse ? currentScope.warehouse_id : '' })}>
+                            <SearchableSelect
+                                value={data.outlet_id}
+                                disabled={locked.outlet}
+                                onChange={(e) => setData({ ...data, outlet_id: e.target.value, outlet_department_id: locked.department ? currentScope.outlet_department_id : '', warehouse_id: locked.warehouse ? currentScope.warehouse_id : '' })}
+                                onAddNew={!locked.outlet && can('outlets-create') ? () => setQuickModal('outlet') : undefined}
+                                addNewLabel="Add Outlet"
+                            >
                                 <option value="">Select an outlet...</option>
                                 {allowedOutlets.map((o) => <option key={o.id} value={String(o.id)}>{o.name}</option>)}
                             </SearchableSelect>
@@ -212,7 +223,13 @@ function AssignRoleModal({ open, onClose, userId, roles, outlets, departments, w
 
                     {needs.department && (
                         <FormField label="Department" error={errors.outlet_department_id}>
-                            <SearchableSelect value={data.outlet_department_id} disabled={locked.department || !data.outlet_id} onChange={(e) => setData({ ...data, outlet_department_id: e.target.value, warehouse_id: locked.warehouse ? currentScope.warehouse_id : '' })}>
+                            <SearchableSelect
+                                value={data.outlet_department_id}
+                                disabled={locked.department || !data.outlet_id}
+                                onChange={(e) => setData({ ...data, outlet_department_id: e.target.value, warehouse_id: locked.warehouse ? currentScope.warehouse_id : '' })}
+                                onAddNew={!locked.department && can('outlet-departments-create') ? () => setQuickModal('dept') : undefined}
+                                addNewLabel="Add Department"
+                            >
                                 <option value="">Select a department...</option>
                                 {filteredDepts.map((d) => <option key={d.id} value={String(d.id)}>{d.name}</option>)}
                             </SearchableSelect>
@@ -221,7 +238,13 @@ function AssignRoleModal({ open, onClose, userId, roles, outlets, departments, w
 
                     {needs.warehouse && (
                         <FormField label="Warehouse" error={errors.warehouse_id}>
-                            <SearchableSelect value={data.warehouse_id} disabled={locked.warehouse || (needs.outlet && !data.outlet_id)} onChange={(e) => setData('warehouse_id', e.target.value)}>
+                            <SearchableSelect
+                                value={data.warehouse_id}
+                                disabled={locked.warehouse || (needs.outlet && !data.outlet_id)}
+                                onChange={(e) => setData('warehouse_id', e.target.value)}
+                                onAddNew={!locked.warehouse && can('warehouses-create') ? () => setQuickModal('warehouse') : undefined}
+                                addNewLabel="Add Warehouse"
+                            >
                                 <option value="">Select a warehouse...</option>
                                 {filteredWhs.map((w) => <option key={w.id} value={String(w.id)}>{w.name}</option>)}
                             </SearchableSelect>
@@ -235,6 +258,21 @@ function AssignRoleModal({ open, onClose, userId, roles, outlets, departments, w
                 </form>
             </DialogContent>
         </Dialog>
+
+        <QuickCreateOutletModal open={quickModal === 'outlet'} onClose={() => setQuickModal(null)} />
+        <QuickCreateOutletDepartmentModal
+            open={quickModal === 'dept'}
+            onClose={() => setQuickModal(null)}
+            outlets={outlets}
+            defaultOutletId={data.outlet_id}
+        />
+        <QuickCreateWarehouseModal
+            open={quickModal === 'warehouse'}
+            onClose={() => setQuickModal(null)}
+            outlets={outlets}
+            defaultOutletId={data.outlet_id}
+        />
+        </>
     );
 }
 
@@ -244,6 +282,8 @@ function AddOverrideModal({ open, onClose, userId, permissions, outlets, departm
     outlets: Outlet[]; departments: OutletDepartment[]; warehouses: Warehouse[];
     scopeTypes: ScopeType[]; allowedScopes: AllowedScopes; allowedScopeTypes: string[]; currentScope: CurrentScope; returnUrl: string;
 }) {
+    const { can } = useCan();
+    const [quickModal, setQuickModal] = useState<'outlet' | 'dept' | 'warehouse' | null>(null);
     const locked = {
         outlet:     ['outlet', 'outlet_warehouse', 'outlet_department', 'department_warehouse'].includes(currentScope.type),
         department: ['outlet_department', 'department_warehouse'].includes(currentScope.type),
@@ -293,6 +333,7 @@ function AddOverrideModal({ open, onClose, userId, permissions, outlets, departm
     }
 
     return (
+        <>
         <Dialog open={open} onOpenChange={(o) => { if (!o) onClose(); }}>
             <DialogContent className="max-w-md bg-card">
                 <DialogHeader><DialogTitle>Add Permission Override</DialogTitle></DialogHeader>
@@ -321,7 +362,13 @@ function AddOverrideModal({ open, onClose, userId, permissions, outlets, departm
 
                     {needs.outlet && (
                         <FormField label="Outlet" error={errors.outlet_id}>
-                            <SearchableSelect value={data.outlet_id} disabled={locked.outlet} onChange={(e) => setData({ ...data, outlet_id: e.target.value, outlet_department_id: locked.department ? currentScope.outlet_department_id : '', warehouse_id: locked.warehouse ? currentScope.warehouse_id : '' })}>
+                            <SearchableSelect
+                                value={data.outlet_id}
+                                disabled={locked.outlet}
+                                onChange={(e) => setData({ ...data, outlet_id: e.target.value, outlet_department_id: locked.department ? currentScope.outlet_department_id : '', warehouse_id: locked.warehouse ? currentScope.warehouse_id : '' })}
+                                onAddNew={!locked.outlet && can('outlets-create') ? () => setQuickModal('outlet') : undefined}
+                                addNewLabel="Add Outlet"
+                            >
                                 <option value="">Select an outlet...</option>
                                 {allowedOutlets.map((o) => <option key={o.id} value={String(o.id)}>{o.name}</option>)}
                             </SearchableSelect>
@@ -330,7 +377,13 @@ function AddOverrideModal({ open, onClose, userId, permissions, outlets, departm
 
                     {needs.department && (
                         <FormField label="Department" error={errors.outlet_department_id}>
-                            <SearchableSelect value={data.outlet_department_id} disabled={locked.department || !data.outlet_id} onChange={(e) => setData({ ...data, outlet_department_id: e.target.value, warehouse_id: locked.warehouse ? currentScope.warehouse_id : '' })}>
+                            <SearchableSelect
+                                value={data.outlet_department_id}
+                                disabled={locked.department || !data.outlet_id}
+                                onChange={(e) => setData({ ...data, outlet_department_id: e.target.value, warehouse_id: locked.warehouse ? currentScope.warehouse_id : '' })}
+                                onAddNew={!locked.department && can('outlet-departments-create') ? () => setQuickModal('dept') : undefined}
+                                addNewLabel="Add Department"
+                            >
                                 <option value="">Select a department...</option>
                                 {filteredDepts.map((d) => <option key={d.id} value={String(d.id)}>{d.name}</option>)}
                             </SearchableSelect>
@@ -339,7 +392,13 @@ function AddOverrideModal({ open, onClose, userId, permissions, outlets, departm
 
                     {needs.warehouse && (
                         <FormField label="Warehouse" error={errors.warehouse_id}>
-                            <SearchableSelect value={data.warehouse_id} disabled={locked.warehouse || (needs.outlet && !data.outlet_id)} onChange={(e) => setData('warehouse_id', e.target.value)}>
+                            <SearchableSelect
+                                value={data.warehouse_id}
+                                disabled={locked.warehouse || (needs.outlet && !data.outlet_id)}
+                                onChange={(e) => setData('warehouse_id', e.target.value)}
+                                onAddNew={!locked.warehouse && can('warehouses-create') ? () => setQuickModal('warehouse') : undefined}
+                                addNewLabel="Add Warehouse"
+                            >
                                 <option value="">Select a warehouse...</option>
                                 {filteredWhs.map((w) => <option key={w.id} value={String(w.id)}>{w.name}</option>)}
                             </SearchableSelect>
@@ -357,6 +416,21 @@ function AddOverrideModal({ open, onClose, userId, permissions, outlets, departm
                 </form>
             </DialogContent>
         </Dialog>
+
+        <QuickCreateOutletModal open={quickModal === 'outlet'} onClose={() => setQuickModal(null)} />
+        <QuickCreateOutletDepartmentModal
+            open={quickModal === 'dept'}
+            onClose={() => setQuickModal(null)}
+            outlets={outlets}
+            defaultOutletId={data.outlet_id}
+        />
+        <QuickCreateWarehouseModal
+            open={quickModal === 'warehouse'}
+            onClose={() => setQuickModal(null)}
+            outlets={outlets}
+            defaultOutletId={data.outlet_id}
+        />
+        </>
     );
 }
 

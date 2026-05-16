@@ -12,12 +12,21 @@ import { Input } from '@/components/ui/input';
 import { SearchableSelect } from '@/components/ui/searchable-select';
 import { store as permissionsStore } from '@/routes/access-control/permissions';
 import { store as rolesStore } from '@/routes/access-control/roles';
+import { store as addonGroupsStore } from '@/routes/addon-groups';
+import { store as citiesStore } from '@/routes/cities';
 import { store as countriesStore } from '@/routes/countries';
+import { store as foodCategoriesStore } from '@/routes/food-categories';
 import { store as categoriesStore } from '@/routes/ingredient-categories';
+import { store as outletDepartmentsStore } from '@/routes/outlet-departments';
+import { store as outletsStore } from '@/routes/outlets';
 import { store as statesStore } from '@/routes/states';
 import { store as unitsStore } from '@/routes/units';
 import { store as usersStore } from '@/routes/users';
+import { store as warehousesStore } from '@/routes/warehouses';
 import type { Country } from '@/types';
+
+type OutletOption = { id: number; name: string };
+type StateOption = { id: number; name: string };
 
 type CountryOption = Pick<Country, 'id' | 'name'>;
 
@@ -237,8 +246,11 @@ export function QuickCreateRoleModal({
                                 }
                             >
                                 <option value="global">Global</option>
+                                <option value="central_warehouse">Central Warehouse</option>
                                 <option value="outlet">Outlet</option>
-                                <option value="warehouse">Warehouse</option>
+                                <option value="outlet_warehouse">Outlet Warehouse</option>
+                                <option value="outlet_department">Outlet Department</option>
+                                <option value="department_warehouse">Department Warehouse</option>
                             </SearchableSelect>
                         </FormField>
                         <FormField label="Rank" error={errors.rank}>
@@ -358,8 +370,11 @@ export function QuickCreatePermissionModal({
                             onChange={(e) => setData('level', e.target.value)}
                         >
                             <option value="global">Global</option>
+                            <option value="central_warehouse">Central Warehouse</option>
                             <option value="outlet">Outlet</option>
-                            <option value="warehouse">Warehouse</option>
+                            <option value="outlet_warehouse">Outlet Warehouse</option>
+                            <option value="outlet_department">Outlet Department</option>
+                            <option value="department_warehouse">Department Warehouse</option>
                         </SearchableSelect>
                     </FormField>
                     <ModalActions
@@ -708,6 +723,314 @@ export function QuickCreateIngredientCategoryModal({
                         submitLabel="Create Category"
                         onCancel={close}
                     />
+                </form>
+            </DialogContent>
+        </Dialog>
+    );
+}
+
+export function QuickCreateOutletModal({
+    open,
+    onClose,
+}: {
+    open: boolean;
+    onClose: () => void;
+}) {
+    const { data, setData, post, processing, errors, reset } = useForm({
+        name: '',
+        code: '',
+        address: '',
+        is_active: true,
+        _redirect: currentUrl(),
+    });
+
+    function close() { reset(); onClose(); }
+    function submit(e: React.FormEvent) {
+        e.preventDefault();
+        post(outletsStore.url(), { preserveScroll: true, preserveState: true, onSuccess: close });
+    }
+
+    return (
+        <Dialog open={open} onOpenChange={(o) => { if (!o) close(); }}>
+            <DialogContent className="max-w-md bg-card">
+                <DialogHeader><DialogTitle>Add Outlet</DialogTitle></DialogHeader>
+                <form onSubmit={submit} className="space-y-4">
+                    <FormField label="Name" error={errors.name}>
+                        <Input value={data.name} onChange={(e) => setData('name', e.target.value)} placeholder="e.g. Main Branch" />
+                    </FormField>
+                    <FormField label="Code" error={errors.code}>
+                        <Input value={data.code} onChange={(e) => setData('code', e.target.value)} placeholder="e.g. MB" />
+                    </FormField>
+                    <FormField label="Address" error={errors.address}>
+                        <Input value={data.address} onChange={(e) => setData('address', e.target.value)} placeholder="e.g. 123 Main St" />
+                    </FormField>
+                    <ModalActions processing={processing} submitLabel="Create Outlet" onCancel={close} />
+                </form>
+            </DialogContent>
+        </Dialog>
+    );
+}
+
+export function QuickCreateOutletDepartmentModal({
+    open,
+    onClose,
+    outlets,
+    defaultOutletId = '',
+}: {
+    open: boolean;
+    onClose: () => void;
+    outlets: OutletOption[];
+    defaultOutletId?: string;
+}) {
+    const { data, setData, post, processing, errors, reset } = useForm({
+        outlet_id: defaultOutletId,
+        name: '',
+        code: '',
+        type: 'other',
+        is_active: true,
+        _redirect: currentUrl(),
+    });
+
+    useEffect(() => { if (open) setData('outlet_id', defaultOutletId); }, [defaultOutletId, open, setData]);
+
+    function close() { reset(); onClose(); }
+    function submit(e: React.FormEvent) {
+        e.preventDefault();
+        post(outletDepartmentsStore.url(), { preserveScroll: true, preserveState: true, onSuccess: close });
+    }
+
+    return (
+        <Dialog open={open} onOpenChange={(o) => { if (!o) close(); }}>
+            <DialogContent className="max-w-md bg-card">
+                <DialogHeader><DialogTitle>Add Department</DialogTitle></DialogHeader>
+                <form onSubmit={submit} className="space-y-4">
+                    <FormField label="Outlet" error={errors.outlet_id}>
+                        <SearchableSelect value={data.outlet_id} onChange={(e) => setData('outlet_id', e.target.value)}>
+                            <option value="">Select outlet...</option>
+                            {outlets.map((o) => <option key={o.id} value={String(o.id)}>{o.name}</option>)}
+                        </SearchableSelect>
+                    </FormField>
+                    <FormField label="Name" error={errors.name}>
+                        <Input value={data.name} onChange={(e) => setData('name', e.target.value)} placeholder="e.g. Kitchen" />
+                    </FormField>
+                    <div className="grid grid-cols-2 gap-4">
+                        <FormField label="Code" error={errors.code}>
+                            <Input value={data.code} onChange={(e) => setData('code', e.target.value)} placeholder="e.g. KIT" />
+                        </FormField>
+                        <FormField label="Type" error={errors.type}>
+                            <SearchableSelect value={data.type} onChange={(e) => setData('type', e.target.value)}>
+                                <option value="kitchen">Kitchen</option>
+                                <option value="bar">Bar</option>
+                                <option value="store">Store</option>
+                                <option value="prep">Prep</option>
+                                <option value="other">Other</option>
+                            </SearchableSelect>
+                        </FormField>
+                    </div>
+                    <ModalActions processing={processing} submitLabel="Create Department" onCancel={close} />
+                </form>
+            </DialogContent>
+        </Dialog>
+    );
+}
+
+export function QuickCreateWarehouseModal({
+    open,
+    onClose,
+    outlets,
+    defaultOutletId = '',
+}: {
+    open: boolean;
+    onClose: () => void;
+    outlets: OutletOption[];
+    defaultOutletId?: string;
+}) {
+    const { data, setData, post, processing, errors, reset } = useForm({
+        outlet_id: defaultOutletId,
+        name: '',
+        code: '',
+        type: 'outlet',
+        address: '',
+        is_active: true,
+        _redirect: currentUrl(),
+    });
+
+    useEffect(() => { if (open) setData('outlet_id', defaultOutletId); }, [defaultOutletId, open, setData]);
+
+    function close() { reset(); onClose(); }
+    function submit(e: React.FormEvent) {
+        e.preventDefault();
+        post(warehousesStore.url(), { preserveScroll: true, preserveState: true, onSuccess: close });
+    }
+
+    return (
+        <Dialog open={open} onOpenChange={(o) => { if (!o) close(); }}>
+            <DialogContent className="max-w-md bg-card">
+                <DialogHeader><DialogTitle>Add Warehouse</DialogTitle></DialogHeader>
+                <form onSubmit={submit} className="space-y-4">
+                    <FormField label="Type" error={errors.type}>
+                        <SearchableSelect value={data.type} onChange={(e) => setData('type', e.target.value)}>
+                            <option value="central">Central</option>
+                            <option value="outlet">Outlet</option>
+                            <option value="department">Department</option>
+                        </SearchableSelect>
+                    </FormField>
+                    {data.type !== 'central' && (
+                        <FormField label="Outlet" error={errors.outlet_id}>
+                            <SearchableSelect value={data.outlet_id} onChange={(e) => setData('outlet_id', e.target.value)}>
+                                <option value="">Select outlet...</option>
+                                {outlets.map((o) => <option key={o.id} value={String(o.id)}>{o.name}</option>)}
+                            </SearchableSelect>
+                        </FormField>
+                    )}
+                    <FormField label="Name" error={errors.name}>
+                        <Input value={data.name} onChange={(e) => setData('name', e.target.value)} placeholder="e.g. Main Store" />
+                    </FormField>
+                    <FormField label="Code" error={errors.code}>
+                        <Input value={data.code} onChange={(e) => setData('code', e.target.value)} placeholder="e.g. WH-01" />
+                    </FormField>
+                    <ModalActions processing={processing} submitLabel="Create Warehouse" onCancel={close} />
+                </form>
+            </DialogContent>
+        </Dialog>
+    );
+}
+
+export function QuickCreateFoodCategoryModal({
+    open,
+    onClose,
+}: {
+    open: boolean;
+    onClose: () => void;
+}) {
+    const { data, setData, post, processing, errors, reset } = useForm({
+        name: '',
+        description: '',
+        is_active: true,
+        _redirect: currentUrl(),
+    });
+
+    function close() { reset(); onClose(); }
+    function submit(e: React.FormEvent) {
+        e.preventDefault();
+        post(foodCategoriesStore.url(), { preserveScroll: true, preserveState: true, onSuccess: close });
+    }
+
+    return (
+        <Dialog open={open} onOpenChange={(o) => { if (!o) close(); }}>
+            <DialogContent className="max-w-md bg-card">
+                <DialogHeader><DialogTitle>Add Food Category</DialogTitle></DialogHeader>
+                <form onSubmit={submit} className="space-y-4">
+                    <FormField label="Name" error={errors.name}>
+                        <Input value={data.name} onChange={(e) => setData('name', e.target.value)} placeholder="e.g. Beverages" />
+                    </FormField>
+                    <FormField label="Description" error={errors.description}>
+                        <Input value={data.description} onChange={(e) => setData('description', e.target.value)} placeholder="Optional" />
+                    </FormField>
+                    <ModalActions processing={processing} submitLabel="Create Category" onCancel={close} />
+                </form>
+            </DialogContent>
+        </Dialog>
+    );
+}
+
+export function QuickCreateAddonGroupModal({
+    open,
+    onClose,
+}: {
+    open: boolean;
+    onClose: () => void;
+}) {
+    const { data, setData, post, processing, errors, reset } = useForm({
+        name: '',
+        is_required: false,
+        min_select: '1',
+        max_select: '',
+        sort_order: '0',
+        is_active: true,
+        _redirect: currentUrl(),
+    });
+
+    function close() { reset(); onClose(); }
+    function submit(e: React.FormEvent) {
+        e.preventDefault();
+        post(addonGroupsStore.url(), { preserveScroll: true, preserveState: true, onSuccess: close });
+    }
+
+    return (
+        <Dialog open={open} onOpenChange={(o) => { if (!o) close(); }}>
+            <DialogContent className="max-w-md bg-card">
+                <DialogHeader><DialogTitle>Add Add-on Group</DialogTitle></DialogHeader>
+                <form onSubmit={submit} className="space-y-4">
+                    <FormField label="Name" error={errors.name}>
+                        <Input value={data.name} onChange={(e) => setData('name', e.target.value)} placeholder="e.g. Toppings" />
+                    </FormField>
+                    <div className="grid grid-cols-2 gap-4">
+                        <FormField label="Min Select" error={errors.min_select}>
+                            <Input type="number" min={0} value={data.min_select} onChange={(e) => setData('min_select', e.target.value)} />
+                        </FormField>
+                        <FormField label="Max Select" error={errors.max_select}>
+                            <Input type="number" min={0} value={data.max_select} onChange={(e) => setData('max_select', e.target.value)} placeholder="Unlimited" />
+                        </FormField>
+                    </div>
+                    <FormField label="Required" error={errors.is_required}>
+                        <SearchableSelect value={data.is_required ? 'true' : 'false'} onChange={(e) => setData('is_required', e.target.value === 'true')}>
+                            <option value="false">No</option>
+                            <option value="true">Yes</option>
+                        </SearchableSelect>
+                    </FormField>
+                    <ModalActions processing={processing} submitLabel="Create Group" onCancel={close} />
+                </form>
+            </DialogContent>
+        </Dialog>
+    );
+}
+
+export function QuickCreateCityModal({
+    open,
+    onClose,
+    states,
+    defaultStateId = '',
+}: {
+    open: boolean;
+    onClose: () => void;
+    states: StateOption[];
+    defaultStateId?: string;
+}) {
+    const { data, setData, post, processing, errors, reset } = useForm({
+        state_id: defaultStateId,
+        name: '',
+        code: '',
+        is_active: true,
+        _redirect: currentUrl(),
+    });
+
+    useEffect(() => { if (open) setData('state_id', defaultStateId); }, [defaultStateId, open, setData]);
+
+    function close() { reset(); onClose(); }
+    function submit(e: React.FormEvent) {
+        e.preventDefault();
+        post(citiesStore.url(), { preserveScroll: true, preserveState: true, onSuccess: close });
+    }
+
+    return (
+        <Dialog open={open} onOpenChange={(o) => { if (!o) close(); }}>
+            <DialogContent className="max-w-md bg-card">
+                <DialogHeader><DialogTitle>Add City</DialogTitle></DialogHeader>
+                <form onSubmit={submit} className="space-y-4">
+                    <FormField label="State" error={errors.state_id}>
+                        <SearchableSelect value={data.state_id} onChange={(e) => setData('state_id', e.target.value)}>
+                            <option value="">Select state...</option>
+                            {states.map((s) => <option key={s.id} value={String(s.id)}>{s.name}</option>)}
+                        </SearchableSelect>
+                    </FormField>
+                    <FormField label="Name" error={errors.name}>
+                        <Input value={data.name} onChange={(e) => setData('name', e.target.value)} placeholder="e.g. Kathmandu" />
+                    </FormField>
+                    <FormField label="Code" error={errors.code}>
+                        <Input value={data.code} onChange={(e) => setData('code', e.target.value)} placeholder="e.g. KTM" />
+                    </FormField>
+                    <ModalActions processing={processing} submitLabel="Create City" onCancel={close} />
                 </form>
             </DialogContent>
         </Dialog>

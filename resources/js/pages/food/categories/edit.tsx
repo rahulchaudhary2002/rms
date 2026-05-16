@@ -2,10 +2,12 @@ import { Head, Link, useForm } from '@inertiajs/react';
 import { useEffect, useState } from 'react';
 import { FormSection } from '@/components/form-section';
 import { PageHeader } from '@/components/page-header';
+import { QuickCreateFoodCategoryModal } from '@/components/quick-create-modals';
 import { DropzoneUploader } from '@/components/ui/dropzone-uploader';
 import { FormField } from '@/components/ui/form-field';
 import { Input } from '@/components/ui/input';
 import { SearchableSelect } from '@/components/ui/searchable-select';
+import { useCan } from '@/hooks/use-can';
 import { dashboard } from '@/routes';
 import { index as categoriesIndex, update as categoriesUpdate } from '@/routes/food-categories';
 import type { FoodCategory } from '@/types';
@@ -16,6 +18,8 @@ type Props = {
 };
 
 export default function FoodCategoriesEdit({ category, parentCategories }: Props) {
+    const { can } = useCan();
+    const [modal, setModal] = useState<'parent' | null>(null);
     const [previewUrl, setPreviewUrl] = useState<string | null>(null);
     const [currentImageUrl, setCurrentImageUrl] = useState<string | null>(category.image_url ?? null);
     const { data, setData, post, processing, errors } = useForm({
@@ -88,7 +92,12 @@ export default function FoodCategoriesEdit({ category, parentCategories }: Props
                         </FormField>
 
                         <FormField label="Parent Category (optional)" error={errors.parent_id}>
-                            <SearchableSelect value={data.parent_id} onChange={(e) => setData('parent_id', e.target.value)}>
+                            <SearchableSelect
+                                value={data.parent_id}
+                                onChange={(e) => setData('parent_id', e.target.value)}
+                                onAddNew={can('food-categories-create') ? () => setModal('parent') : undefined}
+                                addNewLabel="Add Category"
+                            >
                                 <option value="">None (root category)</option>
                                 {parentCategories.filter((c) => c.id !== category.id).map((c) => (
                                     <option key={c.id} value={String(c.id)}>{c.name}</option>
@@ -150,6 +159,8 @@ export default function FoodCategoriesEdit({ category, parentCategories }: Props
                     </button>
                 </div>
             </form>
+
+            <QuickCreateFoodCategoryModal open={modal === 'parent'} onClose={() => setModal(null)} />
         </>
     );
 }

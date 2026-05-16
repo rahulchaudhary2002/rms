@@ -2,7 +2,7 @@ import { Head, Link, useForm } from '@inertiajs/react';
 import { useMemo, useState } from 'react';
 import { FormSection } from '@/components/form-section';
 import { PageHeader } from '@/components/page-header';
-import { QuickCreatePermissionModal, QuickCreateUserModal } from '@/components/quick-create-modals';
+import { QuickCreateOutletDepartmentModal, QuickCreateOutletModal, QuickCreatePermissionModal, QuickCreateUserModal, QuickCreateWarehouseModal } from '@/components/quick-create-modals';
 import { FormField } from '@/components/ui/form-field';
 import { Input } from '@/components/ui/input';
 import { SearchableSelect } from '@/components/ui/searchable-select';
@@ -50,7 +50,7 @@ export default function UserPermissionOverridesCreate({
     currentScope,
 }: Props) {
     const { can } = useCan();
-    const [modal, setModal] = useState<'user' | 'permission' | null>(null);
+    const [modal, setModal] = useState<'user' | 'permission' | 'outlet' | 'dept' | 'warehouse' | null>(null);
     const defaultScopeType = allowedScopeTypes[0] ?? 'global';
 
     const locked = {
@@ -194,6 +194,8 @@ export default function UserPermissionOverridesCreate({
                                         outlet_department_id: locked.department ? currentScope.outlet_department_id : '',
                                         warehouse_id: locked.warehouse ? currentScope.warehouse_id : '',
                                     })}
+                                    onAddNew={!locked.outlet && can('outlets-create') ? () => setModal('outlet') : undefined}
+                                    addNewLabel="Add Outlet"
                                 >
                                     <option value="">Select an outlet...</option>
                                     {allowedOutlets.map((o) => (
@@ -213,6 +215,8 @@ export default function UserPermissionOverridesCreate({
                                         outlet_department_id: e.target.value,
                                         warehouse_id: locked.warehouse ? currentScope.warehouse_id : '',
                                     })}
+                                    onAddNew={!locked.department && can('outlet-departments-create') ? () => setModal('dept') : undefined}
+                                    addNewLabel="Add Department"
                                 >
                                     <option value="">Select a department...</option>
                                     {filteredDepartments.map((d) => (
@@ -228,6 +232,8 @@ export default function UserPermissionOverridesCreate({
                                     value={data.warehouse_id}
                                     disabled={locked.warehouse || (needs.outlet && !data.outlet_id)}
                                     onChange={(e) => setData('warehouse_id', e.target.value)}
+                                    onAddNew={!locked.warehouse && can('warehouses-create') ? () => setModal('warehouse') : undefined}
+                                    addNewLabel="Add Warehouse"
                                 >
                                     <option value="">Select a warehouse...</option>
                                     {filteredWarehouses.map((w) => (
@@ -295,6 +301,19 @@ export default function UserPermissionOverridesCreate({
 
             <QuickCreateUserModal open={modal === 'user'} onClose={() => setModal(null)} />
             <QuickCreatePermissionModal open={modal === 'permission'} onClose={() => setModal(null)} />
+            <QuickCreateOutletModal open={modal === 'outlet'} onClose={() => setModal(null)} />
+            <QuickCreateOutletDepartmentModal
+                open={modal === 'dept'}
+                onClose={() => setModal(null)}
+                outlets={outlets}
+                defaultOutletId={data.outlet_id}
+            />
+            <QuickCreateWarehouseModal
+                open={modal === 'warehouse'}
+                onClose={() => setModal(null)}
+                outlets={outlets}
+                defaultOutletId={data.outlet_id}
+            />
         </>
     );
 }

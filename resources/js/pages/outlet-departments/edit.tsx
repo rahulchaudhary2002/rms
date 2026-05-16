@@ -1,9 +1,12 @@
 import { Head, Link, useForm } from '@inertiajs/react';
+import { useState } from 'react';
 import { FormSection } from '@/components/form-section';
 import { PageHeader } from '@/components/page-header';
+import { QuickCreateOutletModal } from '@/components/quick-create-modals';
 import { FormField } from '@/components/ui/form-field';
 import { Input } from '@/components/ui/input';
 import { SearchableSelect } from '@/components/ui/searchable-select';
+import { useCan } from '@/hooks/use-can';
 import { dashboard } from '@/routes';
 import {
     index as departmentsIndex,
@@ -27,6 +30,8 @@ type Props = {
 };
 
 export default function OutletDepartmentsEdit({ department, outlets }: Props) {
+    const { can } = useCan();
+    const [modal, setModal] = useState<'outlet' | null>(null);
     const { data, setData, put, processing, errors } = useForm({
         outlet_id:   String(department.outlet_id),
         name:        department.name,
@@ -68,6 +73,8 @@ export default function OutletDepartmentsEdit({ department, outlets }: Props) {
                             <SearchableSelect
                                 value={data.outlet_id}
                                 onChange={(e) => setData('outlet_id', e.target.value)}
+                                onAddNew={can('outlets-create') ? () => setModal('outlet') : undefined}
+                                addNewLabel="Add Outlet"
                             >
                                 <option value="">Select outlet…</option>
                                 {outlets.map((o) => (
@@ -163,6 +170,8 @@ export default function OutletDepartmentsEdit({ department, outlets }: Props) {
                     </button>
                 </div>
             </form>
+
+            <QuickCreateOutletModal open={modal === 'outlet'} onClose={() => setModal(null)} />
         </>
     );
 }

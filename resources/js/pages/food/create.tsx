@@ -1,9 +1,12 @@
 import { Head, Link, useForm } from '@inertiajs/react';
+import { useState } from 'react';
 import { FormSection } from '@/components/form-section';
 import { PageHeader } from '@/components/page-header';
+import { QuickCreateFoodCategoryModal } from '@/components/quick-create-modals';
 import { FormField } from '@/components/ui/form-field';
 import { Input } from '@/components/ui/input';
 import { SearchableSelect } from '@/components/ui/searchable-select';
+import { useCan } from '@/hooks/use-can';
 import { dashboard } from '@/routes';
 import { index as foodsIndex, store as foodsStore } from '@/routes/foods';
 import type { FoodCategory } from '@/types';
@@ -13,6 +16,8 @@ type Props = {
 };
 
 export default function FoodCreate({ categories }: Props) {
+    const { can } = useCan();
+    const [modal, setModal] = useState<'food-category' | null>(null);
     const { data, setData, post, processing, errors } = useForm({
         name: '',
         food_category_id: '',
@@ -59,7 +64,12 @@ export default function FoodCreate({ categories }: Props) {
                         </FormField>
 
                         <FormField label="Category" error={errors.food_category_id}>
-                            <SearchableSelect value={data.food_category_id} onChange={(e) => setData('food_category_id', e.target.value)}>
+                            <SearchableSelect
+                                value={data.food_category_id}
+                                onChange={(e) => setData('food_category_id', e.target.value)}
+                                onAddNew={can('food-categories-create') ? () => setModal('food-category') : undefined}
+                                addNewLabel="Add Category"
+                            >
                                 <option value="">None</option>
                                 {categories.map((c) => <option key={c.id} value={String(c.id)}>{c.name}</option>)}
                             </SearchableSelect>
@@ -177,6 +187,8 @@ export default function FoodCreate({ categories }: Props) {
                     </button>
                 </div>
             </form>
+
+            <QuickCreateFoodCategoryModal open={modal === 'food-category'} onClose={() => setModal(null)} />
         </>
     );
 }

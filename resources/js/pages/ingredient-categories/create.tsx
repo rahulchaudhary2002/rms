@@ -1,16 +1,21 @@
 import { Head, Link, useForm } from '@inertiajs/react';
-import { dashboard } from '@/routes';
-import { index as categoriesIndex, store as categoriesStore } from '@/routes/ingredient-categories';
-import { PageHeader } from '@/components/page-header';
+import { useState } from 'react';
 import { FormSection } from '@/components/form-section';
+import { PageHeader } from '@/components/page-header';
+import { QuickCreateIngredientCategoryModal } from '@/components/quick-create-modals';
 import { FormField } from '@/components/ui/form-field';
 import { Input } from '@/components/ui/input';
 import { SearchableSelect } from '@/components/ui/searchable-select';
+import { useCan } from '@/hooks/use-can';
+import { dashboard } from '@/routes';
+import { index as categoriesIndex, store as categoriesStore } from '@/routes/ingredient-categories';
 import type { IngredientCategory } from '@/types';
 
 type Props = { categories: Pick<IngredientCategory, 'id' | 'name' | 'slug'>[] };
 
 export default function IngredientCategoriesCreate({ categories }: Props) {
+    const { can } = useCan();
+    const [modal, setModal] = useState<'parent' | null>(null);
     const { data, setData, post, processing, errors } = useForm({
         name:      '',
         slug:      '',
@@ -83,6 +88,8 @@ export default function IngredientCategoriesCreate({ categories }: Props) {
                             <SearchableSelect
                                 value={data.parent_id}
                                 onChange={(e) => setData('parent_id', e.target.value)}
+                                onAddNew={can('ingredient-categories-create') ? () => setModal('parent') : undefined}
+                                addNewLabel="Add Category"
                             >
                                 <option value="">None (top-level)</option>
                                 {categories.map((cat) => (
@@ -117,6 +124,8 @@ export default function IngredientCategoriesCreate({ categories }: Props) {
                     </button>
                 </div>
             </form>
+
+            <QuickCreateIngredientCategoryModal open={modal === 'parent'} onClose={() => setModal(null)} />
         </>
     );
 }

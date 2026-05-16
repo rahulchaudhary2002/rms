@@ -1,9 +1,12 @@
 import { Head, Link, useForm } from '@inertiajs/react';
+import { useState } from 'react';
 import { FormSection } from '@/components/form-section';
 import { PageHeader } from '@/components/page-header';
+import { QuickCreateAddonGroupModal } from '@/components/quick-create-modals';
 import { FormField } from '@/components/ui/form-field';
 import { Input } from '@/components/ui/input';
 import { SearchableSelect } from '@/components/ui/searchable-select';
+import { useCan } from '@/hooks/use-can';
 import { dashboard } from '@/routes';
 import { index as addonsIndex } from '@/routes/addons';
 import type { Addon, AddonGroup } from '@/types';
@@ -16,6 +19,8 @@ type Props = {
 const addonShowUrl = (id: number) => `/addons/${id}`;
 
 export default function AddonEdit({ addon, groups }: Props) {
+    const { can } = useCan();
+    const [modal, setModal] = useState<'addon-group' | null>(null);
     const form = useForm({
         addon_group_id: addon.addon_group_id ? String(addon.addon_group_id) : '',
         name: addon.name,
@@ -54,7 +59,12 @@ export default function AddonEdit({ addon, groups }: Props) {
                 <FormSection title="Add-on Details" description="Update group, pricing, recipe flag and status.">
                     <div className="grid grid-cols-1 gap-5 md:grid-cols-2">
                         <FormField label="Group" error={form.errors.addon_group_id} className="md:col-span-2">
-                            <SearchableSelect value={form.data.addon_group_id} onChange={(e) => form.setData('addon_group_id', e.target.value)}>
+                            <SearchableSelect
+                                value={form.data.addon_group_id}
+                                onChange={(e) => form.setData('addon_group_id', e.target.value)}
+                                onAddNew={can('addon-groups-create') ? () => setModal('addon-group') : undefined}
+                                addNewLabel="Add Group"
+                            >
                                 <option value="">Select group...</option>
                                 {groups.map((group) => (
                                     <option key={group.id} value={String(group.id)}>{group.name}</option>
@@ -99,6 +109,8 @@ export default function AddonEdit({ addon, groups }: Props) {
                     </button>
                 </div>
             </form>
+
+            <QuickCreateAddonGroupModal open={modal === 'addon-group'} onClose={() => setModal(null)} />
         </>
     );
 }
