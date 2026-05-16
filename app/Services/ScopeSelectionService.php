@@ -98,7 +98,7 @@ class ScopeSelectionService
             'name'      => $warehouseName,
         ]);
 
-        $request->session()->put('current_scope_type', 'outlet_warehouse');
+        $request->session()->put('current_scope_type', 'warehouse');
         $request->session()->put('current_outlet_id', (string) $outlet->getKey());
         $request->session()->forget('current_department_id');
         $request->session()->put('current_node_id', (string) $warehouse->getKey());
@@ -114,8 +114,10 @@ class ScopeSelectionService
             throw ValidationException::withMessages(['warehouse_id' => 'Please select a central warehouse.']);
         }
 
-        if (! Warehouse::query()->whereKey($warehouseId)->where('type', 'central')->exists()) {
-            throw ValidationException::withMessages(['warehouse_id' => 'The selected warehouse is not available.']);
+        $warehouse = Warehouse::query()->where('type', 'central')->find($warehouseId);
+
+        if (! $warehouse) {
+            throw ValidationException::withMessages(['warehouse_id' => 'The selected central warehouse is not available.']);
         }
 
         $request->session()->put('current_scope_type', 'central_warehouse');
@@ -145,8 +147,10 @@ class ScopeSelectionService
             throw ValidationException::withMessages(['warehouse_id' => 'Please select an outlet and warehouse.']);
         }
 
-        if (! Warehouse::query()->whereKey($warehouseId)->where('outlet_id', $outletId)->where('type', 'outlet')->exists()) {
-            throw ValidationException::withMessages(['warehouse_id' => 'The selected warehouse is not available.']);
+        $warehouse = Warehouse::query()->where('type', 'outlet')->where('outlet_id', $outletId)->find($warehouseId);
+
+        if (! $warehouse) {
+            throw ValidationException::withMessages(['warehouse_id' => 'The selected warehouse is not available for this outlet.']);
         }
 
         $request->session()->put('current_scope_type', 'outlet_warehouse');
@@ -184,8 +188,10 @@ class ScopeSelectionService
             throw ValidationException::withMessages(['warehouse_id' => 'Please select an outlet, department, and warehouse.']);
         }
 
-        if (! Warehouse::query()->whereKey($warehouseId)->where('outlet_department_id', $departmentId)->where('type', 'department')->exists()) {
-            throw ValidationException::withMessages(['warehouse_id' => 'The selected warehouse is not available.']);
+        $warehouse = Warehouse::query()->where('type', 'department')->where('outlet_department_id', $departmentId)->find($warehouseId);
+
+        if (! $warehouse) {
+            throw ValidationException::withMessages(['warehouse_id' => 'The selected warehouse is not available for this department.']);
         }
 
         $request->session()->put('current_scope_type', 'department_warehouse');
@@ -201,24 +207,22 @@ class ScopeSelectionService
             ->where('scope_type', '!=', 'global')
             ->get(['scope_type', 'outlet_id', 'outlet_department_id', 'warehouse_id']);
 
-        $allowedOutletIds    = $assignments->whereNotNull('outlet_id')->pluck('outlet_id')->unique()->values()->toArray();
-        $allowedDeptIds      = $assignments->whereNotNull('outlet_department_id')->pluck('outlet_department_id')->unique()->values()->toArray();
-        $allowedWarehouseIds = $assignments->whereNotNull('warehouse_id')->pluck('warehouse_id')->unique()->values()->toArray();
+        $allowedOutletIds        = $assignments->where('scope_type', 'outlet')->whereNotNull('outlet_id')->pluck('outlet_id')->unique()->values()->toArray();
+        $allowedOutletWhIds      = $assignments->where('scope_type', 'outlet_warehouse')->whereNotNull('warehouse_id')->pluck('warehouse_id')->unique()->values()->toArray();
+        $allowedDeptIds          = $assignments->where('scope_type', 'outlet_department')->whereNotNull('outlet_department_id')->pluck('outlet_department_id')->unique()->values()->toArray();
+        $allowedDeptWhIds        = $assignments->where('scope_type', 'department_warehouse')->whereNotNull('warehouse_id')->pluck('warehouse_id')->unique()->values()->toArray();
+        $allowedCentralWhIds     = $assignments->where('scope_type', 'central_warehouse')->whereNotNull('warehouse_id')->pluck('warehouse_id')->unique()->values()->toArray();
 
         $outletId     = (int) ($data['outlet_id'] ?? 0);
         $departmentId = (int) ($data['department_id'] ?? 0);
         $warehouseId  = (int) ($data['warehouse_id'] ?? 0);
 
-        $hasOutlet    = in_array($outletId, $allowedOutletIds, true);
-        $hasDept      = in_array($departmentId, $allowedDeptIds, true);
-        $hasWarehouse = in_array($warehouseId, $allowedWarehouseIds, true);
-
         $error = match ($data['scope_type']) {
-            'central_warehouse'    => ! $hasWarehouse,
-            'outlet'               => ! $hasOutlet,
-            'outlet_warehouse'     => ! $hasOutlet && ! $hasWarehouse,
-            'outlet_department'    => ! $hasOutlet && ! $hasDept,
-            'department_warehouse' => ! $hasOutlet && ! $hasDept && ! $hasWarehouse,
+            'central_warehouse'    => ! in_array($warehouseId, $allowedCentralWhIds, true),
+            'outlet'               => ! in_array($outletId, $allowedOutletIds, true),
+            'outlet_warehouse'     => ! in_array($outletId, $allowedOutletIds, true) && ! in_array($warehouseId, $allowedOutletWhIds, true),
+            'outlet_department'    => ! in_array($outletId, $allowedOutletIds, true) && ! in_array($departmentId, $allowedDeptIds, true),
+            'department_warehouse' => ! in_array($outletId, $allowedOutletIds, true) && ! in_array($departmentId, $allowedDeptIds, true) && ! in_array($warehouseId, $allowedDeptWhIds, true),
             default                => true,
         };
 

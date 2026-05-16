@@ -49,14 +49,18 @@ class UserService
         $user->load([
             'roleAssignments' => function ($q) use ($scope) {
                 $q->with(['role', 'assignedBy', 'outlet', 'department', 'warehouse']);
-                $this->accessControl->applyScopeFilter($q, $scope);
+                if ($scope['type'] !== 'global') {
+                    $this->accessControl->applyScopeFilter($q, $scope);
+                }
             },
             'permissionOverrides' => function ($q) use ($actorPermissionIds, $scope) {
                 $q->with(['permission', 'assignedBy', 'outlet', 'department', 'warehouse']);
                 if ($actorPermissionIds !== null) {
                     $q->whereIn('permission_id', $actorPermissionIds);
                 }
-                $this->accessControl->applyScopeFilter($q, $scope);
+                if ($scope['type'] !== 'global') {
+                    $this->accessControl->applyScopeFilter($q, $scope);
+                }
             },
             'resourcePermissions' => function ($q) use ($actorPermissionIds, $actorAssignedScopes, $scope) {
                 $q->with(['permission', 'assignedBy']);
@@ -94,9 +98,10 @@ class UserService
         ]);
 
         $allowedLevels = match ($scope['type']) {
-            'outlet'    => ['outlet', 'outlet_warehouse', 'outlet_department', 'department_warehouse'],
-            'warehouse' => ['outlet_warehouse', 'central_warehouse', 'department_warehouse'],
-            default     => array_keys(config('access_control.scope_types', [])),
+            'outlet'     => ['outlet', 'department', 'warehouse'],
+            'department' => ['department', 'warehouse'],
+            'warehouse'  => ['warehouse'],
+            default      => array_keys(config('access_control.scope_types', [])),
         };
 
         $roles = Role::where('is_active', true)
@@ -108,9 +113,11 @@ class UserService
             ->when($actorPermissionIds !== null, fn ($q) => $q->whereIn('id', $actorPermissionIds))
             ->orderBy('module')->orderBy('action')->get(['id', 'name', 'slug', 'module', 'action']);
 
+        $isGlobal    = $this->accessControl->hasGlobalScopeRole($actor);
         $outlets     = Outlet::orderBy('name')->get(['id', 'name']);
         $departments = OutletDepartment::orderBy('name')->get(['id', 'outlet_id', 'name']);
-        $warehouses  = Warehouse::orderBy('name')->get(['id', 'outlet_id', 'outlet_department_id', 'name', 'type']);
+        $warehouses  = Warehouse::when(! $isGlobal, fn ($q) => $q->where('type', '!=', 'central'))
+            ->orderBy('name')->get(['id', 'outlet_id', 'outlet_department_id', 'name', 'type']);
 
         $allowedResourceIds = $this->resolveSessionConstrainedResourceIds($actorAssignedScopes, $scope);
 

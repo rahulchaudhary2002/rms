@@ -66,10 +66,10 @@ class HandleInertiaRequests extends Middleware
             return ['user' => null, 'roles' => [], 'permissions' => [], 'can' => []];
         }
 
-        [$scopeType, $outletId, $warehouseId] = $this->resolveCurrentScope($request);
+        [$scopeType, $outletId, $departmentId, $warehouseId] = $this->resolveCurrentScope($request);
 
-        $permissions = $this->accessControl->getUserPermissions($user, $scopeType, $outletId, $warehouseId);
-        $roles = $this->accessControl->getUserRoles($user, $scopeType, $outletId, $warehouseId)
+        $permissions = $this->accessControl->getUserPermissions($user, $scopeType, $outletId, $departmentId, $warehouseId);
+        $roles = $this->accessControl->getUserRoles($user, $scopeType, $outletId, $departmentId, $warehouseId)
             ->map(fn ($role) => ['id' => $role->id, 'name' => $role->name, 'slug' => $role->slug, 'level' => $role->level])
             ->values()
             ->all();
@@ -87,22 +87,19 @@ class HandleInertiaRequests extends Middleware
      */
     private function resolveCurrentScope(Request $request): array
     {
-        $scopeType = (string) $request->session()->get('current_scope_type', 'global');
-        $nodeId    = $request->session()->get('current_node_id');
-        $outletId  = $request->session()->get('current_outlet_id');
+        $scopeType    = (string) $request->session()->get('current_scope_type', 'global');
+        $outletId     = $request->session()->get('current_outlet_id');
+        $departmentId = $request->session()->get('current_department_id');
+        $nodeId       = $request->session()->get('current_node_id');
 
-        $warehouseScopes = ['central_warehouse', 'outlet_warehouse', 'department_warehouse'];
-        $outletScopes    = ['outlet', 'outlet_department'];
-
-        if (in_array($scopeType, $warehouseScopes) && $nodeId) {
-            return [$scopeType, $outletId ? (int) $outletId : null, (int) $nodeId];
-        }
-
-        if (in_array($scopeType, $outletScopes) && $outletId) {
-            return [$scopeType, (int) $outletId, null];
-        }
-
-        return ['global', null, null];
+        return match ($scopeType) {
+            'central_warehouse'    => [$scopeType, null,                              null,                                          $nodeId ? (int) $nodeId : null],
+            'outlet'               => [$scopeType, $outletId ? (int) $outletId : null, null,                                        null],
+            'outlet_warehouse'     => [$scopeType, $outletId ? (int) $outletId : null, null,                                        $nodeId ? (int) $nodeId : null],
+            'outlet_department'    => [$scopeType, $outletId ? (int) $outletId : null, $departmentId ? (int) $departmentId : null,  null],
+            'department_warehouse' => [$scopeType, $outletId ? (int) $outletId : null, $departmentId ? (int) $departmentId : null,  $nodeId ? (int) $nodeId : null],
+            default                => ['global', null, null, null],
+        };
     }
 
     /**
@@ -237,16 +234,17 @@ class HandleInertiaRequests extends Middleware
             $allAllowedOutletIds = array_unique(array_merge($allowed['outlet'], $outletIdsFromDepts, $outletIdsFromWarehouses));
         }
 
-        // --- Central warehouses ---
-        $centralWarehouses = DB::table('warehouses')
-            ->where('type', 'central')
-            ->whereNull('deleted_at')
-            ->when($allowed !== null, fn ($q) => $q->whereIn('id', $allowed['warehouse']))
-            ->orderBy('name')
-            ->get(['id', 'name'])
-            ->map(fn ($w) => ['id' => (string) $w->id, 'name' => (string) $w->name])
-            ->values()
-            ->all();
+        // --- Central warehouses (global users only) ---
+        $centralWarehouses = $canSelectGlobal
+            ? DB::table('warehouses')
+                ->where('type', 'central')
+                ->whereNull('deleted_at')
+                ->orderBy('name')
+                ->get(['id', 'name'])
+                ->map(fn ($w) => ['id' => (string) $w->id, 'name' => (string) $w->name])
+                ->values()
+                ->all()
+            : [];
 
         // --- Outlets ---
         $outlets = DB::table('outlets')

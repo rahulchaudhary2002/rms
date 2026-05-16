@@ -14,7 +14,7 @@ import type { Outlet, OutletDepartment, Permission, ScopeType, Warehouse } from 
 
 type User = { id: number; name: string; email: string };
 type ScopeTypeOption = { type: string; label: string };
-type AllowedScopes = { outlet: number[]; warehouse: number[] } | null;
+type AllowedScopes = { outlet: number[]; outlet_warehouse: number[]; outlet_department: number[]; department_warehouse: number[]; central_warehouse: number[] } | null;
 
 type Props = {
     users: User[];
@@ -77,22 +77,23 @@ export default function UserPermissionOverridesCreate({
     }, [departments, data.outlet_id]);
 
     const filteredWarehouses = useMemo(() => {
+        const scopeType = data.scope_type;
         let filtered = warehouses;
-        if (allowedScopes) {
-            filtered = filtered.filter((w) => allowedScopes.warehouse.includes(w.id));
-        }
-        if (data.scope_type === 'department_warehouse' && data.outlet_department_id) {
-            filtered = filtered.filter((w) => String(w.outlet_department_id) === data.outlet_department_id);
-        } else if (data.scope_type === 'outlet_warehouse' && data.outlet_id) {
-            filtered = filtered.filter((w) => String(w.outlet_id) === data.outlet_id);
-        } else if (data.scope_type === 'central_warehouse') {
+        if (scopeType === 'central_warehouse') {
             filtered = filtered.filter((w) => w.type === 'central');
+            if (allowedScopes) filtered = filtered.filter((w) => allowedScopes.central_warehouse.includes(w.id));
+        } else if (scopeType === 'outlet_warehouse') {
+            filtered = filtered.filter((w) => w.type === 'outlet' && String(w.outlet_id) === data.outlet_id);
+            if (allowedScopes) filtered = filtered.filter((w) => allowedScopes.outlet_warehouse.includes(w.id));
+        } else if (scopeType === 'department_warehouse') {
+            filtered = filtered.filter((w) => w.type === 'department' && String(w.outlet_department_id) === data.outlet_department_id);
+            if (allowedScopes) filtered = filtered.filter((w) => allowedScopes.department_warehouse.includes(w.id));
         }
         return filtered;
     }, [warehouses, allowedScopes, data.scope_type, data.outlet_id, data.outlet_department_id]);
 
     function handleScopeTypeChange(value: string) {
-        setData({ ...data, scope_type: value as ScopeType, outlet_id: '', outlet_department_id: '', warehouse_id: '' });
+        setData({ ...data, scope_type: value as ScopeType, outlet_id: '', outlet_department_id: '', warehouse_id: ''  });
     }
 
     function submit(e: React.FormEvent) {

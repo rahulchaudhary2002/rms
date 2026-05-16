@@ -207,8 +207,8 @@ export default function UserPermissionOverridesIndex({ overrides, users, permiss
                                         <SearchableSelect value={form.scope_type} onChange={(e) => setForm((c) => ({ ...c, scope_type: e.target.value }))}>
                                             <option value="">All Scopes</option>
                                             <option value="global">Global</option>
-                                            <option value="central_warehouse">Central Warehouse</option>
                                             <option value="outlet">Outlet</option>
+                                            <option value="central_warehouse">Central Warehouse</option>
                                             <option value="outlet_warehouse">Outlet Warehouse</option>
                                             <option value="outlet_department">Outlet Department</option>
                                             <option value="department_warehouse">Department Warehouse</option>

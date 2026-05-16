@@ -31,6 +31,7 @@ class AccessControlService
         string $permissionSlug,
         string $scopeType = 'global',
         ?int $outletId = null,
+        ?int $departmentId = null,
         ?int $warehouseId = null
     ): bool {
         $permission = $this->findPermission($permissionSlug);
@@ -39,11 +40,11 @@ class AccessControlService
             return false;
         }
 
-        if ($this->hasDenyOverride($user, $permission->id, $scopeType, $outletId, $warehouseId)) {
+        if ($this->hasDenyOverride($user, $permission->id, $scopeType, $outletId, $departmentId, $warehouseId)) {
             return false;
         }
 
-        if ($this->hasAllowOverride($user, $permission->id, $scopeType, $outletId, $warehouseId)) {
+        if ($this->hasAllowOverride($user, $permission->id, $scopeType, $outletId, $departmentId, $warehouseId)) {
             return true;
         }
 
@@ -51,7 +52,7 @@ class AccessControlService
             return true;
         }
 
-        return $this->roleGrantsPermission($user, $permission->id, $scopeType, $outletId, $warehouseId);
+        return $this->roleGrantsPermission($user, $permission->id, $scopeType, $outletId, $departmentId, $warehouseId);
     }
 
     public function userCanAccessResource(
@@ -88,12 +89,13 @@ class AccessControlService
         User $user,
         string $scopeType = 'global',
         ?int $outletId = null,
+        ?int $departmentId = null,
         ?int $warehouseId = null
     ): array {
-        $cacheKey = $this->permissionCacheKey($user->id, $scopeType, $outletId, $warehouseId);
+        $cacheKey = $this->permissionCacheKey($user->id, $scopeType, $outletId, $departmentId, $warehouseId);
 
-        return Cache::remember($cacheKey, self::CACHE_TTL, function () use ($user, $scopeType, $outletId, $warehouseId) {
-            return $this->resolveUserPermissions($user, $scopeType, $outletId, $warehouseId);
+        return Cache::remember($cacheKey, self::CACHE_TTL, function () use ($user, $scopeType, $outletId, $departmentId, $warehouseId) {
+            return $this->resolveUserPermissions($user, $scopeType, $outletId, $departmentId, $warehouseId);
         });
     }
 
@@ -101,20 +103,21 @@ class AccessControlService
         User $user,
         string $scopeType = 'global',
         ?int $outletId = null,
+        ?int $departmentId = null,
         ?int $warehouseId = null
     ): Collection {
         $query = UserRoleAssignment::with('role.permissions')
             ->where('user_id', $user->id)
             ->where('is_active', true)
             ->whereHas('role', fn ($q) => $q->where('is_active', true))
-            ->where(fn ($q) => $this->applyScopeCondition($q, $scopeType, $outletId, $warehouseId));
+            ->where(fn ($q) => $this->applyScopeCondition($q, $scopeType, $outletId, $departmentId, $warehouseId));
 
         return $query->get()->pluck('role')->filter()->values();
     }
 
     public function clearUserPermissionCache(User $user): void
     {
-        Cache::forget($this->permissionCacheKey($user->id, 'global', null, null));
+        Cache::forget($this->permissionCacheKey($user->id, 'global', null, null, null));
 
         $scopeSetKey = "user_permission_scope_keys:{$user->id}";
         $keys = Cache::get($scopeSetKey, []);
@@ -136,28 +139,14 @@ class AccessControlService
         $departmentId = $request->session()->get('current_department_id');
         $nodeId       = $request->session()->get('current_node_id');
 
-        $warehouseScopes = ['central_warehouse', 'outlet_warehouse', 'department_warehouse'];
-        $outletScopes    = ['outlet', 'outlet_department'];
-
-        if (in_array($scopeType, $warehouseScopes) && $nodeId) {
-            return [
-                'type'          => $scopeType,
-                'outlet_id'     => $outletId ? (int) $outletId : null,
-                'department_id' => $departmentId ? (int) $departmentId : null,
-                'warehouse_id'  => (int) $nodeId,
-            ];
-        }
-
-        if (in_array($scopeType, $outletScopes) && $outletId) {
-            return [
-                'type'          => $scopeType,
-                'outlet_id'     => (int) $outletId,
-                'department_id' => $departmentId ? (int) $departmentId : null,
-                'warehouse_id'  => null,
-            ];
-        }
-
-        return ['type' => 'global', 'outlet_id' => null, 'department_id' => null, 'warehouse_id' => null];
+        return match ($scopeType) {
+            'central_warehouse'    => ['type' => 'central_warehouse',    'outlet_id' => null,                            'department_id' => null,                                          'warehouse_id' => $nodeId ? (int) $nodeId : null],
+            'outlet'               => ['type' => 'outlet',               'outlet_id' => $outletId ? (int) $outletId : null, 'department_id' => null,                                       'warehouse_id' => null],
+            'outlet_warehouse'     => ['type' => 'outlet_warehouse',     'outlet_id' => $outletId ? (int) $outletId : null, 'department_id' => null,                                       'warehouse_id' => $nodeId ? (int) $nodeId : null],
+            'outlet_department'    => ['type' => 'outlet_department',    'outlet_id' => $outletId ? (int) $outletId : null, 'department_id' => $departmentId ? (int) $departmentId : null, 'warehouse_id' => null],
+            'department_warehouse' => ['type' => 'department_warehouse', 'outlet_id' => $outletId ? (int) $outletId : null, 'department_id' => $departmentId ? (int) $departmentId : null, 'warehouse_id' => $nodeId ? (int) $nodeId : null],
+            default                => ['type' => 'global',               'outlet_id' => null,                            'department_id' => null,                                          'warehouse_id' => null],
+        };
     }
 
     /**
@@ -168,16 +157,51 @@ class AccessControlService
         return $query->where(function ($q) use ($scope) {
             $q->where('scope_type', 'global');
 
-            if ($scope['type'] === 'outlet' && ($scope['outlet_id'] ?? null) !== null) {
-                $q->orWhere(fn ($q2) => $q2->where('scope_type', 'outlet')->where('outlet_id', $scope['outlet_id']));
-            } elseif ($scope['type'] === 'warehouse') {
-                if (($scope['outlet_id'] ?? null) !== null) {
-                    $q->orWhere(fn ($q2) => $q2->where('scope_type', 'outlet')->where('outlet_id', $scope['outlet_id']));
+            $type        = $scope['type'];
+            $outletId    = $scope['outlet_id'] ?? null;
+            $deptId      = $scope['department_id'] ?? null;
+            $warehouseId = $scope['warehouse_id'] ?? null;
+
+            if ($type === 'central_warehouse' && $warehouseId !== null) {
+                $q->orWhere(fn ($q2) => $q2->where('scope_type', 'central_warehouse')->where('warehouse_id', $warehouseId));
+            }
+
+            if ($type === 'outlet' && $outletId !== null) {
+                // outlet scope: show all records directly or nested under this outlet
+                $q->orWhere(fn ($q2) => $q2->where('scope_type', 'outlet')->where('outlet_id', $outletId));
+                $q->orWhere(fn ($q2) => $q2->where('scope_type', 'outlet_warehouse')->where('outlet_id', $outletId));
+                $q->orWhere(fn ($q2) => $q2->where('scope_type', 'outlet_department')->where('outlet_id', $outletId));
+                $q->orWhere(fn ($q2) => $q2->where('scope_type', 'department_warehouse')->where('outlet_id', $outletId));
+            }
+
+            if ($type === 'outlet_warehouse') {
+                if ($outletId !== null) {
+                    $q->orWhere(fn ($q2) => $q2->where('scope_type', 'outlet')->where('outlet_id', $outletId));
                 }
-                if (($scope['warehouse_id'] ?? null) !== null) {
-                    $q->orWhere(fn ($q2) => $q2
-                        ->whereIn('scope_type', ['outlet_warehouse', 'central_warehouse', 'department_warehouse'])
-                        ->where('warehouse_id', $scope['warehouse_id']));
+                if ($warehouseId !== null) {
+                    $q->orWhere(fn ($q2) => $q2->where('scope_type', 'outlet_warehouse')->where('warehouse_id', $warehouseId));
+                }
+            }
+
+            if ($type === 'outlet_department') {
+                if ($outletId !== null) {
+                    $q->orWhere(fn ($q2) => $q2->where('scope_type', 'outlet')->where('outlet_id', $outletId));
+                }
+                if ($deptId !== null) {
+                    $q->orWhere(fn ($q2) => $q2->where('scope_type', 'outlet_department')->where('outlet_department_id', $deptId));
+                    $q->orWhere(fn ($q2) => $q2->where('scope_type', 'department_warehouse')->where('outlet_department_id', $deptId));
+                }
+            }
+
+            if ($type === 'department_warehouse') {
+                if ($outletId !== null) {
+                    $q->orWhere(fn ($q2) => $q2->where('scope_type', 'outlet')->where('outlet_id', $outletId));
+                }
+                if ($deptId !== null) {
+                    $q->orWhere(fn ($q2) => $q2->where('scope_type', 'outlet_department')->where('outlet_department_id', $deptId));
+                }
+                if ($warehouseId !== null) {
+                    $q->orWhere(fn ($q2) => $q2->where('scope_type', 'department_warehouse')->where('warehouse_id', $warehouseId));
                 }
             }
         });
@@ -194,19 +218,17 @@ class AccessControlService
             ->whereHas('role', fn ($q) => $q->where('is_active', true))
             ->pluck('scope_type');
 
-        if ($scopeTypes->contains('global')) {
-            return 'global';
+        foreach (['global', 'central_warehouse', 'outlet', 'outlet_warehouse', 'outlet_department', 'department_warehouse'] as $level) {
+            if ($scopeTypes->contains($level)) {
+                return $level;
+            }
         }
 
-        if ($scopeTypes->intersect(['outlet', 'outlet_department'])->isNotEmpty()) {
-            return 'outlet';
-        }
-
-        return 'warehouse';
+        return 'outlet_warehouse';
     }
 
     /**
-     * @return array{outlet_ids: int[], warehouse_ids: int[]}|null
+     * @return array{outlet_ids: int[], department_ids: int[], warehouse_ids: int[]}|null
      */
     public function getActorAssignedScopeIds(User $actor): ?array
     {
@@ -217,15 +239,16 @@ class AccessControlService
         $assignments = UserRoleAssignment::where('user_role_assignments.user_id', $actor->id)
             ->where('user_role_assignments.is_active', true)
             ->whereHas('role', fn ($q) => $q->where('is_active', true))
-            ->get(['scope_type', 'outlet_id', 'warehouse_id']);
+            ->get(['scope_type', 'outlet_id', 'outlet_department_id', 'warehouse_id']);
 
         if ($assignments->contains('scope_type', 'global')) {
             return null;
         }
 
         return [
-            'outlet_ids'    => $assignments->whereNotNull('outlet_id')->pluck('outlet_id')->unique()->values()->all(),
-            'warehouse_ids' => $assignments->whereNotNull('warehouse_id')->pluck('warehouse_id')->unique()->values()->all(),
+            'outlet_ids'     => $assignments->whereNotNull('outlet_id')->pluck('outlet_id')->unique()->values()->all(),
+            'department_ids' => $assignments->whereNotNull('outlet_department_id')->pluck('outlet_department_id')->unique()->values()->all(),
+            'warehouse_ids'  => $assignments->whereNotNull('warehouse_id')->pluck('warehouse_id')->unique()->values()->all(),
         ];
     }
 
@@ -264,7 +287,7 @@ class AccessControlService
     }
 
     /**
-     * @return array{outlet: int[], warehouse: int[]}|null
+     * @return array{outlet: int[], outlet_warehouse: int[], outlet_department: int[], department_warehouse: int[], central_warehouse: int[]}|null
      */
     public function resolveAllowedScopes(User $actor): ?array
     {
@@ -282,11 +305,19 @@ class AccessControlService
         $assignments = UserRoleAssignment::where('user_id', $actor->id)
             ->where('is_active', true)
             ->where('scope_type', '!=', 'global')
-            ->get(['scope_type', 'outlet_id', 'warehouse_id']);
+            ->get(['scope_type', 'outlet_id', 'outlet_department_id', 'warehouse_id']);
 
         return [
-            'outlet'    => $assignments->whereNotNull('outlet_id')->pluck('outlet_id')->unique()->values()->toArray(),
-            'warehouse' => $assignments->whereNotNull('warehouse_id')->pluck('warehouse_id')->unique()->values()->toArray(),
+            'outlet'              => $assignments->where('scope_type', 'outlet')->whereNotNull('outlet_id')
+                                         ->pluck('outlet_id')->unique()->values()->toArray(),
+            'outlet_warehouse'    => $assignments->where('scope_type', 'outlet_warehouse')->whereNotNull('warehouse_id')
+                                         ->pluck('warehouse_id')->unique()->values()->toArray(),
+            'outlet_department'   => $assignments->where('scope_type', 'outlet_department')->whereNotNull('outlet_department_id')
+                                         ->pluck('outlet_department_id')->unique()->values()->toArray(),
+            'department_warehouse'=> $assignments->where('scope_type', 'department_warehouse')->whereNotNull('warehouse_id')
+                                         ->pluck('warehouse_id')->unique()->values()->toArray(),
+            'central_warehouse'   => $assignments->where('scope_type', 'central_warehouse')->whereNotNull('warehouse_id')
+                                         ->pluck('warehouse_id')->unique()->values()->toArray(),
         ];
     }
 
@@ -296,9 +327,13 @@ class AccessControlService
     public function resolveAllowedScopeTypes(User $actor): array
     {
         return match ($this->getActorMaxScopeLevel($actor)) {
-            'global' => self::SCOPE_TYPES,
-            'outlet' => ['outlet', 'outlet_warehouse', 'outlet_department', 'department_warehouse'],
-            default  => ['outlet_warehouse', 'central_warehouse', 'department_warehouse'],
+            'global'               => self::SCOPE_TYPES,
+            'central_warehouse'    => ['central_warehouse'],
+            'outlet'               => ['outlet', 'outlet_warehouse', 'outlet_department', 'department_warehouse'],
+            'outlet_warehouse'     => ['outlet_warehouse'],
+            'outlet_department'    => ['outlet_department', 'department_warehouse'],
+            'department_warehouse' => ['department_warehouse'],
+            default                => ['outlet_warehouse'],
         };
     }
 
@@ -313,20 +348,7 @@ class AccessControlService
 
             $q->orWhereHas('roleAssignments', function ($q2) use ($scope) {
                 $q2->where('is_active', true)->where(function ($q3) use ($scope) {
-                    $q3->where('scope_type', 'global');
-
-                    if ($scope['type'] === 'outlet' && ($scope['outlet_id'] ?? null) !== null) {
-                        $q3->orWhere(fn ($q4) => $q4->where('scope_type', 'outlet')->where('outlet_id', $scope['outlet_id']));
-                    } elseif ($scope['type'] === 'warehouse') {
-                        if (($scope['outlet_id'] ?? null) !== null) {
-                            $q3->orWhere(fn ($q4) => $q4->where('scope_type', 'outlet')->where('outlet_id', $scope['outlet_id']));
-                        }
-                        if (($scope['warehouse_id'] ?? null) !== null) {
-                            $q3->orWhere(fn ($q4) => $q4
-                                ->whereIn('scope_type', ['outlet_warehouse', 'central_warehouse', 'department_warehouse'])
-                                ->where('warehouse_id', $scope['warehouse_id']));
-                        }
-                    }
+                    $this->applyScopeCondition($q3, $scope['type'], $scope['outlet_id'] ?? null, $scope['department_id'] ?? null, $scope['warehouse_id'] ?? null);
                 });
             });
         });
@@ -343,6 +365,7 @@ class AccessControlService
         Role $targetRole,
         string $targetScopeType,
         ?int $targetOutletId,
+        ?int $targetDepartmentId,
         ?int $targetWarehouseId
     ): void {
         if (! $targetRole->is_active) {
@@ -376,16 +399,66 @@ class AccessControlService
             throw new AuthorizationException('You cannot assign an equal or higher-ranked role.');
         }
 
-        if ($actorAssignment->scope_type !== 'global' && $actorAssignment->scope_type !== $targetScopeType) {
-            throw new AuthorizationException('Invalid role assignment scope.');
+        if ($actorAssignment->scope_type === 'global') {
+            return;
         }
 
-        if ($actorAssignment->outlet_id !== null && $actorAssignment->outlet_id !== $targetOutletId) {
-            throw new AuthorizationException('You cannot assign a role outside your outlet scope.');
+        if ($targetScopeType === 'global') {
+            throw new AuthorizationException('You cannot assign global scope roles.');
         }
 
-        if ($actorAssignment->warehouse_id !== null && $actorAssignment->warehouse_id !== $targetWarehouseId) {
-            throw new AuthorizationException('You cannot assign a role outside your warehouse scope.');
+        // Each actor scope type may only assign into specific target scope types
+        $allowedTargetScopes = match ($actorAssignment->scope_type) {
+            'central_warehouse'    => ['central_warehouse'],
+            'outlet'               => ['outlet', 'outlet_warehouse', 'outlet_department', 'department_warehouse'],
+            'outlet_warehouse'     => ['outlet_warehouse'],
+            'outlet_department'    => ['outlet_department', 'department_warehouse'],
+            'department_warehouse' => ['department_warehouse'],
+            default                => [],
+        };
+
+        if (! in_array($targetScopeType, $allowedTargetScopes, true)) {
+            throw new AuthorizationException('You cannot assign a role with a broader or unrelated scope.');
+        }
+
+        // Containment checks per actor scope type
+        if ($actorAssignment->scope_type === 'central_warehouse') {
+            if ($actorAssignment->warehouse_id !== $targetWarehouseId) {
+                throw new AuthorizationException('You cannot assign roles outside your central warehouse scope.');
+            }
+        }
+
+        if ($actorAssignment->scope_type === 'outlet') {
+            if ($targetOutletId !== null && $actorAssignment->outlet_id !== $targetOutletId) {
+                throw new AuthorizationException('You cannot assign a role outside your outlet scope.');
+            }
+        }
+
+        if ($actorAssignment->scope_type === 'outlet_warehouse') {
+            if ($actorAssignment->warehouse_id !== $targetWarehouseId) {
+                throw new AuthorizationException('You cannot assign roles outside your outlet warehouse scope.');
+            }
+        }
+
+        if ($actorAssignment->scope_type === 'outlet_department') {
+            if ($targetOutletId !== null && $actorAssignment->outlet_id !== $targetOutletId) {
+                throw new AuthorizationException('You cannot assign a role outside your outlet scope.');
+            }
+            if ($targetDepartmentId !== null && $actorAssignment->outlet_department_id !== $targetDepartmentId) {
+                throw new AuthorizationException('You cannot assign a role outside your department scope.');
+            }
+            if ($targetScopeType === 'department_warehouse' && $targetWarehouseId !== null) {
+                $whDeptId = \App\Models\Warehouse::where('id', $targetWarehouseId)->value('outlet_department_id');
+                if ($whDeptId !== $actorAssignment->outlet_department_id) {
+                    throw new AuthorizationException('You cannot assign a warehouse role outside your department.');
+                }
+            }
+        }
+
+        if ($actorAssignment->scope_type === 'department_warehouse') {
+            if ($actorAssignment->warehouse_id !== $targetWarehouseId) {
+                throw new AuthorizationException('You cannot assign roles outside your department warehouse scope.');
+            }
         }
     }
 
@@ -439,32 +512,68 @@ class AccessControlService
         $baseScopeTypes = $this->resolveAllowedScopeTypes($actor);
         $baseScopes     = $this->resolveAllowedScopes($actor);
 
-        if ($sessionScope['type'] === 'outlet') {
-            $outletId = (int) $sessionScope['outlet_id'];
+        $emptyScopes = ['outlet' => [], 'outlet_warehouse' => [], 'outlet_department' => [], 'department_warehouse' => [], 'central_warehouse' => []];
 
-            $allowedScopeTypes = array_values(array_intersect($baseScopeTypes, ['outlet', 'outlet_warehouse', 'outlet_department', 'department_warehouse']));
+        [$allowedScopeTypes, $allowedScopes] = match ($sessionScope['type']) {
+            'central_warehouse' => (function () use ($sessionScope, $baseScopeTypes, $baseScopes, $emptyScopes) {
+                $whId  = (int) $sessionScope['warehouse_id'];
+                $types = array_values(array_intersect($baseScopeTypes, ['central_warehouse']));
+                $scopes = $baseScopes === null
+                    ? array_merge($emptyScopes, ['central_warehouse' => [$whId]])
+                    : array_merge($emptyScopes, ['central_warehouse' => in_array($whId, $baseScopes['central_warehouse'], true) ? [$whId] : []]);
+                return [$types, $scopes];
+            })(),
 
-            $warehouseIds = DB::table('warehouses')
-                ->where('outlet_id', $outletId)
-                ->pluck('id')
-                ->map(fn ($id) => (int) $id)
-                ->toArray();
+            'outlet' => (function () use ($sessionScope, $baseScopeTypes, $baseScopes, $emptyScopes) {
+                $outletId  = (int) $sessionScope['outlet_id'];
+                $types     = array_values(array_intersect($baseScopeTypes, ['outlet', 'outlet_warehouse', 'outlet_department', 'department_warehouse']));
+                $deptIds   = DB::table('outlet_departments')->where('outlet_id', $outletId)->pluck('id')->map(fn ($id) => (int) $id)->toArray();
+                $outletWhIds = DB::table('warehouses')->where('outlet_id', $outletId)->where('type', 'outlet')->pluck('id')->map(fn ($id) => (int) $id)->toArray();
+                $deptWhIds   = DB::table('warehouses')->where('outlet_id', $outletId)->where('type', 'department')->pluck('id')->map(fn ($id) => (int) $id)->toArray();
+                $scopes = $baseScopes === null
+                    ? array_merge($emptyScopes, ['outlet' => [$outletId], 'outlet_warehouse' => $outletWhIds, 'outlet_department' => $deptIds, 'department_warehouse' => $deptWhIds])
+                    : array_merge($emptyScopes, [
+                        'outlet'               => in_array($outletId, $baseScopes['outlet'], true) ? [$outletId] : [],
+                        'outlet_warehouse'     => array_values(array_intersect($outletWhIds, $baseScopes['outlet_warehouse'])),
+                        'outlet_department'    => array_values(array_intersect($deptIds, $baseScopes['outlet_department'])),
+                        'department_warehouse' => array_values(array_intersect($deptWhIds, $baseScopes['department_warehouse'])),
+                    ]);
+                return [$types, $scopes];
+            })(),
 
-            $allowedScopes = $baseScopes === null
-                ? ['outlet' => [$outletId], 'warehouse' => $warehouseIds]
-                : [
-                    'outlet'    => in_array($outletId, $baseScopes['outlet'], true) ? [$outletId] : [],
-                    'warehouse' => array_values(array_intersect($warehouseIds, $baseScopes['warehouse'])),
-                ];
-        } elseif ($sessionScope['type'] === 'warehouse') {
-            $warehouseId = (int) $sessionScope['warehouse_id'];
+            'outlet_warehouse' => (function () use ($sessionScope, $baseScopeTypes, $baseScopes, $emptyScopes) {
+                $whId  = (int) $sessionScope['warehouse_id'];
+                $types = array_values(array_intersect($baseScopeTypes, ['outlet_warehouse']));
+                $scopes = $baseScopes === null
+                    ? array_merge($emptyScopes, ['outlet_warehouse' => [$whId]])
+                    : array_merge($emptyScopes, ['outlet_warehouse' => in_array($whId, $baseScopes['outlet_warehouse'], true) ? [$whId] : []]);
+                return [$types, $scopes];
+            })(),
 
-            $allowedScopeTypes = array_values(array_intersect($baseScopeTypes, ['outlet_warehouse', 'central_warehouse', 'department_warehouse']));
-            $allowedScopes     = ['outlet' => [], 'warehouse' => [$warehouseId]];
-        } else {
-            $allowedScopeTypes = $baseScopeTypes;
-            $allowedScopes     = $baseScopes;
-        }
+            'outlet_department' => (function () use ($sessionScope, $baseScopeTypes, $baseScopes, $emptyScopes) {
+                $deptId = (int) $sessionScope['department_id'];
+                $types  = array_values(array_intersect($baseScopeTypes, ['outlet_department', 'department_warehouse']));
+                $deptWhIds = DB::table('warehouses')->where('outlet_department_id', $deptId)->pluck('id')->map(fn ($id) => (int) $id)->toArray();
+                $scopes = $baseScopes === null
+                    ? array_merge($emptyScopes, ['outlet_department' => [$deptId], 'department_warehouse' => $deptWhIds])
+                    : array_merge($emptyScopes, [
+                        'outlet_department'    => in_array($deptId, $baseScopes['outlet_department'], true) ? [$deptId] : [],
+                        'department_warehouse' => array_values(array_intersect($deptWhIds, $baseScopes['department_warehouse'])),
+                    ]);
+                return [$types, $scopes];
+            })(),
+
+            'department_warehouse' => (function () use ($sessionScope, $baseScopeTypes, $baseScopes, $emptyScopes) {
+                $whId  = (int) $sessionScope['warehouse_id'];
+                $types = array_values(array_intersect($baseScopeTypes, ['department_warehouse']));
+                $scopes = $baseScopes === null
+                    ? array_merge($emptyScopes, ['department_warehouse' => [$whId]])
+                    : array_merge($emptyScopes, ['department_warehouse' => in_array($whId, $baseScopes['department_warehouse'], true) ? [$whId] : []]);
+                return [$types, $scopes];
+            })(),
+
+            default => [$baseScopeTypes, $baseScopes ?? $emptyScopes],
+        };
 
         return [
             'allowedScopes'     => $allowedScopes,
@@ -473,7 +582,7 @@ class AccessControlService
         ];
     }
 
-    public function assertActorCanMutateScopedRecord(User $actor, string $scopeType, ?int $outletId, ?int $warehouseId = null): void
+    public function assertActorCanMutateScopedRecord(User $actor, string $scopeType, ?int $outletId, ?int $departmentId = null, ?int $warehouseId = null): void
     {
         if ($this->hasGlobalScopeRole($actor)) {
             return;
@@ -489,16 +598,51 @@ class AccessControlService
             abort(403, 'You cannot manage global-scope records.');
         }
 
-        if ($outletId !== null && in_array($outletId, $allowedScopes['outlet'], true)) {
-            return;
+        if ($scopeType === 'central_warehouse') {
+            if ($warehouseId !== null && in_array($warehouseId, $allowedScopes['central_warehouse'], true)) {
+                return;
+            }
+            abort(403, 'This record is outside your scope.');
         }
 
-        if ($warehouseId !== null && in_array($warehouseId, $allowedScopes['warehouse'], true)) {
-            return;
+        if ($scopeType === 'outlet') {
+            if ($outletId !== null && in_array($outletId, $allowedScopes['outlet'], true)) {
+                return;
+            }
+            abort(403, 'This record is outside your scope.');
         }
 
-        if ($warehouseId !== null && $outletId !== null && in_array($outletId, $allowedScopes['outlet'], true)) {
-            return;
+        if ($scopeType === 'outlet_warehouse') {
+            if ($outletId !== null && in_array($outletId, $allowedScopes['outlet'], true)) {
+                return;
+            }
+            if ($warehouseId !== null && in_array($warehouseId, $allowedScopes['outlet_warehouse'], true)) {
+                return;
+            }
+            abort(403, 'This record is outside your scope.');
+        }
+
+        if ($scopeType === 'outlet_department') {
+            if ($outletId !== null && in_array($outletId, $allowedScopes['outlet'], true)) {
+                return;
+            }
+            if ($departmentId !== null && in_array($departmentId, $allowedScopes['outlet_department'], true)) {
+                return;
+            }
+            abort(403, 'This record is outside your scope.');
+        }
+
+        if ($scopeType === 'department_warehouse') {
+            if ($outletId !== null && in_array($outletId, $allowedScopes['outlet'], true)) {
+                return;
+            }
+            if ($departmentId !== null && in_array($departmentId, $allowedScopes['outlet_department'], true)) {
+                return;
+            }
+            if ($warehouseId !== null && in_array($warehouseId, $allowedScopes['department_warehouse'], true)) {
+                return;
+            }
+            abort(403, 'This record is outside your scope.');
         }
 
         abort(403, 'This record is outside your scope.');
@@ -513,15 +657,15 @@ class AccessControlService
         return UserRoleAssignment::where('user_id', $user->id)
             ->where('scope_type', 'global')
             ->where('is_active', true)
-            ->whereHas('role', fn ($q) => $q->where('level', 'global')->where('is_active', true))
+            ->whereHas('role', fn ($q) => $q->where('is_active', true))
             ->exists();
     }
 
-    private function resolveUserPermissions(User $user, string $scopeType, ?int $outletId, ?int $warehouseId): array
+    private function resolveUserPermissions(User $user, string $scopeType, ?int $outletId, ?int $departmentId, ?int $warehouseId): array
     {
         $permissions = [];
 
-        $roles = $this->getUserRoles($user, $scopeType, $outletId, $warehouseId);
+        $roles = $this->getUserRoles($user, $scopeType, $outletId, $departmentId, $warehouseId);
         foreach ($roles as $role) {
             foreach ($role->permissions as $permission) {
                 if ($permission->is_active) {
@@ -534,7 +678,7 @@ class AccessControlService
             ->with('permission')
             ->where('is_active', true)
             ->whereHas('permission', fn ($q) => $q->where('is_active', true))
-            ->where(fn ($q) => $this->applyScopeCondition($q, $scopeType, $outletId, $warehouseId))
+            ->where(fn ($q) => $this->applyScopeCondition($q, $scopeType, $outletId, $departmentId, $warehouseId))
             ->get();
 
         foreach ($overrides->where('effect', 'allow') as $override) {
@@ -557,31 +701,31 @@ class AccessControlService
         return $permissions;
     }
 
-    private function hasDenyOverride(User $user, int $permissionId, string $scopeType, ?int $outletId, ?int $warehouseId): bool
+    private function hasDenyOverride(User $user, int $permissionId, string $scopeType, ?int $outletId, ?int $departmentId, ?int $warehouseId): bool
     {
         return $user->permissionOverrides()
             ->where('permission_id', $permissionId)
             ->where('effect', 'deny')
             ->where('is_active', true)
-            ->where(fn ($q) => $this->applyScopeCondition($q, $scopeType, $outletId, $warehouseId))
+            ->where(fn ($q) => $this->applyScopeCondition($q, $scopeType, $outletId, $departmentId, $warehouseId))
             ->exists();
     }
 
-    private function hasAllowOverride(User $user, int $permissionId, string $scopeType, ?int $outletId, ?int $warehouseId): bool
+    private function hasAllowOverride(User $user, int $permissionId, string $scopeType, ?int $outletId, ?int $departmentId, ?int $warehouseId): bool
     {
         return $user->permissionOverrides()
             ->where('permission_id', $permissionId)
             ->where('effect', 'allow')
             ->where('is_active', true)
-            ->where(fn ($q) => $this->applyScopeCondition($q, $scopeType, $outletId, $warehouseId))
+            ->where(fn ($q) => $this->applyScopeCondition($q, $scopeType, $outletId, $departmentId, $warehouseId))
             ->exists();
     }
 
-    private function roleGrantsPermission(User $user, int $permissionId, string $scopeType, ?int $outletId, ?int $warehouseId): bool
+    private function roleGrantsPermission(User $user, int $permissionId, string $scopeType, ?int $outletId, ?int $departmentId, ?int $warehouseId): bool
     {
         return UserRoleAssignment::where('user_id', $user->id)
             ->where('is_active', true)
-            ->where(fn ($q) => $this->applyScopeCondition($q, $scopeType, $outletId, $warehouseId))
+            ->where(fn ($q) => $this->applyScopeCondition($q, $scopeType, $outletId, $departmentId, $warehouseId))
             ->whereHas('role', function ($q) use ($permissionId) {
                 $q->where('is_active', true)
                     ->whereHas('permissions', fn ($q2) => $q2->where('permissions.id', $permissionId)->where('is_active', true));
@@ -589,24 +733,40 @@ class AccessControlService
             ->exists();
     }
 
-    private function applyScopeCondition(\Illuminate\Database\Eloquent\Builder|\Illuminate\Database\Query\Builder $query, string $scopeType, ?int $outletId, ?int $warehouseId): void
+    private function applyScopeCondition(\Illuminate\Database\Eloquent\Builder|\Illuminate\Database\Query\Builder $query, string $scopeType, ?int $outletId, ?int $departmentId, ?int $warehouseId): void
     {
         if ($scopeType === 'global') {
             $query->where('scope_type', 'global');
             return;
         }
 
-        $query->where(function ($q) use ($outletId, $warehouseId) {
+        $query->where(function ($q) use ($scopeType, $outletId, $departmentId, $warehouseId) {
             $q->where('scope_type', 'global');
 
-            if ($outletId !== null) {
-                $q->orWhere(fn ($q2) => $q2->whereIn('scope_type', ['outlet', 'outlet_department'])->where('outlet_id', $outletId));
+            // central_warehouse: only global + that central_warehouse applies
+            if ($scopeType === 'central_warehouse' && $warehouseId !== null) {
+                $q->orWhere(fn ($q2) => $q2->where('scope_type', 'central_warehouse')->where('warehouse_id', $warehouseId));
+                return;
             }
 
-            if ($warehouseId !== null) {
-                $q->orWhere(fn ($q2) => $q2
-                    ->whereIn('scope_type', ['outlet_warehouse', 'central_warehouse', 'department_warehouse'])
-                    ->where('warehouse_id', $warehouseId));
+            // outlet-level and below: global + outlet applies
+            if ($outletId !== null) {
+                $q->orWhere(fn ($q2) => $q2->where('scope_type', 'outlet')->where('outlet_id', $outletId));
+            }
+
+            // outlet_department / department_warehouse: also apply outlet_department records
+            if (in_array($scopeType, ['outlet_department', 'department_warehouse'], true) && $departmentId !== null) {
+                $q->orWhere(fn ($q2) => $q2->where('scope_type', 'outlet_department')->where('outlet_department_id', $departmentId));
+            }
+
+            // outlet_warehouse scope: apply outlet_warehouse records
+            if ($scopeType === 'outlet_warehouse' && $warehouseId !== null) {
+                $q->orWhere(fn ($q2) => $q2->where('scope_type', 'outlet_warehouse')->where('warehouse_id', $warehouseId));
+            }
+
+            // department_warehouse scope: apply department_warehouse records
+            if ($scopeType === 'department_warehouse' && $warehouseId !== null) {
+                $q->orWhere(fn ($q2) => $q2->where('scope_type', 'department_warehouse')->where('warehouse_id', $warehouseId));
             }
         });
     }
@@ -616,9 +776,9 @@ class AccessControlService
         return Permission::where('slug', $slug)->where('is_active', true)->first();
     }
 
-    private function permissionCacheKey(int $userId, string $scopeType, ?int $outletId, ?int $warehouseId): string
+    private function permissionCacheKey(int $userId, string $scopeType, ?int $outletId, ?int $departmentId, ?int $warehouseId): string
     {
-        $key = "user_permissions:{$userId}:{$scopeType}:o" . ($outletId ?? 'null') . ':w' . ($warehouseId ?? 'null');
+        $key = "user_permissions:{$userId}:{$scopeType}:o" . ($outletId ?? 'null') . ':d' . ($departmentId ?? 'null') . ':w' . ($warehouseId ?? 'null');
 
         if ($scopeType !== 'global') {
             $scopeSetKey = "user_permission_scope_keys:{$userId}";

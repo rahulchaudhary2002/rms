@@ -51,7 +51,7 @@ type User = {
     resource_permissions: ResourcePermission[];
 };
 
-type AllowedScopes = { outlet: number[]; warehouse: number[] } | null;
+type AllowedScopes = { outlet: number[]; outlet_warehouse: number[]; outlet_department: number[]; department_warehouse: number[]; central_warehouse: number[] } | null;
 type AllowedResourceIds = { outlet_ids: number[]; warehouse_ids: number[] } | null;
 
 type Outlet = { id: number; name: string };
@@ -135,11 +135,19 @@ function AssignRoleModal({ open, onClose, userId, roles, outlets, departments, w
     const allowedOutlets = allowedScopes ? outlets.filter((o) => allowedScopes.outlet.includes(o.id)) : outlets;
     const filteredDepts = data.outlet_id ? departments.filter((d) => String(d.outlet_id) === data.outlet_id) : departments;
     const filteredWhs = (() => {
-        let list = allowedScopes ? warehouses.filter((w) => allowedScopes.warehouse.includes(w.id)) : warehouses;
-        if (data.scope_type === 'central_warehouse') list = list.filter((w) => w.type === 'central');
-        else if (data.scope_type === 'department_warehouse' && data.outlet_department_id) list = list.filter((w) => String(w.outlet_department_id) === data.outlet_department_id);
-        else if (data.scope_type === 'outlet_warehouse' && data.outlet_id) list = list.filter((w) => String(w.outlet_id) === data.outlet_id);
-        return list;
+        const st = data.scope_type;
+        let whs = warehouses;
+        if (st === 'central_warehouse') {
+            whs = whs.filter((w) => w.type === 'central');
+            if (allowedScopes) whs = whs.filter((w) => allowedScopes.central_warehouse.includes(w.id));
+        } else if (st === 'outlet_warehouse') {
+            whs = whs.filter((w) => w.type === 'outlet' && String(w.outlet_id) === data.outlet_id);
+            if (allowedScopes) whs = whs.filter((w) => allowedScopes.outlet_warehouse.includes(w.id));
+        } else if (st === 'department_warehouse') {
+            whs = whs.filter((w) => w.type === 'department' && String(w.outlet_department_id) === data.outlet_department_id);
+            if (allowedScopes) whs = whs.filter((w) => allowedScopes.department_warehouse.includes(w.id));
+        }
+        return whs;
     })();
 
     function handleRoleChange(roleId: string) {
@@ -233,11 +241,19 @@ function AddOverrideModal({ open, onClose, userId, permissions, outlets, departm
     const allowedOutlets = allowedScopes ? outlets.filter((o) => allowedScopes.outlet.includes(o.id)) : outlets;
     const filteredDepts = data.outlet_id ? departments.filter((d) => String(d.outlet_id) === data.outlet_id) : departments;
     const filteredWhs = (() => {
-        let list = allowedScopes ? warehouses.filter((w) => allowedScopes.warehouse.includes(w.id)) : warehouses;
-        if (data.scope_type === 'central_warehouse') list = list.filter((w) => w.type === 'central');
-        else if (data.scope_type === 'department_warehouse' && data.outlet_department_id) list = list.filter((w) => String(w.outlet_department_id) === data.outlet_department_id);
-        else if (data.scope_type === 'outlet_warehouse' && data.outlet_id) list = list.filter((w) => String(w.outlet_id) === data.outlet_id);
-        return list;
+        const st = data.scope_type;
+        let whs = warehouses;
+        if (st === 'central_warehouse') {
+            whs = whs.filter((w) => w.type === 'central');
+            if (allowedScopes) whs = whs.filter((w) => allowedScopes.central_warehouse.includes(w.id));
+        } else if (st === 'outlet_warehouse') {
+            whs = whs.filter((w) => w.type === 'outlet' && String(w.outlet_id) === data.outlet_id);
+            if (allowedScopes) whs = whs.filter((w) => allowedScopes.outlet_warehouse.includes(w.id));
+        } else if (st === 'department_warehouse') {
+            whs = whs.filter((w) => w.type === 'department' && String(w.outlet_department_id) === data.outlet_department_id);
+            if (allowedScopes) whs = whs.filter((w) => allowedScopes.department_warehouse.includes(w.id));
+        }
+        return whs;
     })();
 
     function submit(e: { preventDefault(): void }) {

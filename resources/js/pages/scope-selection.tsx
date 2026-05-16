@@ -39,9 +39,6 @@ type Selected = {
     warehouse_id: string;
 };
 
-const WAREHOUSE_SCOPES: ScopeType[] = ['central_warehouse', 'outlet_warehouse', 'department_warehouse'];
-const OUTLET_SCOPES: ScopeType[]    = ['outlet', 'outlet_department'];
-
 function isValid(s: Selected): boolean {
     if (s.scope_type === 'global')               return true;
     if (s.scope_type === 'central_warehouse')    return s.warehouse_id !== '';
@@ -135,17 +132,13 @@ export default function ScopeSelection() {
 
         setProcessing(true);
 
-        const needsOutlet    = OUTLET_SCOPES.includes(selected.scope_type as ScopeType) || WAREHOUSE_SCOPES.includes(selected.scope_type as ScopeType);
-        const needsDept      = selected.scope_type === 'outlet_department' || selected.scope_type === 'department_warehouse';
-        const needsWarehouse = WAREHOUSE_SCOPES.includes(selected.scope_type as ScopeType);
-
         router.post(
             scopeSelectionStore.url(),
             {
                 scope_type:    selected.scope_type,
-                outlet_id:     needsOutlet    ? selected.outlet_id     : null,
-                department_id: needsDept      ? selected.department_id : null,
-                warehouse_id:  needsWarehouse ? selected.warehouse_id  : null,
+                outlet_id:     selected.outlet_id || null,
+                department_id: selected.department_id || null,
+                warehouse_id:  selected.warehouse_id || null,
                 redirect_to:   dashboard.url(),
             } as Record<string, string | null>,
             {

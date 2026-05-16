@@ -28,7 +28,9 @@ class UserRoleAssignmentService
             ->whereHas('user', fn ($q) => $q->where('is_superadmin', false))
             ->when($actorMinRank !== null, fn ($b) => $b->whereHas('role', fn ($q) => $q->where('rank', '>', $actorMinRank)));
 
-        $this->accessControl->applyScopeFilter($query, $scope);
+        if ($scope['type'] !== 'global') {
+            $this->accessControl->applyScopeFilter($query, $scope);
+        }
 
         $query->when($filters['search'] !== '', function ($b) use ($filters) {
                 $search = '%'.$filters['search'].'%';
@@ -63,9 +65,10 @@ class UserRoleAssignmentService
         )->orderBy('name')->get(['id', 'name', 'email']);
 
         $allowedLevels = match ($scope['type']) {
-            'outlet'    => ['outlet', 'outlet_warehouse', 'outlet_department', 'department_warehouse'],
-            'warehouse' => ['outlet_warehouse', 'central_warehouse', 'department_warehouse'],
-            default     => array_keys(config('access_control.scope_types', [])),
+            'outlet'     => ['outlet', 'department', 'warehouse'],
+            'department' => ['department', 'warehouse'],
+            'warehouse'  => ['warehouse'],
+            default      => array_keys(config('access_control.scope_types', [])),
         };
 
         $roles = Role::where('is_active', true)
@@ -73,9 +76,11 @@ class UserRoleAssignmentService
             ->whereIn('level', $allowedLevels)
             ->orderBy('name')->get(['id', 'name', 'slug', 'level']);
 
+        $isGlobal    = $this->accessControl->hasGlobalScopeRole($actor);
         $outlets     = Outlet::orderBy('name')->get(['id', 'name']);
         $departments = OutletDepartment::orderBy('name')->get(['id', 'outlet_id', 'name']);
-        $warehouses  = Warehouse::orderBy('name')->get(['id', 'outlet_id', 'outlet_department_id', 'name', 'type']);
+        $warehouses  = Warehouse::when(! $isGlobal, fn ($q) => $q->where('type', '!=', 'central'))
+            ->orderBy('name')->get(['id', 'outlet_id', 'outlet_department_id', 'name', 'type']);
 
         return array_merge(
             compact('users', 'roles', 'outlets', 'departments', 'warehouses'),
@@ -85,15 +90,17 @@ class UserRoleAssignmentService
 
     public function assign(User $actor, array $data): void
     {
-        $targetRole  = Role::findOrFail($data['role_id']);
-        $outletId    = !empty($data['outlet_id']) ? (int) $data['outlet_id'] : null;
-        $warehouseId = !empty($data['warehouse_id']) ? (int) $data['warehouse_id'] : null;
+        $targetRole   = Role::findOrFail($data['role_id']);
+        $outletId     = !empty($data['outlet_id']) ? (int) $data['outlet_id'] : null;
+        $departmentId = !empty($data['outlet_department_id']) ? (int) $data['outlet_department_id'] : null;
+        $warehouseId  = !empty($data['warehouse_id']) ? (int) $data['warehouse_id'] : null;
 
         $this->accessControl->authorizeRoleAssignment(
             $actor,
             $targetRole,
             $data['scope_type'],
             $outletId,
+            $departmentId,
             $warehouseId,
         );
 
@@ -123,7 +130,7 @@ class UserRoleAssignmentService
     {
         /** @var \App\Models\User $actor */
         $actor = Auth::user();
-        $this->accessControl->assertActorCanMutateScopedRecord($actor, $assignment->scope_type, $assignment->outlet_id, $assignment->warehouse_id);
+        $this->accessControl->assertActorCanMutateScopedRecord($actor, $assignment->scope_type, $assignment->outlet_id, $assignment->outlet_department_id, $assignment->warehouse_id);
         $assignment->update(['is_active' => $isActive]);
         /** @var \App\Models\User $assignmentUser */
         $assignmentUser = $assignment->user()->first();
@@ -134,7 +141,7 @@ class UserRoleAssignmentService
     {
         /** @var \App\Models\User $actor */
         $actor = Auth::user();
-        $this->accessControl->assertActorCanMutateScopedRecord($actor, $assignment->scope_type, $assignment->outlet_id, $assignment->warehouse_id);
+        $this->accessControl->assertActorCanMutateScopedRecord($actor, $assignment->scope_type, $assignment->outlet_id, $assignment->outlet_department_id, $assignment->warehouse_id);
         /** @var \App\Models\User $user */
         $user = $assignment->user()->first();
         $assignment->delete();

@@ -34,9 +34,6 @@ type Pending = {
     warehouse_id: string | null;
 };
 
-const WAREHOUSE_SCOPES: ScopeType[] = ['central_warehouse', 'outlet_warehouse', 'department_warehouse'];
-const OUTLET_SCOPES: ScopeType[]    = ['outlet', 'outlet_department'];
-
 function pendingChanged(pending: Pending, ns: NodeSelectionData): boolean {
     return (
         pending.scope_type    !== ns.current_scope_type ||
@@ -127,17 +124,14 @@ export function OutletNodeSwitcher() {
         if (!nodeSelection?.selection_url || pending.scope_type === null || processing) return;
 
         setProcessing(true);
-        const needsOutlet    = OUTLET_SCOPES.includes(pending.scope_type) || WAREHOUSE_SCOPES.includes(pending.scope_type);
-        const needsDept      = pending.scope_type === 'outlet_department' || pending.scope_type === 'department_warehouse';
-        const needsWarehouse = WAREHOUSE_SCOPES.includes(pending.scope_type);
 
         router.post(
             nodeSelection.selection_url,
             {
                 scope_type:    pending.scope_type,
-                outlet_id:     needsOutlet    ? pending.outlet_id     : null,
-                department_id: needsDept      ? pending.department_id : null,
-                warehouse_id:  needsWarehouse ? pending.warehouse_id  : null,
+                outlet_id:     pending.outlet_id,
+                department_id: pending.department_id,
+                warehouse_id:  pending.warehouse_id,
                 redirect_to:   window.location.pathname,
             } as Record<string, string | null>,
             {

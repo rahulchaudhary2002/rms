@@ -28,7 +28,9 @@ class UserPermissionOverrideService
             ->whereHas('user', fn ($q) => $q->where('is_superadmin', false))
             ->when($actorPermissionIds !== null, fn ($b) => $b->whereIn('permission_id', $actorPermissionIds));
 
-        $this->accessControl->applyScopeFilter($query, $scope);
+        if ($scope['type'] !== 'global') {
+            $this->accessControl->applyScopeFilter($query, $scope);
+        }
 
         $query->when($filters['search'] !== '', function ($b) use ($filters) {
                 $search = '%'.$filters['search'].'%';
@@ -113,7 +115,7 @@ class UserPermissionOverrideService
     {
         /** @var \App\Models\User $actor */
         $actor = Auth::user();
-        $this->accessControl->assertActorCanMutateScopedRecord($actor, $override->scope_type, $override->outlet_id, $override->warehouse_id);
+        $this->accessControl->assertActorCanMutateScopedRecord($actor, $override->scope_type, $override->outlet_id, $override->outlet_department_id, $override->warehouse_id);
         $override->update(['is_active' => $isActive]);
         /** @var \App\Models\User $overrideUser */
         $overrideUser = $override->user()->first();
@@ -124,7 +126,7 @@ class UserPermissionOverrideService
     {
         /** @var \App\Models\User $actor */
         $actor = Auth::user();
-        $this->accessControl->assertActorCanMutateScopedRecord($actor, $override->scope_type, $override->outlet_id, $override->warehouse_id);
+        $this->accessControl->assertActorCanMutateScopedRecord($actor, $override->scope_type, $override->outlet_id, $override->outlet_department_id, $override->warehouse_id);
         /** @var \App\Models\User $user */
         $user = $override->user()->first();
         $override->delete();

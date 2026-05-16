@@ -49,14 +49,38 @@ trait InteractsWithScope
             ];
         }
 
-        if ($scope['type'] === 'warehouse') {
+        if ($scope['type'] === 'outlet_warehouse') {
             $warehouseId = (int) $scope['warehouse_id'];
 
             return [
                 'outlet_ids'    => [],
                 'warehouse_ids' => $actorAssignedScopes === null || in_array($warehouseId, $actorAssignedScopes['warehouse_ids'], true)
-                    ? [$warehouseId]
-                    : [],
+                    ? [$warehouseId] : [],
+            ];
+        }
+
+        if ($scope['type'] === 'outlet_department') {
+            $deptId       = (int) $scope['department_id'];
+            $warehouseIds = DB::table('warehouses')
+                ->where('outlet_department_id', $deptId)->pluck('id')->map(fn ($id) => (int) $id)->toArray();
+
+            if ($actorAssignedScopes === null) {
+                return ['outlet_ids' => [], 'warehouse_ids' => $warehouseIds];
+            }
+
+            return [
+                'outlet_ids'    => [],
+                'warehouse_ids' => array_values(array_intersect($warehouseIds, $actorAssignedScopes['warehouse_ids'])),
+            ];
+        }
+
+        if ($scope['type'] === 'department_warehouse' || $scope['type'] === 'central_warehouse') {
+            $warehouseId = (int) $scope['warehouse_id'];
+
+            return [
+                'outlet_ids'    => [],
+                'warehouse_ids' => $actorAssignedScopes === null || in_array($warehouseId, $actorAssignedScopes['warehouse_ids'], true)
+                    ? [$warehouseId] : [],
             ];
         }
 
