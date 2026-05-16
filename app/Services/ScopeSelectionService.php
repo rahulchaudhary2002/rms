@@ -220,9 +220,9 @@ class ScopeSelectionService
         $error = match ($data['scope_type']) {
             'central_warehouse'    => ! in_array($warehouseId, $allowedCentralWhIds, true),
             'outlet'               => ! in_array($outletId, $allowedOutletIds, true),
-            'outlet_warehouse'     => ! in_array($outletId, $allowedOutletIds, true) && ! in_array($warehouseId, $allowedOutletWhIds, true),
-            'outlet_department'    => ! in_array($outletId, $allowedOutletIds, true) && ! in_array($departmentId, $allowedDeptIds, true),
-            'department_warehouse' => ! in_array($outletId, $allowedOutletIds, true) && ! in_array($departmentId, $allowedDeptIds, true) && ! in_array($warehouseId, $allowedDeptWhIds, true),
+            'outlet_warehouse'     => ! in_array($warehouseId, $allowedOutletWhIds, true),
+            'outlet_department'    => ! in_array($departmentId, $allowedDeptIds, true),
+            'department_warehouse' => ! in_array($warehouseId, $allowedDeptWhIds, true),
             default                => true,
         };
 

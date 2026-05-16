@@ -234,6 +234,30 @@ class HandleInertiaRequests extends Middleware
             $allAllowedOutletIds = array_unique(array_merge($allowed['outlet'], $outletIdsFromDepts, $outletIdsFromWarehouses));
         }
 
+        // --- Direct-assignment IDs for selectability flags ---
+        $directOutletIds = [];
+        $directDeptIds   = [];
+
+        if ($allowed !== null) {
+            $rawAssignments = UserRoleAssignment::where('user_id', $user->id)
+                ->where('is_active', true)
+                ->get(['scope_type', 'outlet_id', 'outlet_department_id']);
+
+            $directOutletIds = $rawAssignments
+                ->where('scope_type', 'outlet')
+                ->whereNotNull('outlet_id')
+                ->pluck('outlet_id')
+                ->map(fn ($id) => (int) $id)
+                ->unique()->values()->toArray();
+
+            $directDeptIds = $rawAssignments
+                ->where('scope_type', 'outlet_department')
+                ->whereNotNull('outlet_department_id')
+                ->pluck('outlet_department_id')
+                ->map(fn ($id) => (int) $id)
+                ->unique()->values()->toArray();
+        }
+
         // --- Central warehouses (global users only) ---
         $centralWarehouses = $canSelectGlobal
             ? DB::table('warehouses')
@@ -305,15 +329,16 @@ class HandleInertiaRequests extends Middleware
         $deptByOutlet = $depts->groupBy('outlet_id');
         $whByDept    = $deptWhs->groupBy('outlet_department_id');
 
-        $outletData = $outlets->map(function ($outlet) use ($whByOutlet, $deptByOutlet, $whByDept) {
+        $outletData = $outlets->map(function ($outlet) use ($whByOutlet, $deptByOutlet, $whByDept, $allowed, $directOutletIds, $directDeptIds) {
             $directWhs = ($whByOutlet[$outlet->id] ?? collect())
                 ->map(fn ($w) => ['id' => (string) $w->id, 'name' => (string) $w->name])
                 ->values()->all();
 
-            $deptList = ($deptByOutlet[$outlet->id] ?? collect())->map(function ($dept) use ($whByDept) {
+            $deptList = ($deptByOutlet[$outlet->id] ?? collect())->map(function ($dept) use ($whByDept, $allowed, $directDeptIds) {
                 return [
                     'id'         => (string) $dept->id,
                     'name'       => (string) $dept->name,
+                    'selectable' => $allowed === null || in_array((int) $dept->id, $directDeptIds),
                     'warehouses' => ($whByDept[$dept->id] ?? collect())
                         ->map(fn ($w) => ['id' => (string) $w->id, 'name' => (string) $w->name])
                         ->values()->all(),
@@ -323,6 +348,7 @@ class HandleInertiaRequests extends Middleware
             return [
                 'id'          => (string) $outlet->id,
                 'name'        => (string) $outlet->name,
+                'selectable'  => $allowed === null || in_array((int) $outlet->id, $directOutletIds),
                 'warehouses'  => $directWhs,
                 'departments' => $deptList,
             ];

@@ -10,9 +10,9 @@ import type { ScopeType } from '@/types';
 
 type CentralWarehouse = { id: string; name: string };
 type DeptWarehouse    = { id: string; name: string };
-type Department       = { id: string; name: string; warehouses: DeptWarehouse[] };
+type Department       = { id: string; name: string; selectable?: boolean; warehouses: DeptWarehouse[] };
 type OutletWarehouse  = { id: string; name: string };
-type OutletItem       = { id: string; name: string; warehouses: OutletWarehouse[]; departments: Department[] };
+type OutletItem       = { id: string; name: string; selectable?: boolean; warehouses: OutletWarehouse[]; departments: Department[] };
 
 type NodeSelectionData = {
     setup_completed: boolean;
@@ -207,19 +207,25 @@ export default function ScopeSelection() {
                                     const outletExpanded = openOutlet === outlet.id;
                                     const hasChildren    = outlet.warehouses.length > 0 || outlet.departments.length > 0;
 
+                                    const outletSelectable = outlet.selectable !== false;
+
                                     return (
                                         <div key={outlet.id} className="rounded-lg border border-border/30 bg-card/50 dark:bg-background/30">
                                             {/* Outlet row */}
                                             <ScopeButton
                                                 icon="storefront"
                                                 label={outlet.name}
-                                                badge="Outlet"
+                                                badge={outletSelectable ? 'Outlet' : undefined}
                                                 selected={outletSelected}
                                                 expanded={outletExpanded}
                                                 hasChildren={hasChildren}
                                                 onClick={() => {
-                                                    sel({ scope_type: 'outlet', outlet_id: outlet.id, department_id: '', warehouse_id: '' });
-                                                    setOpenOutlet(outletExpanded && !outletSelected ? null : outlet.id);
+                                                    if (outletSelectable) {
+                                                        sel({ scope_type: 'outlet', outlet_id: outlet.id, department_id: '', warehouse_id: '' });
+                                                        setOpenOutlet(outletExpanded && !outletSelected ? null : outlet.id);
+                                                    } else {
+                                                        setOpenOutlet(outletExpanded ? null : outlet.id);
+                                                    }
                                                 }}
                                             />
 
@@ -245,9 +251,10 @@ export default function ScopeSelection() {
 
                                                         {/* Departments */}
                                                         {outlet.departments.map((dept) => {
-                                                            const deptSelected = selected.scope_type === 'outlet_department' && selected.department_id === dept.id;
-                                                            const deptExpanded = openDept === dept.id;
-                                                            const hasDeptWh    = dept.warehouses.length > 0;
+                                                            const deptSelected   = selected.scope_type === 'outlet_department' && selected.department_id === dept.id;
+                                                            const deptExpanded   = openDept === dept.id;
+                                                            const hasDeptWh      = dept.warehouses.length > 0;
+                                                            const deptSelectable = dept.selectable !== false;
 
                                                             return (
                                                                 <div key={dept.id}>
@@ -255,13 +262,17 @@ export default function ScopeSelection() {
                                                                     <ScopeButton
                                                                         icon="meeting_room"
                                                                         label={dept.name}
-                                                                        badge="Department"
+                                                                        badge={deptSelectable ? 'Department' : undefined}
                                                                         selected={deptSelected}
                                                                         expanded={deptExpanded}
                                                                         hasChildren={hasDeptWh}
                                                                         onClick={() => {
-                                                                            sel({ scope_type: 'outlet_department', outlet_id: outlet.id, department_id: dept.id, warehouse_id: '' });
-                                                                            if (hasDeptWh) setOpenDept(deptExpanded && !deptSelected ? null : dept.id);
+                                                                            if (deptSelectable) {
+                                                                                sel({ scope_type: 'outlet_department', outlet_id: outlet.id, department_id: dept.id, warehouse_id: '' });
+                                                                                if (hasDeptWh) setOpenDept(deptExpanded && !deptSelected ? null : dept.id);
+                                                                            } else if (hasDeptWh) {
+                                                                                setOpenDept(deptExpanded ? null : dept.id);
+                                                                            }
                                                                         }}
                                                                     />
 
