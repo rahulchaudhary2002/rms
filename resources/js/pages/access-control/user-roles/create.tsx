@@ -15,6 +15,7 @@ import type { Outlet, OutletDepartment, Role, ScopeType, Warehouse } from '@/typ
 
 type User = { id: number; name: string; email: string };
 type AllowedScopes = { outlet: number[]; outlet_warehouse: number[]; outlet_department: number[]; department_warehouse: number[]; central_warehouse: number[] } | null;
+type CurrentScope = { type: string; outlet_id: string; outlet_department_id: string; warehouse_id: string };
 
 type Props = {
     users: User[];
@@ -23,6 +24,7 @@ type Props = {
     departments: OutletDepartment[];
     warehouses: Warehouse[];
     allowedScopes: AllowedScopes;
+    currentScope: CurrentScope;
 };
 
 const SCOPE_NEEDS: Record<string, { outlet: boolean; department: boolean; warehouse: boolean }> = {
@@ -34,17 +36,23 @@ const SCOPE_NEEDS: Record<string, { outlet: boolean; department: boolean; wareho
     department_warehouse: { outlet: true,  department: true,  warehouse: true  },
 };
 
-export default function UserRolesCreate({ users, roles, outlets, departments, warehouses, allowedScopes }: Props) {
+export default function UserRolesCreate({ users, roles, outlets, departments, warehouses, allowedScopes, currentScope }: Props) {
     const { can } = useCan();
     const [modal, setModal] = useState<'user' | 'role' | null>(null);
+
+    const locked = {
+        outlet:     ['outlet', 'outlet_warehouse', 'outlet_department', 'department_warehouse'].includes(currentScope.type),
+        department: ['outlet_department', 'department_warehouse'].includes(currentScope.type),
+        warehouse:  ['central_warehouse', 'outlet_warehouse', 'department_warehouse'].includes(currentScope.type),
+    };
 
     const { data, setData, post, processing, errors } = useForm({
         user_id: '',
         role_id: '',
         scope_type: 'global' as ScopeType,
-        outlet_id: '',
-        outlet_department_id: '',
-        warehouse_id: '',
+        outlet_id: currentScope.outlet_id,
+        outlet_department_id: currentScope.outlet_department_id,
+        warehouse_id: currentScope.warehouse_id,
         is_active: true,
         starts_at: '',
         ends_at: '',
@@ -59,9 +67,9 @@ export default function UserRolesCreate({ users, roles, outlets, departments, wa
             ...data,
             role_id: roleId,
             scope_type: (role?.level ?? 'global') as ScopeType,
-            outlet_id: '',
-            outlet_department_id: '',
-            warehouse_id: '',
+            outlet_id: locked.outlet ? currentScope.outlet_id : '',
+            outlet_department_id: locked.department ? currentScope.outlet_department_id : '',
+            warehouse_id: locked.warehouse ? currentScope.warehouse_id : '',
         });
     }
 
@@ -72,8 +80,10 @@ export default function UserRolesCreate({ users, roles, outlets, departments, wa
 
     const filteredDepartments = useMemo(() => {
         if (!data.outlet_id) return departments;
-        return departments.filter((d) => String(d.outlet_id) === data.outlet_id);
-    }, [departments, data.outlet_id]);
+        let filtered = departments.filter((d) => String(d.outlet_id) === data.outlet_id);
+        if (allowedScopes) filtered = filtered.filter((d) => allowedScopes.outlet_department.includes(d.id));
+        return filtered;
+    }, [departments, data.outlet_id, allowedScopes]);
 
     const filteredWarehouses = useMemo(() => {
         const scopeType = data.scope_type;
@@ -176,11 +186,12 @@ export default function UserRolesCreate({ users, roles, outlets, departments, wa
                             <FormField label="Outlet" error={errors.outlet_id}>
                                 <SearchableSelect
                                     value={data.outlet_id}
+                                    disabled={locked.outlet}
                                     onChange={(e) => setData({
                                         ...data,
                                         outlet_id: e.target.value,
-                                        outlet_department_id: '',
-                                        warehouse_id: '',
+                                        outlet_department_id: locked.department ? currentScope.outlet_department_id : '',
+                                        warehouse_id: locked.warehouse ? currentScope.warehouse_id : '',
                                     })}
                                 >
                                     <option value="">Select an outlet...</option>
@@ -195,11 +206,11 @@ export default function UserRolesCreate({ users, roles, outlets, departments, wa
                             <FormField label="Department" error={errors.outlet_department_id}>
                                 <SearchableSelect
                                     value={data.outlet_department_id}
-                                    disabled={!data.outlet_id}
+                                    disabled={locked.department || !data.outlet_id}
                                     onChange={(e) => setData({
                                         ...data,
                                         outlet_department_id: e.target.value,
-                                        warehouse_id: '',
+                                        warehouse_id: locked.warehouse ? currentScope.warehouse_id : '',
                                     })}
                                 >
                                     <option value="">Select a department...</option>
@@ -214,7 +225,7 @@ export default function UserRolesCreate({ users, roles, outlets, departments, wa
                             <FormField label="Warehouse" error={errors.warehouse_id}>
                                 <SearchableSelect
                                     value={data.warehouse_id}
-                                    disabled={needs.outlet && !data.outlet_id}
+                                    disabled={locked.warehouse || (needs.outlet && !data.outlet_id)}
                                     onChange={(e) => setData('warehouse_id', e.target.value)}
                                 >
                                     <option value="">Select a warehouse...</option>

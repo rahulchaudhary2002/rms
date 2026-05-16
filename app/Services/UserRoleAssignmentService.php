@@ -65,10 +65,12 @@ class UserRoleAssignmentService
         )->orderBy('name')->get(['id', 'name', 'email']);
 
         $allowedLevels = match ($scope['type']) {
-            'outlet'     => ['outlet', 'department', 'warehouse'],
-            'department' => ['department', 'warehouse'],
-            'warehouse'  => ['warehouse'],
-            default      => array_keys(config('access_control.scope_types', [])),
+            'central_warehouse'    => ['central_warehouse'],
+            'outlet'               => ['outlet', 'outlet_warehouse', 'outlet_department', 'department_warehouse'],
+            'outlet_warehouse'     => ['outlet_warehouse'],
+            'outlet_department'    => ['outlet_department', 'department_warehouse'],
+            'department_warehouse' => ['department_warehouse'],
+            default                => array_keys(config('access_control.scope_types', [])),
         };
 
         $roles = Role::where('is_active', true)
@@ -84,7 +86,8 @@ class UserRoleAssignmentService
 
         return array_merge(
             compact('users', 'roles', 'outlets', 'departments', 'warehouses'),
-            $this->resolveScopeProps($actor, $scope)
+            $this->resolveScopeProps($actor, $scope),
+            ['currentScope' => $this->buildCurrentScope($scope)],
         );
     }
 

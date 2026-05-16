@@ -542,21 +542,27 @@ class AccessControlService
             })(),
 
             'outlet_warehouse' => (function () use ($sessionScope, $baseScopeTypes, $baseScopes, $emptyScopes) {
-                $whId  = (int) $sessionScope['warehouse_id'];
-                $types = array_values(array_intersect($baseScopeTypes, ['outlet_warehouse']));
-                $scopes = $baseScopes === null
-                    ? array_merge($emptyScopes, ['outlet_warehouse' => [$whId]])
-                    : array_merge($emptyScopes, ['outlet_warehouse' => in_array($whId, $baseScopes['outlet_warehouse'], true) ? [$whId] : []]);
+                $outletId = (int) $sessionScope['outlet_id'];
+                $whId     = (int) $sessionScope['warehouse_id'];
+                $types    = array_values(array_intersect($baseScopeTypes, ['outlet_warehouse']));
+                $scopes   = $baseScopes === null
+                    ? array_merge($emptyScopes, ['outlet' => [$outletId], 'outlet_warehouse' => [$whId]])
+                    : array_merge($emptyScopes, [
+                        'outlet'           => [$outletId],
+                        'outlet_warehouse' => in_array($whId, $baseScopes['outlet_warehouse'], true) ? [$whId] : [],
+                    ]);
                 return [$types, $scopes];
             })(),
 
             'outlet_department' => (function () use ($sessionScope, $baseScopeTypes, $baseScopes, $emptyScopes) {
-                $deptId = (int) $sessionScope['department_id'];
-                $types  = array_values(array_intersect($baseScopeTypes, ['outlet_department', 'department_warehouse']));
+                $outletId  = (int) $sessionScope['outlet_id'];
+                $deptId    = (int) $sessionScope['department_id'];
+                $types     = array_values(array_intersect($baseScopeTypes, ['outlet_department', 'department_warehouse']));
                 $deptWhIds = DB::table('warehouses')->where('outlet_department_id', $deptId)->pluck('id')->map(fn ($id) => (int) $id)->toArray();
                 $scopes = $baseScopes === null
-                    ? array_merge($emptyScopes, ['outlet_department' => [$deptId], 'department_warehouse' => $deptWhIds])
+                    ? array_merge($emptyScopes, ['outlet' => [$outletId], 'outlet_department' => [$deptId], 'department_warehouse' => $deptWhIds])
                     : array_merge($emptyScopes, [
+                        'outlet'               => [$outletId],
                         'outlet_department'    => in_array($deptId, $baseScopes['outlet_department'], true) ? [$deptId] : [],
                         'department_warehouse' => array_values(array_intersect($deptWhIds, $baseScopes['department_warehouse'])),
                     ]);
@@ -564,15 +570,21 @@ class AccessControlService
             })(),
 
             'department_warehouse' => (function () use ($sessionScope, $baseScopeTypes, $baseScopes, $emptyScopes) {
-                $whId  = (int) $sessionScope['warehouse_id'];
-                $types = array_values(array_intersect($baseScopeTypes, ['department_warehouse']));
-                $scopes = $baseScopes === null
-                    ? array_merge($emptyScopes, ['department_warehouse' => [$whId]])
-                    : array_merge($emptyScopes, ['department_warehouse' => in_array($whId, $baseScopes['department_warehouse'], true) ? [$whId] : []]);
+                $outletId = (int) $sessionScope['outlet_id'];
+                $deptId   = (int) $sessionScope['department_id'];
+                $whId     = (int) $sessionScope['warehouse_id'];
+                $types    = array_values(array_intersect($baseScopeTypes, ['department_warehouse']));
+                $scopes   = $baseScopes === null
+                    ? array_merge($emptyScopes, ['outlet' => [$outletId], 'outlet_department' => [$deptId], 'department_warehouse' => [$whId]])
+                    : array_merge($emptyScopes, [
+                        'outlet'               => [$outletId],
+                        'outlet_department'    => [$deptId],
+                        'department_warehouse' => in_array($whId, $baseScopes['department_warehouse'], true) ? [$whId] : [],
+                    ]);
                 return [$types, $scopes];
             })(),
 
-            default => [$baseScopeTypes, $baseScopes ?? $emptyScopes],
+            default => [$baseScopeTypes, $baseScopes],
         };
 
         return [

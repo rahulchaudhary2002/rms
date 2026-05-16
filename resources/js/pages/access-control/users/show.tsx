@@ -53,6 +53,7 @@ type User = {
 
 type AllowedScopes = { outlet: number[]; outlet_warehouse: number[]; outlet_department: number[]; department_warehouse: number[]; central_warehouse: number[] } | null;
 type AllowedResourceIds = { outlet_ids: number[]; warehouse_ids: number[] } | null;
+type CurrentScope = { type: string; outlet_id: string; outlet_department_id: string; warehouse_id: string };
 
 type Outlet = { id: number; name: string };
 type OutletDepartment = { id: number; outlet_id: number; name: string };
@@ -70,6 +71,7 @@ type Props = {
     allowedScopes: AllowedScopes;
     allowedResourceIds: AllowedResourceIds;
     allowedScopeTypes: string[];
+    currentScope: CurrentScope;
 };
 
 type Tab = 'overview' | 'roles' | 'overrides' | 'resources';
@@ -113,19 +115,25 @@ const SCOPE_NEEDS: Record<string, { outlet: boolean; department: boolean; wareho
     department_warehouse: { outlet: true,  department: true,  warehouse: true  },
 };
 
-function AssignRoleModal({ open, onClose, userId, roles, outlets, departments, warehouses, allowedScopes, returnUrl }: {
+function AssignRoleModal({ open, onClose, userId, roles, outlets, departments, warehouses, allowedScopes, currentScope, returnUrl }: {
     open: boolean; onClose: () => void;
     userId: number; roles: Role[];
     outlets: Outlet[]; departments: OutletDepartment[]; warehouses: Warehouse[];
-    allowedScopes: AllowedScopes; returnUrl: string;
+    allowedScopes: AllowedScopes; currentScope: CurrentScope; returnUrl: string;
 }) {
+    const locked = {
+        outlet:     ['outlet', 'outlet_warehouse', 'outlet_department', 'department_warehouse'].includes(currentScope.type),
+        department: ['outlet_department', 'department_warehouse'].includes(currentScope.type),
+        warehouse:  ['central_warehouse', 'outlet_warehouse', 'department_warehouse'].includes(currentScope.type),
+    };
+
     const { data, setData, post, processing, errors, reset } = useForm({
         user_id: String(userId),
         role_id: '',
         scope_type: 'global',
-        outlet_id: '',
-        outlet_department_id: '',
-        warehouse_id: '',
+        outlet_id: currentScope.outlet_id,
+        outlet_department_id: currentScope.outlet_department_id,
+        warehouse_id: currentScope.warehouse_id,
         _redirect: returnUrl,
     });
 
@@ -133,7 +141,12 @@ function AssignRoleModal({ open, onClose, userId, roles, outlets, departments, w
     const needs = SCOPE_NEEDS[data.scope_type] ?? SCOPE_NEEDS.global;
 
     const allowedOutlets = allowedScopes ? outlets.filter((o) => allowedScopes.outlet.includes(o.id)) : outlets;
-    const filteredDepts = data.outlet_id ? departments.filter((d) => String(d.outlet_id) === data.outlet_id) : departments;
+    const filteredDepts = (() => {
+        if (!data.outlet_id) return departments;
+        let depts = departments.filter((d) => String(d.outlet_id) === data.outlet_id);
+        if (allowedScopes) depts = depts.filter((d) => allowedScopes.outlet_department.includes(d.id));
+        return depts;
+    })();
     const filteredWhs = (() => {
         const st = data.scope_type;
         let whs = warehouses;
@@ -152,7 +165,14 @@ function AssignRoleModal({ open, onClose, userId, roles, outlets, departments, w
 
     function handleRoleChange(roleId: string) {
         const role = roles.find((r) => String(r.id) === roleId) ?? null;
-        setData({ ...data, role_id: roleId, scope_type: role?.level ?? 'global', outlet_id: '', outlet_department_id: '', warehouse_id: '' });
+        setData({
+            ...data,
+            role_id: roleId,
+            scope_type: role?.level ?? 'global',
+            outlet_id: locked.outlet ? currentScope.outlet_id : '',
+            outlet_department_id: locked.department ? currentScope.outlet_department_id : '',
+            warehouse_id: locked.warehouse ? currentScope.warehouse_id : '',
+        });
     }
 
     function submit(e: { preventDefault(): void }) {
@@ -183,7 +203,7 @@ function AssignRoleModal({ open, onClose, userId, roles, outlets, departments, w
 
                     {needs.outlet && (
                         <FormField label="Outlet" error={errors.outlet_id}>
-                            <SearchableSelect value={data.outlet_id} onChange={(e) => setData({ ...data, outlet_id: e.target.value, outlet_department_id: '', warehouse_id: '' })}>
+                            <SearchableSelect value={data.outlet_id} disabled={locked.outlet} onChange={(e) => setData({ ...data, outlet_id: e.target.value, outlet_department_id: locked.department ? currentScope.outlet_department_id : '', warehouse_id: locked.warehouse ? currentScope.warehouse_id : '' })}>
                                 <option value="">Select an outlet...</option>
                                 {allowedOutlets.map((o) => <option key={o.id} value={String(o.id)}>{o.name}</option>)}
                             </SearchableSelect>
@@ -192,7 +212,7 @@ function AssignRoleModal({ open, onClose, userId, roles, outlets, departments, w
 
                     {needs.department && (
                         <FormField label="Department" error={errors.outlet_department_id}>
-                            <SearchableSelect value={data.outlet_department_id} disabled={!data.outlet_id} onChange={(e) => setData({ ...data, outlet_department_id: e.target.value, warehouse_id: '' })}>
+                            <SearchableSelect value={data.outlet_department_id} disabled={locked.department || !data.outlet_id} onChange={(e) => setData({ ...data, outlet_department_id: e.target.value, warehouse_id: locked.warehouse ? currentScope.warehouse_id : '' })}>
                                 <option value="">Select a department...</option>
                                 {filteredDepts.map((d) => <option key={d.id} value={String(d.id)}>{d.name}</option>)}
                             </SearchableSelect>
@@ -201,7 +221,7 @@ function AssignRoleModal({ open, onClose, userId, roles, outlets, departments, w
 
                     {needs.warehouse && (
                         <FormField label="Warehouse" error={errors.warehouse_id}>
-                            <SearchableSelect value={data.warehouse_id} disabled={needs.outlet && !data.outlet_id} onChange={(e) => setData('warehouse_id', e.target.value)}>
+                            <SearchableSelect value={data.warehouse_id} disabled={locked.warehouse || (needs.outlet && !data.outlet_id)} onChange={(e) => setData('warehouse_id', e.target.value)}>
                                 <option value="">Select a warehouse...</option>
                                 {filteredWhs.map((w) => <option key={w.id} value={String(w.id)}>{w.name}</option>)}
                             </SearchableSelect>
@@ -218,20 +238,26 @@ function AssignRoleModal({ open, onClose, userId, roles, outlets, departments, w
     );
 }
 
-function AddOverrideModal({ open, onClose, userId, permissions, outlets, departments, warehouses, scopeTypes, allowedScopes, allowedScopeTypes, returnUrl }: {
+function AddOverrideModal({ open, onClose, userId, permissions, outlets, departments, warehouses, scopeTypes, allowedScopes, allowedScopeTypes, currentScope, returnUrl }: {
     open: boolean; onClose: () => void;
     userId: number; permissions: Permission[];
     outlets: Outlet[]; departments: OutletDepartment[]; warehouses: Warehouse[];
-    scopeTypes: ScopeType[]; allowedScopes: AllowedScopes; allowedScopeTypes: string[]; returnUrl: string;
+    scopeTypes: ScopeType[]; allowedScopes: AllowedScopes; allowedScopeTypes: string[]; currentScope: CurrentScope; returnUrl: string;
 }) {
+    const locked = {
+        outlet:     ['outlet', 'outlet_warehouse', 'outlet_department', 'department_warehouse'].includes(currentScope.type),
+        department: ['outlet_department', 'department_warehouse'].includes(currentScope.type),
+        warehouse:  ['central_warehouse', 'outlet_warehouse', 'department_warehouse'].includes(currentScope.type),
+    };
+
     const defaultScopeType = allowedScopeTypes[0] ?? 'global';
     const { data, setData, post, processing, errors, reset } = useForm({
         user_id: String(userId),
         permission_id: '',
         scope_type: defaultScopeType,
-        outlet_id: '',
-        outlet_department_id: '',
-        warehouse_id: '',
+        outlet_id: currentScope.outlet_id,
+        outlet_department_id: currentScope.outlet_department_id,
+        warehouse_id: currentScope.warehouse_id,
         effect: 'allow',
         reason: '',
         _redirect: returnUrl,
@@ -239,7 +265,12 @@ function AddOverrideModal({ open, onClose, userId, permissions, outlets, departm
 
     const needs = SCOPE_NEEDS[data.scope_type] ?? SCOPE_NEEDS.global;
     const allowedOutlets = allowedScopes ? outlets.filter((o) => allowedScopes.outlet.includes(o.id)) : outlets;
-    const filteredDepts = data.outlet_id ? departments.filter((d) => String(d.outlet_id) === data.outlet_id) : departments;
+    const filteredDepts = (() => {
+        if (!data.outlet_id) return departments;
+        let depts = departments.filter((d) => String(d.outlet_id) === data.outlet_id);
+        if (allowedScopes) depts = depts.filter((d) => allowedScopes.outlet_department.includes(d.id));
+        return depts;
+    })();
     const filteredWhs = (() => {
         const st = data.scope_type;
         let whs = warehouses;
@@ -281,7 +312,7 @@ function AddOverrideModal({ open, onClose, userId, permissions, outlets, departm
                     </FormField>
 
                     <FormField label="Scope Type" error={errors.scope_type}>
-                        <SearchableSelect value={data.scope_type} onChange={(e) => setData({ ...data, scope_type: e.target.value, outlet_id: '', outlet_department_id: '', warehouse_id: '' })}>
+                        <SearchableSelect value={data.scope_type} disabled={allowedScopeTypes.length <= 1} onChange={(e) => setData({ ...data, scope_type: e.target.value, outlet_id: locked.outlet ? currentScope.outlet_id : '', outlet_department_id: locked.department ? currentScope.outlet_department_id : '', warehouse_id: locked.warehouse ? currentScope.warehouse_id : '' })}>
                             {scopeTypes.filter((st) => allowedScopeTypes.includes(st.type)).map((st) => (
                                 <option key={st.type} value={st.type}>{st.label}</option>
                             ))}
@@ -290,7 +321,7 @@ function AddOverrideModal({ open, onClose, userId, permissions, outlets, departm
 
                     {needs.outlet && (
                         <FormField label="Outlet" error={errors.outlet_id}>
-                            <SearchableSelect value={data.outlet_id} onChange={(e) => setData({ ...data, outlet_id: e.target.value, outlet_department_id: '', warehouse_id: '' })}>
+                            <SearchableSelect value={data.outlet_id} disabled={locked.outlet} onChange={(e) => setData({ ...data, outlet_id: e.target.value, outlet_department_id: locked.department ? currentScope.outlet_department_id : '', warehouse_id: locked.warehouse ? currentScope.warehouse_id : '' })}>
                                 <option value="">Select an outlet...</option>
                                 {allowedOutlets.map((o) => <option key={o.id} value={String(o.id)}>{o.name}</option>)}
                             </SearchableSelect>
@@ -299,7 +330,7 @@ function AddOverrideModal({ open, onClose, userId, permissions, outlets, departm
 
                     {needs.department && (
                         <FormField label="Department" error={errors.outlet_department_id}>
-                            <SearchableSelect value={data.outlet_department_id} disabled={!data.outlet_id} onChange={(e) => setData({ ...data, outlet_department_id: e.target.value, warehouse_id: '' })}>
+                            <SearchableSelect value={data.outlet_department_id} disabled={locked.department || !data.outlet_id} onChange={(e) => setData({ ...data, outlet_department_id: e.target.value, warehouse_id: locked.warehouse ? currentScope.warehouse_id : '' })}>
                                 <option value="">Select a department...</option>
                                 {filteredDepts.map((d) => <option key={d.id} value={String(d.id)}>{d.name}</option>)}
                             </SearchableSelect>
@@ -308,7 +339,7 @@ function AddOverrideModal({ open, onClose, userId, permissions, outlets, departm
 
                     {needs.warehouse && (
                         <FormField label="Warehouse" error={errors.warehouse_id}>
-                            <SearchableSelect value={data.warehouse_id} disabled={needs.outlet && !data.outlet_id} onChange={(e) => setData('warehouse_id', e.target.value)}>
+                            <SearchableSelect value={data.warehouse_id} disabled={locked.warehouse || (needs.outlet && !data.outlet_id)} onChange={(e) => setData('warehouse_id', e.target.value)}>
                                 <option value="">Select a warehouse...</option>
                                 {filteredWhs.map((w) => <option key={w.id} value={String(w.id)}>{w.name}</option>)}
                             </SearchableSelect>
@@ -430,7 +461,7 @@ const tabList: { id: Tab; label: string; icon: string }[] = [
     { id: 'resources',  label: 'Resource Permissions',  icon: 'rule' },
 ];
 
-export default function UserShow({ user, roles, permissions, outlets, departments, warehouses, scopeTypes, resourceTypes, allowedScopes, allowedResourceIds, allowedScopeTypes }: Props) {
+export default function UserShow({ user, roles, permissions, outlets, departments, warehouses, scopeTypes, resourceTypes, allowedScopes, allowedResourceIds, allowedScopeTypes, currentScope }: Props) {
     const [activeTab, setActiveTab] = useState<Tab>('overview');
     const [modal, setModal] = useState<'role' | 'override' | 'resource' | null>(null);
     const returnUrl = usersShow.url(user.id);
@@ -712,6 +743,7 @@ export default function UserShow({ user, roles, permissions, outlets, department
                 departments={departments}
                 warehouses={warehouses}
                 allowedScopes={allowedScopes}
+                currentScope={currentScope}
                 returnUrl={returnUrl}
             />
             <AddOverrideModal
@@ -725,6 +757,7 @@ export default function UserShow({ user, roles, permissions, outlets, department
                 scopeTypes={scopeTypes}
                 allowedScopes={allowedScopes}
                 allowedScopeTypes={allowedScopeTypes}
+                currentScope={currentScope}
                 returnUrl={returnUrl}
             />
             <AddResourceModal

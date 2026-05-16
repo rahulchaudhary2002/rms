@@ -75,7 +75,8 @@ class UserPermissionOverrideService
 
         return array_merge(
             compact('users', 'permissions', 'outlets', 'departments', 'warehouses'),
-            $this->resolveScopeProps($actor, $scope)
+            $this->resolveScopeProps($actor, $scope),
+            ['currentScope' => $this->buildCurrentScope($scope)],
         );
     }
 

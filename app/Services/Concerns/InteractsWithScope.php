@@ -32,6 +32,16 @@ trait InteractsWithScope
         ];
     }
 
+    protected function buildCurrentScope(array $scope): array
+    {
+        return [
+            'type'                 => $scope['type'],
+            'outlet_id'            => $scope['outlet_id'] ? (string) $scope['outlet_id'] : '',
+            'outlet_department_id' => $scope['department_id'] ? (string) $scope['department_id'] : '',
+            'warehouse_id'         => $scope['warehouse_id'] ? (string) $scope['warehouse_id'] : '',
+        ];
+    }
+
     protected function resolveSessionConstrainedResourceIds(?array $actorAssignedScopes, array $scope): ?array
     {
         if ($scope['type'] === 'outlet') {
