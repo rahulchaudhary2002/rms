@@ -25,6 +25,7 @@ class CheckNodeSelection
         if (! $hasValidSelection) {
             $request->session()->forget('current_node_id');
             $request->session()->forget('current_outlet_id');
+            $request->session()->forget('current_department_id');
             $request->session()->forget('current_scope_type');
 
             if (! $this->isAllowedWithoutSelection($request)) {
@@ -47,23 +48,20 @@ class CheckNodeSelection
 
     private function hasValidSelection(Request $request): bool
     {
-        $scopeType = (string) $request->session()->get('current_scope_type', '');
-        $outletId = (string) $request->session()->get('current_outlet_id', '');
-        $nodeId = (string) $request->session()->get('current_node_id', '');
+        $scopeType    = (string) $request->session()->get('current_scope_type', '');
+        $outletId     = (string) $request->session()->get('current_outlet_id', '');
+        $departmentId = (string) $request->session()->get('current_department_id', '');
+        $nodeId       = (string) $request->session()->get('current_node_id', '');
 
-        if ($scopeType === 'global') {
-            return true;
-        }
-
-        if ($scopeType === 'outlet') {
-            return $outletId !== '';
-        }
-
-        if ($scopeType === 'warehouse') {
-            return $nodeId !== '';
-        }
-
-        return false;
+        return match ($scopeType) {
+            'global'               => true,
+            'central_warehouse'    => $nodeId !== '',
+            'outlet'               => $outletId !== '',
+            'outlet_warehouse'     => $outletId !== '' && $nodeId !== '',
+            'outlet_department'    => $outletId !== '' && $departmentId !== '',
+            'department_warehouse' => $outletId !== '' && $departmentId !== '' && $nodeId !== '',
+            default                => false,
+        };
     }
 
     private function isAllowedWithoutSelection(Request $request): bool

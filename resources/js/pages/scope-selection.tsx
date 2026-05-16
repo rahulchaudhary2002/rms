@@ -1,237 +1,152 @@
 import { Head, router, usePage } from '@inertiajs/react';
-import { useMemo, useState } from 'react';
+import { useState } from 'react';
 import type { FormEvent } from 'react';
 import { PageHeader } from '@/components/page-header';
 import { dashboard, logout } from '@/routes';
 import { store as scopeSelectionStore } from '@/routes/scope-selection';
-import { store as outletsStore } from '@/routes/outlets';
-import { store as warehousesStore } from '@/routes/warehouses';
 import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import {
-    Dialog,
-    DialogContent,
-    DialogDescription,
-    DialogHeader,
-    DialogTitle,
-} from '@/components/ui/dialog';
 import { cn } from '@/lib/utils';
+import type { ScopeType } from '@/types';
 
-type SelectionScope = 'outlet' | 'warehouse' | 'global';
-
-type NodeItem = {
-    id: string;
-    outlet_id?: string;
-    outlet: string;
-    node: string;
-};
+type CentralWarehouse = { id: string; name: string };
+type DeptWarehouse    = { id: string; name: string };
+type Department       = { id: string; name: string; warehouses: DeptWarehouse[] };
+type OutletWarehouse  = { id: string; name: string };
+type OutletItem       = { id: string; name: string; warehouses: OutletWarehouse[]; departments: Department[] };
 
 type NodeSelectionData = {
-    current_scope_type: SelectionScope | null;
-    current_outlet_id: string | null;
-    current_node_id: string | null;
+    setup_completed: boolean;
+    selection_url: string | null;
     can_select_global: boolean;
-    items: NodeItem[];
+    current_scope_type: ScopeType | null;
+    current_outlet_id: string | null;
+    current_department_id: string | null;
+    current_node_id: string | null;
+    current_label: string | null;
+    central_warehouses: CentralWarehouse[];
+    outlets: OutletItem[];
 };
 
 type SharedProps = {
-    errors?: {
-        outlet_id?: string;
-        warehouse_id?: string;
-    };
+    errors?: { outlet_id?: string; department_id?: string; warehouse_id?: string; scope_type?: string };
     nodeSelection?: NodeSelectionData;
-    outlets?: Array<{ id: string; name: string }>;
-    auth?: {
-        can: Record<string, boolean>;
-    };
 };
 
-type OutletGroup = {
-    key: string;
-    id: string;
-    name: string;
-    nodes: NodeItem[];
+type Selected = {
+    scope_type: ScopeType | '';
+    outlet_id: string;
+    department_id: string;
+    warehouse_id: string;
 };
+
+const WAREHOUSE_SCOPES: ScopeType[] = ['central_warehouse', 'outlet_warehouse', 'department_warehouse'];
+const OUTLET_SCOPES: ScopeType[]    = ['outlet', 'outlet_department'];
+
+function isValid(s: Selected): boolean {
+    if (s.scope_type === 'global')               return true;
+    if (s.scope_type === 'central_warehouse')    return s.warehouse_id !== '';
+    if (s.scope_type === 'outlet')               return s.outlet_id !== '';
+    if (s.scope_type === 'outlet_warehouse')     return s.outlet_id !== '' && s.warehouse_id !== '';
+    if (s.scope_type === 'outlet_department')    return s.outlet_id !== '' && s.department_id !== '';
+    if (s.scope_type === 'department_warehouse') return s.outlet_id !== '' && s.department_id !== '' && s.warehouse_id !== '';
+    return false;
+}
+
+function Badge({ label, selected }: { label: string; selected: boolean }) {
+    return (
+        <span className={cn(
+            'shrink-0 rounded px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wide',
+            selected ? 'bg-white/20 text-white' : 'bg-muted-foreground/10 text-muted-foreground',
+        )}>
+            {label}
+        </span>
+    );
+}
+
+function ScopeButton({ icon, label, badge, selected, expanded, hasChildren, onClick }: {
+    icon: string; label: string; badge?: string; selected: boolean;
+    expanded?: boolean; hasChildren?: boolean; onClick: () => void;
+}) {
+    return (
+        <button
+            type="button"
+            className={cn(
+                'flex w-full items-center gap-2.5 rounded-lg px-3 py-2.5 text-left transition-colors',
+                selected ? 'bg-primary text-white shadow-sm' : expanded ? 'bg-primary/5 dark:bg-primary/10' : 'hover:bg-muted',
+            )}
+            onClick={onClick}
+        >
+            <span className={cn('material-symbols-outlined text-[18px] shrink-0', selected ? '' : expanded ? 'text-primary' : 'text-muted-foreground')}>
+                {icon}
+            </span>
+            <span className="min-w-0 flex-1 truncate text-sm font-semibold leading-tight">{label}</span>
+            {badge && <Badge label={badge} selected={selected} />}
+            {selected
+                ? <span className="material-symbols-outlined text-sm shrink-0">check_circle</span>
+                : hasChildren && (
+                    <span className={cn('material-symbols-outlined text-sm shrink-0 text-muted-foreground transition-transform', expanded && 'rotate-90')}>
+                        chevron_right
+                    </span>
+                )
+            }
+        </button>
+    );
+}
+
+function SectionHeader({ icon, label }: { icon: string; label: string }) {
+    return (
+        <div className="flex items-center gap-2 px-1 pb-1.5 pt-3">
+            <span className="material-symbols-outlined text-sm text-muted-foreground/60">{icon}</span>
+            <span className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground/60">{label}</span>
+        </div>
+    );
+}
 
 export default function ScopeSelection() {
-    const page = usePage<SharedProps>();
-    const { errors } = page.props;
+    const page          = usePage<SharedProps>();
+    const { errors }    = page.props;
     const nodeSelection = page.props.nodeSelection;
-    const can = page.props.auth?.can ?? {};
-    const canCreateOutlet = can['outlets-create'] ?? false;
-    const canCreateWarehouse = can['warehouses-create'] ?? false;
-    const canSelectGlobal = nodeSelection?.can_select_global ?? false;
-    const nodes = nodeSelection?.items ?? [];
 
-    const initialNode =
-        nodes.find((node) => node.id === (nodeSelection?.current_node_id ?? '')) ??
-        nodes[0];
-    const initialOutletKey =
-        initialNode !== undefined
-            ? (initialNode.outlet || 'Unknown Outlet').toLowerCase()
-            : null;
+    const canSelectGlobal  = nodeSelection?.can_select_global ?? false;
+    const centralWarehouses = nodeSelection?.central_warehouses ?? [];
+    const outlets           = nodeSelection?.outlets ?? [];
 
-    const [selectedNodeId, setSelectedNodeId] = useState(
-        nodeSelection?.current_node_id ?? nodes[0]?.id ?? '',
+    const initialSelected: Selected = {
+        scope_type:    nodeSelection?.current_scope_type ?? '',
+        outlet_id:     nodeSelection?.current_outlet_id ?? '',
+        department_id: nodeSelection?.current_department_id ?? '',
+        warehouse_id:  nodeSelection?.current_node_id ?? '',
+    };
+
+    const [selected, setSelected]  = useState<Selected>(initialSelected);
+    const [openOutlet, setOpenOutlet] = useState<string | null>(
+        nodeSelection?.current_outlet_id ?? (outlets[0]?.id ?? null),
     );
-    const [selectedOutletId, setSelectedOutletId] = useState(
-        nodeSelection?.current_outlet_id ?? '',
+    const [openDept, setOpenDept] = useState<string | null>(
+        nodeSelection?.current_department_id ?? null,
     );
-    const [selectedScopeType, setSelectedScopeType] = useState<SelectionScope>(
-        nodeSelection?.current_scope_type ?? 'warehouse',
-    );
-    const [openOutlet, setOpenOutlet] = useState<string | null>(initialOutletKey);
-    const [searchQuery, setSearchQuery] = useState('');
     const [processing, setProcessing] = useState(false);
 
-    // Modal and form states
-    const [showCreateOutletModal, setShowCreateOutletModal] = useState(false);
-    const [showCreateWarehouseModal, setShowCreateWarehouseModal] = useState(false);
-    const [outletName, setOutletName] = useState('');
-    const [warehouseName, setWarehouseName] = useState('');
-    const [isCreating, setIsCreating] = useState(false);
-    const [creationError, setCreationError] = useState('');
-
-    const canSubmit =
-        selectedScopeType === 'global' ||
-        (selectedScopeType === 'outlet' && selectedOutletId !== '') ||
-        (selectedScopeType === 'warehouse' && selectedNodeId !== '');
-
-    const handleCreateOutlet = async (event: FormEvent<HTMLFormElement>) => {
-        event.preventDefault();
-        setIsCreating(true);
-        setCreationError('');
-
-        try {
-            const response = await fetch(outletsStore.url(), {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                    'Accept': 'application/json',
-                    'X-CSRF-Token': (document.querySelector('meta[name="csrf-token"]') as HTMLMetaElement)
-                        ?.content || '',
-                },
-                body: JSON.stringify({ name: outletName }),
-            });
-
-            if (!response.ok) {
-                const data = await response.json();
-                throw new Error(data.message || 'Failed to create outlet');
-            }
-
-            setOutletName('');
-            setShowCreateOutletModal(false);
-            router.reload();
-        } catch (error) {
-            setCreationError(error instanceof Error ? error.message : 'An error occurred');
-        } finally {
-            setIsCreating(false);
-        }
-    };
-
-    const handleCreateWarehouse = async (event: FormEvent<HTMLFormElement>) => {
-        event.preventDefault();
-        setIsCreating(true);
-        setCreationError('');
-
-        try {
-            const response = await fetch(warehousesStore.url(), {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                    'Accept': 'application/json',
-                    'X-CSRF-Token': (document.querySelector('meta[name="csrf-token"]') as HTMLMetaElement)
-                        ?.content || '',
-                },
-                body: JSON.stringify({
-                    outlet_id: selectedOutletId,
-                    name: warehouseName,
-                }),
-            });
-
-            if (!response.ok) {
-                const data = await response.json();
-                throw new Error(data.message || 'Failed to create warehouse');
-            }
-
-            setWarehouseName('');
-            setShowCreateWarehouseModal(false);
-            router.reload();
-        } catch (error) {
-            setCreationError(error instanceof Error ? error.message : 'An error occurred');
-        } finally {
-            setIsCreating(false);
-        }
-    };
-
-    const hierarchy = useMemo<OutletGroup[]>(() => {
-        const outletMap = new Map<string, OutletGroup>();
-        const term = searchQuery.trim().toLowerCase();
-
-        // Register outlets from shared props first (covers outlets with no warehouses).
-        for (const outlet of page.props.outlets ?? []) {
-            const outletName = outlet.name || 'Unknown Outlet';
-            const outletKey = outletName.toLowerCase();
-
-            if (term !== '' && !outletName.toLowerCase().includes(term)) {
-                continue;
-            }
-
-            if (!outletMap.has(outletKey)) {
-                outletMap.set(outletKey, { key: outletKey, id: outlet.id, name: outletName, nodes: [] });
-            }
-        }
-
-        // Add warehouse nodes.
-        for (const node of nodes) {
-            if (!node.id || !node.node) continue;
-
-            const outletName = node.outlet || 'Unknown Outlet';
-
-            if (
-                term !== '' &&
-                !outletName.toLowerCase().includes(term) &&
-                !node.node.toLowerCase().includes(term)
-            ) {
-                continue;
-            }
-
-            const outletKey = outletName.toLowerCase();
-
-            if (!outletMap.has(outletKey)) {
-                outletMap.set(outletKey, { key: outletKey, id: node.outlet_id ?? '', name: outletName, nodes: [] });
-            }
-
-            outletMap.get(outletKey)?.nodes.push(node);
-        }
-
-        return Array.from(outletMap.values());
-    }, [nodes, searchQuery, page.props.outlets]);
-
-    const handleOutletToggle = (outletKey: string) => {
-        if (searchQuery.trim() !== '') {
-            return;
-        }
-
-        setOpenOutlet((current) => (current === outletKey ? null : outletKey));
-    };
+    const sel = (patch: Partial<Selected>) => setSelected((prev) => ({ ...prev, ...patch }));
 
     const onSubmit = (event: FormEvent<HTMLFormElement>) => {
         event.preventDefault();
-
-        if (!canSubmit) {
-            return;
-        }
+        if (!isValid(selected)) return;
 
         setProcessing(true);
+
+        const needsOutlet    = OUTLET_SCOPES.includes(selected.scope_type as ScopeType) || WAREHOUSE_SCOPES.includes(selected.scope_type as ScopeType);
+        const needsDept      = selected.scope_type === 'outlet_department' || selected.scope_type === 'department_warehouse';
+        const needsWarehouse = WAREHOUSE_SCOPES.includes(selected.scope_type as ScopeType);
 
         router.post(
             scopeSelectionStore.url(),
             {
-                scope_type: selectedScopeType,
-                outlet_id: selectedScopeType === 'outlet' ? selectedOutletId : null,
-                warehouse_id: selectedScopeType === 'warehouse' ? selectedNodeId : null,
-                redirect_to: dashboard.url(),
+                scope_type:    selected.scope_type,
+                outlet_id:     needsOutlet    ? selected.outlet_id     : null,
+                department_id: needsDept      ? selected.department_id : null,
+                warehouse_id:  needsWarehouse ? selected.warehouse_id  : null,
+                redirect_to:   dashboard.url(),
             } as Record<string, string | null>,
             {
                 preserveScroll: false,
@@ -240,6 +155,8 @@ export default function ScopeSelection() {
         );
     };
 
+    const hasAnything = centralWarehouses.length > 0 || outlets.length > 0;
+
     return (
         <div className="flex min-h-screen items-center justify-center bg-muted dark:bg-card">
             <Head title="Scope Selection" />
@@ -247,235 +164,169 @@ export default function ScopeSelection() {
             <div className="mx-auto w-full max-w-3xl space-y-6 px-4 py-8">
                 <PageHeader
                     breadcrumbs={[{ label: 'Dashboard', href: dashboard.url() }, { label: 'Scope Selection' }]}
-                    title="Select active outlet or warehouse"
-                    description="Choose an outlet for all warehouse operations, or a warehouse for warehouse-specific data."
+                    title="Select working scope"
+                    description="Choose the context you want to work in — global, a central warehouse, an outlet, a department, or a specific warehouse."
                 />
 
                 <form
                     onSubmit={onSubmit}
-                    className="space-y-4 rounded-xl border border-amber-200/70 bg-white p-6 shadow-sm dark:border-border dark:bg-card"
+                    className="space-y-2 rounded-xl border border-amber-200/70 bg-white p-6 shadow-sm dark:border-border dark:bg-card"
                 >
+                    {/* ── Global ─────────────────────────────────── */}
                     {canSelectGlobal && (
-                        <div className="rounded-xl border border-border/40 bg-card p-3 dark:border-border dark:bg-background">
-                            <button
-                                type="button"
-                                className={cn(
-                                    'flex w-full items-center gap-2 rounded-lg p-2 text-left transition-colors',
-                                    selectedScopeType === 'global'
-                                        ? 'bg-primary text-white shadow-sm'
-                                        : 'hover:bg-muted',
-                                )}
-                                onClick={() => {
-                                    setSelectedScopeType('global');
-                                    setSelectedOutletId('');
-                                    setSelectedNodeId('');
-                                }}
-                            >
-                                <span className={cn('material-symbols-outlined text-sm', selectedScopeType === 'global' ? '' : 'text-muted-foreground')}>
-                                    public
-                                </span>
-                                <span className="min-w-0 flex-1 text-sm font-semibold">Global</span>
-                                <span className={cn('text-xs', selectedScopeType === 'global' ? 'text-white' : 'text-muted-foreground')}>
-                                    All outlets &amp; warehouses
-                                </span>
-                                {selectedScopeType === 'global' && (
-                                    <span className="material-symbols-outlined text-xs">check_circle</span>
-                                )}
-                            </button>
+                        <div>
+                            <SectionHeader icon="public" label="Global" />
+                            <ScopeButton
+                                icon="language"
+                                label="Global"
+                                selected={selected.scope_type === 'global'}
+                                onClick={() => sel({ scope_type: 'global', outlet_id: '', department_id: '', warehouse_id: '' })}
+                            />
                         </div>
                     )}
 
-                    {hierarchy.length === 0 ? (
-                        <p className="text-sm text-muted-foreground">
-                            No outlets or warehouses are available yet. Please complete setup first.
-                        </p>
-                    ) : (
-                        <div className="rounded-xl border border-border/40 bg-card p-3 dark:border-border dark:bg-background">
-                            <div className="relative mb-3">
-                                <span className="material-symbols-outlined absolute top-1/2 left-3 -translate-y-1/2 text-sm text-muted-foreground">
-                                    search
-                                </span>
-                                <Input
-                                    type="text"
-                                    value={searchQuery}
-                                    onChange={(event) => setSearchQuery(event.target.value)}
-                                    placeholder="Search outlet or warehouse..."
-                                    className="border-border/40 bg-white pl-9 dark:border-border dark:bg-card"
-                                />
+                    {/* ── Central Warehouses ──────────────────────── */}
+                    {centralWarehouses.length > 0 && (
+                        <div>
+                            <SectionHeader icon="warehouse" label="Central Warehouses" />
+                            <div className="space-y-0.5">
+                                {centralWarehouses.map((wh) => (
+                                    <ScopeButton
+                                        key={wh.id}
+                                        icon="inventory_2"
+                                        label={wh.name}
+                                        badge="Warehouse"
+                                        selected={selected.scope_type === 'central_warehouse' && selected.warehouse_id === wh.id}
+                                        onClick={() => sel({ scope_type: 'central_warehouse', outlet_id: '', department_id: '', warehouse_id: wh.id })}
+                                    />
+                                ))}
                             </div>
+                        </div>
+                    )}
 
-                            <div className="max-h-[460px] space-y-1 overflow-y-auto pr-1">
-                                {hierarchy.length === 0 ? (
-                                    <p className="p-3 text-sm text-muted-foreground">
-                                        No warehouses match your search.
-                                    </p>
-                                ) : (
-                                    hierarchy.map((outlet, outletIndex) => {
-                                        const hasWarehouses = outlet.nodes.length > 0;
-                                        const outletExpanded =
-                                            searchQuery.trim() !== '' || openOutlet === outlet.key;
-                                        const outletSelected =
-                                            selectedScopeType === 'outlet' && selectedOutletId === outlet.id;
+                    {/* ── Outlets ─────────────────────────────────── */}
+                    {outlets.length > 0 && (
+                        <div>
+                            <SectionHeader icon="storefront" label="Outlets" />
+                            <div className="space-y-1">
+                                {outlets.map((outlet) => {
+                                    const outletSelected = selected.scope_type === 'outlet' && selected.outlet_id === outlet.id;
+                                    const outletExpanded = openOutlet === outlet.id;
+                                    const hasChildren    = outlet.warehouses.length > 0 || outlet.departments.length > 0;
 
-                                        return (
-                                            <div key={outlet.key}>
-                                                {outletIndex > 0 && (
-                                                    <div className="my-2 h-px bg-border/30 dark:bg-border" />
-                                                )}
+                                    return (
+                                        <div key={outlet.id} className="rounded-lg border border-border/30 bg-card/50 dark:bg-background/30">
+                                            {/* Outlet row */}
+                                            <ScopeButton
+                                                icon="storefront"
+                                                label={outlet.name}
+                                                badge="Outlet"
+                                                selected={outletSelected}
+                                                expanded={outletExpanded}
+                                                hasChildren={hasChildren}
+                                                onClick={() => {
+                                                    sel({ scope_type: 'outlet', outlet_id: outlet.id, department_id: '', warehouse_id: '' });
+                                                    setOpenOutlet(outletExpanded && !outletSelected ? null : outlet.id);
+                                                }}
+                                            />
 
-                                                {!hasWarehouses ? (
-                                                    /* Outlet with no warehouses - direct selectable row */
-                                                    <button
-                                                        type="button"
-                                                        className={cn(
-                                                            'flex w-full items-center gap-2 rounded-lg p-2 text-left transition-colors',
-                                                            outletSelected
-                                                                ? 'bg-primary text-white shadow-sm'
-                                                                : 'hover:bg-muted',
-                                                        )}
-                                                        onClick={() => {
-                                                            setSelectedScopeType('outlet');
-                                                            setSelectedOutletId(outlet.id);
-                                                            setSelectedNodeId('');
-                                                        }}
-                                                    >
-                                                        <span className={cn('material-symbols-outlined text-sm', outletSelected ? '' : 'text-muted-foreground')}>
-                                                            storefront
-                                                        </span>
-                                                        <span className="min-w-0 flex-1 truncate text-sm font-semibold">
-                                                            {outlet.name}
-                                                        </span>
-                                                        {outletSelected && (
-                                                            <span className="material-symbols-outlined text-xs">check_circle</span>
-                                                        )}
-                                                    </button>
-                                                ) : (
-                                                    /* Outlet with warehouses - selectable header + collapsible warehouse list */
-                                                    <>
-                                                        <button
-                                                            type="button"
-                                                            className={cn(
-                                                                'flex w-full items-center gap-2 rounded-lg p-2 text-left transition-colors',
-                                                                outletSelected
-                                                                    ? 'bg-primary text-white shadow-sm'
-                                                                    : 'hover:bg-muted',
-                                                                !outletSelected && outletExpanded && 'bg-primary/5 dark:bg-primary/10',
-                                                            )}
-                                                            aria-expanded={outletExpanded}
-                                                            onClick={() => {
-                                                                setSelectedScopeType('outlet');
-                                                                setSelectedOutletId(outlet.id);
-                                                                setSelectedNodeId('');
-                                                                setOpenOutlet(outlet.key);
-                                                            }}
-                                                        >
-                                                            <span className={cn('material-symbols-outlined text-sm', outletSelected ? '' : outletExpanded ? 'text-primary' : 'text-muted-foreground')}>
-                                                                storefront
-                                                            </span>
-                                                            <span className="min-w-0 flex-1 truncate text-sm font-semibold">
-                                                                {outlet.name}
-                                                            </span>
-                                                            {outletSelected ? (
-                                                                <span className="material-symbols-outlined text-sm">check_circle</span>
-                                                            ) : (
-                                                                <span className={cn('material-symbols-outlined text-sm text-muted-foreground transition-transform', outletExpanded && 'rotate-90')}>
-                                                                    chevron_right
-                                                                </span>
-                                                            )}
-                                                        </button>
+                                            {/* Collapsible children */}
+                                            <div className={cn(
+                                                'grid transition-[grid-template-rows] duration-200 ease-in-out',
+                                                outletExpanded ? 'grid-rows-[1fr]' : 'grid-rows-[0fr]',
+                                            )}>
+                                                <div className="overflow-hidden">
+                                                    <div className="ml-4 border-l-2 border-primary/20 pl-2 pb-1 space-y-0.5">
 
-                                                        <div
-                                                            className={cn(
-                                                                'grid transition-[grid-template-rows] duration-200 ease-in-out',
-                                                                outletExpanded ? 'grid-rows-[1fr]' : 'grid-rows-[0fr]',
-                                                            )}
-                                                        >
-                                                            <div className="overflow-hidden">
-                                                                <div className="ml-6 space-y-1 border-l-2 border-primary/20">
-                                                                    {outlet.nodes.map((node) => {
-                                                                        const selected =
-                                                                            selectedScopeType === 'warehouse' && selectedNodeId === node.id;
+                                                        {/* Outlet-direct warehouses */}
+                                                        {outlet.warehouses.map((wh) => (
+                                                            <ScopeButton
+                                                                key={wh.id}
+                                                                icon="inventory_2"
+                                                                label={wh.name}
+                                                                badge="Warehouse"
+                                                                selected={selected.scope_type === 'outlet_warehouse' && selected.warehouse_id === wh.id}
+                                                                onClick={() => sel({ scope_type: 'outlet_warehouse', outlet_id: outlet.id, department_id: '', warehouse_id: wh.id })}
+                                                            />
+                                                        ))}
 
-                                                                        return (
-                                                                            <button
-                                                                                key={node.id}
-                                                                                type="button"
-                                                                                className={cn(
-                                                                                    'ml-2 flex w-[calc(100%-0.5rem)] items-center justify-between gap-2 rounded-lg p-2 text-left transition-colors',
-                                                                                    selected
-                                                                                        ? 'bg-primary text-white shadow-sm'
-                                                                                        : 'text-muted-foreground hover:bg-muted',
-                                                                                )}
-                                                                                onClick={() => {
-                                                                                    setSelectedScopeType('warehouse');
-                                                                                    setSelectedOutletId(node.outlet_id ?? '');
-                                                                                    setSelectedNodeId(node.id);
-                                                                                }}
-                                                                            >
-                                                                                <span className="flex min-w-0 items-center gap-2">
-                                                                                    <span className="material-symbols-outlined text-sm">inventory_2</span>
-                                                                                    <span className="truncate text-xs font-medium">{node.node}</span>
-                                                                                </span>
-                                                                                {selected && (
-                                                                                    <span className="material-symbols-outlined text-xs">check_circle</span>
-                                                                                )}
-                                                                            </button>
-                                                                        );
-                                                                    })}
+                                                        {/* Departments */}
+                                                        {outlet.departments.map((dept) => {
+                                                            const deptSelected = selected.scope_type === 'outlet_department' && selected.department_id === dept.id;
+                                                            const deptExpanded = openDept === dept.id;
+                                                            const hasDeptWh    = dept.warehouses.length > 0;
+
+                                                            return (
+                                                                <div key={dept.id}>
+                                                                    {/* Department row — accordion if it has warehouses */}
+                                                                    <ScopeButton
+                                                                        icon="meeting_room"
+                                                                        label={dept.name}
+                                                                        badge="Department"
+                                                                        selected={deptSelected}
+                                                                        expanded={deptExpanded}
+                                                                        hasChildren={hasDeptWh}
+                                                                        onClick={() => {
+                                                                            sel({ scope_type: 'outlet_department', outlet_id: outlet.id, department_id: dept.id, warehouse_id: '' });
+                                                                            if (hasDeptWh) setOpenDept(deptExpanded && !deptSelected ? null : dept.id);
+                                                                        }}
+                                                                    />
+
+                                                                    {/* Department warehouses accordion */}
+                                                                    {hasDeptWh && (
+                                                                        <div className={cn(
+                                                                            'grid transition-[grid-template-rows] duration-200 ease-in-out',
+                                                                            deptExpanded ? 'grid-rows-[1fr]' : 'grid-rows-[0fr]',
+                                                                        )}>
+                                                                            <div className="overflow-hidden">
+                                                                                <div className="ml-4 border-l-2 border-border/40 pl-2 space-y-0.5 pb-0.5">
+                                                                                    {dept.warehouses.map((wh) => (
+                                                                                        <ScopeButton
+                                                                                            key={wh.id}
+                                                                                            icon="inventory_2"
+                                                                                            label={wh.name}
+                                                                                            badge="Warehouse"
+                                                                                            selected={selected.scope_type === 'department_warehouse' && selected.warehouse_id === wh.id}
+                                                                                            onClick={() => sel({ scope_type: 'department_warehouse', outlet_id: outlet.id, department_id: dept.id, warehouse_id: wh.id })}
+                                                                                        />
+                                                                                    ))}
+                                                                                </div>
+                                                                            </div>
+                                                                        </div>
+                                                                    )}
                                                                 </div>
-                                                            </div>
-                                                        </div>
-                                                    </>
-                                                )}
+                                                            );
+                                                        })}
+                                                    </div>
+                                                </div>
                                             </div>
-                                        );
-                                    })
-                                )}
+                                        </div>
+                                    );
+                                })}
                             </div>
                         </div>
                     )}
 
-                    {errors?.outlet_id && (
-                        <p className="text-sm text-red-600 dark:text-red-400">{errors.outlet_id}</p>
+                    {!canSelectGlobal && !hasAnything && (
+                        <p className="py-4 text-sm text-muted-foreground text-center">
+                            No outlets or warehouses are available yet.
+                        </p>
                     )}
 
-                    {errors?.warehouse_id && (
-                        <p className="text-sm text-red-600 dark:text-red-400">{errors.warehouse_id}</p>
+                    {(errors?.outlet_id || errors?.department_id || errors?.warehouse_id || errors?.scope_type) && (
+                        <p className="text-sm text-red-600 dark:text-red-400">
+                            {errors.scope_type ?? errors.outlet_id ?? errors.department_id ?? errors.warehouse_id}
+                        </p>
                     )}
 
-                    <div className="flex gap-2 pt-4">
+                    <div className="pt-4">
                         <Button
                             type="submit"
-                            disabled={!canSubmit || processing}
-                            className="rounded-lg flex-1"
+                            disabled={!isValid(selected) || processing}
+                            className="w-full rounded-lg"
                         >
                             {processing ? 'Applying...' : 'Continue'}
                         </Button>
-
-                        {canCreateOutlet && (
-                            <Button
-                                type="button"
-                                variant="outline"
-                                onClick={() => setShowCreateOutletModal(true)}
-                                className="rounded-lg"
-                            >
-                                <span className="material-symbols-outlined text-base mr-2">add</span>
-                                Outlet
-                            </Button>
-                        )}
-
-                        {canCreateWarehouse && (
-                            <Button
-                                type="button"
-                                variant="outline"
-                                onClick={() => setShowCreateWarehouseModal(true)}
-                                disabled={selectedOutletId === ''}
-                                className="rounded-lg"
-                            >
-                                <span className="material-symbols-outlined text-base mr-2">add</span>
-                                Warehouse
-                            </Button>
-                        )}
                     </div>
                 </form>
 
@@ -489,102 +340,6 @@ export default function ScopeSelection() {
                         Sign out
                     </button>
                 </div>
-
-                {/* Create Outlet Modal */}
-                <Dialog open={showCreateOutletModal} onOpenChange={setShowCreateOutletModal}>
-                    <DialogContent className="sm:max-w-md">
-                        <DialogHeader>
-                            <DialogTitle>Create New Outlet</DialogTitle>
-                            <DialogDescription>
-                                Enter a name for the new outlet.
-                            </DialogDescription>
-                        </DialogHeader>
-
-                        <form onSubmit={handleCreateOutlet} className="space-y-4">
-                            <div>
-                                <label htmlFor="outlet-name" className="block text-sm font-medium mb-2">
-                                    Outlet Name
-                                </label>
-                                <Input
-                                    id="outlet-name"
-                                    type="text"
-                                    value={outletName}
-                                    onChange={(e) => setOutletName(e.target.value)}
-                                    placeholder="e.g., Main Branch"
-                                    required
-                                    autoFocus
-                                    disabled={isCreating}
-                                />
-                            </div>
-
-                            {creationError && (
-                                <p className="text-sm text-red-600 dark:text-red-400">{creationError}</p>
-                            )}
-
-                            <div className="flex gap-2 justify-end pt-4">
-                                <Button
-                                    type="button"
-                                    variant="outline"
-                                    onClick={() => setShowCreateOutletModal(false)}
-                                    disabled={isCreating}
-                                >
-                                    Cancel
-                                </Button>
-                                <Button type="submit" disabled={isCreating || outletName.trim() === ''}>
-                                    {isCreating ? 'Creating...' : 'Create'}
-                                </Button>
-                            </div>
-                        </form>
-                    </DialogContent>
-                </Dialog>
-
-                {/* Create Warehouse Modal */}
-                <Dialog open={showCreateWarehouseModal} onOpenChange={setShowCreateWarehouseModal}>
-                    <DialogContent className="sm:max-w-md">
-                        <DialogHeader>
-                            <DialogTitle>Create New Warehouse</DialogTitle>
-                            <DialogDescription>
-                                Enter a name for the new warehouse.
-                            </DialogDescription>
-                        </DialogHeader>
-
-                        <form onSubmit={handleCreateWarehouse} className="space-y-4">
-                            <div>
-                                <label htmlFor="warehouse-name" className="block text-sm font-medium mb-2">
-                                    Warehouse Name
-                                </label>
-                                <Input
-                                    id="warehouse-name"
-                                    type="text"
-                                    value={warehouseName}
-                                    onChange={(e) => setWarehouseName(e.target.value)}
-                                    placeholder="e.g., Warehouse A"
-                                    required
-                                    autoFocus
-                                    disabled={isCreating}
-                                />
-                            </div>
-
-                            {creationError && (
-                                <p className="text-sm text-red-600 dark:text-red-400">{creationError}</p>
-                            )}
-
-                            <div className="flex gap-2 justify-end pt-4">
-                                <Button
-                                    type="button"
-                                    variant="outline"
-                                    onClick={() => setShowCreateWarehouseModal(false)}
-                                    disabled={isCreating}
-                                >
-                                    Cancel
-                                </Button>
-                                <Button type="submit" disabled={isCreating || warehouseName.trim() === ''}>
-                                    {isCreating ? 'Creating...' : 'Create'}
-                                </Button>
-                            </div>
-                        </form>
-                    </DialogContent>
-                </Dialog>
             </div>
         </div>
     );

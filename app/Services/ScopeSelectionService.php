@@ -3,6 +3,7 @@
 namespace App\Services;
 
 use App\Models\Outlet;
+use App\Models\OutletDepartment;
 use App\Models\User;
 use App\Models\UserRoleAssignment;
 use App\Models\Warehouse;
@@ -17,64 +18,31 @@ class ScopeSelectionService
     public function selectScope(Request $request, User $actor, array $data): string
     {
         $redirectTo = (string) ($data['redirect_to'] ?? '/dashboard');
+        $scopeType  = $data['scope_type'];
 
-        if (! $this->accessControl->hasGlobalScopeRole($actor)) {
-            $this->assertActorCanAccessScope($actor, $data);
-        }
-
-        if ($data['scope_type'] === 'global') {
+        if ($scopeType === 'global') {
             if (! $this->accessControl->hasGlobalScopeRole($actor)) {
                 throw ValidationException::withMessages(['scope_type' => 'You do not have permission to use global scope.']);
             }
 
             $request->session()->put('current_scope_type', 'global');
-            $request->session()->forget('current_outlet_id');
-            $request->session()->forget('current_node_id');
+            $request->session()->forget(['current_outlet_id', 'current_department_id', 'current_node_id']);
 
             return $redirectTo;
         }
 
-        if ($data['scope_type'] === 'outlet') {
-            $outletId = (string) ($data['outlet_id'] ?? '');
-
-            if ($outletId === '') {
-                throw ValidationException::withMessages(['outlet_id' => 'Please select an outlet.']);
-            }
-
-            if (! Schema::hasTable('outlets')) {
-                throw ValidationException::withMessages(['outlet_id' => 'Outlet data is not available yet.']);
-            }
-
-            if (! Outlet::query()->whereKey($outletId)->exists()) {
-                throw ValidationException::withMessages(['outlet_id' => 'The selected outlet is not available.']);
-            }
-
-            $request->session()->put('current_scope_type', 'outlet');
-            $request->session()->put('current_outlet_id', $outletId);
-            $request->session()->forget('current_node_id');
-
-            return $redirectTo;
+        if (! $this->accessControl->hasGlobalScopeRole($actor)) {
+            $this->assertActorCanAccessScope($actor, $data);
         }
 
-        $warehouseId = (string) ($data['warehouse_id'] ?? '');
-
-        if ($warehouseId === '') {
-            throw ValidationException::withMessages(['warehouse_id' => 'Please select a warehouse.']);
-        }
-
-        if (! Schema::hasTable('warehouses')) {
-            throw ValidationException::withMessages(['warehouse_id' => 'Warehouse data is not available yet.']);
-        }
-
-        $warehouse = Warehouse::query()->select(['id', 'outlet_id'])->whereKey($warehouseId)->first();
-
-        if ($warehouse === null) {
-            throw ValidationException::withMessages(['warehouse_id' => 'The selected warehouse is not available.']);
-        }
-
-        $request->session()->put('current_scope_type', 'warehouse');
-        $request->session()->put('current_node_id', (string) $warehouse->getKey());
-        $request->session()->put('current_outlet_id', (string) ($warehouse->outlet_id ?? ''));
+        match ($scopeType) {
+            'central_warehouse'    => $this->storeCentralWarehouseScope($request, $data),
+            'outlet'               => $this->storeOutletScope($request, $data),
+            'outlet_warehouse'     => $this->storeOutletWarehouseScope($request, $data),
+            'outlet_department'    => $this->storeOutletDepartmentScope($request, $data),
+            'department_warehouse' => $this->storeDepartmentWarehouseScope($request, $data),
+            default                => throw ValidationException::withMessages(['scope_type' => 'Invalid scope type.']),
+        };
 
         return $redirectTo;
     }
@@ -130,11 +98,100 @@ class ScopeSelectionService
             'name'      => $warehouseName,
         ]);
 
-        $request->session()->put('current_scope_type', 'warehouse');
+        $request->session()->put('current_scope_type', 'outlet_warehouse');
         $request->session()->put('current_outlet_id', (string) $outlet->getKey());
+        $request->session()->forget('current_department_id');
         $request->session()->put('current_node_id', (string) $warehouse->getKey());
 
         return (string) ($data['redirect_to'] ?? '/dashboard');
+    }
+
+    private function storeCentralWarehouseScope(Request $request, array $data): void
+    {
+        $warehouseId = (string) ($data['warehouse_id'] ?? '');
+
+        if ($warehouseId === '') {
+            throw ValidationException::withMessages(['warehouse_id' => 'Please select a central warehouse.']);
+        }
+
+        if (! Warehouse::query()->whereKey($warehouseId)->where('type', 'central')->exists()) {
+            throw ValidationException::withMessages(['warehouse_id' => 'The selected warehouse is not available.']);
+        }
+
+        $request->session()->put('current_scope_type', 'central_warehouse');
+        $request->session()->put('current_node_id', $warehouseId);
+        $request->session()->forget(['current_outlet_id', 'current_department_id']);
+    }
+
+    private function storeOutletScope(Request $request, array $data): void
+    {
+        $outletId = (string) ($data['outlet_id'] ?? '');
+
+        if ($outletId === '' || ! Outlet::query()->whereKey($outletId)->exists()) {
+            throw ValidationException::withMessages(['outlet_id' => 'Please select a valid outlet.']);
+        }
+
+        $request->session()->put('current_scope_type', 'outlet');
+        $request->session()->put('current_outlet_id', $outletId);
+        $request->session()->forget(['current_department_id', 'current_node_id']);
+    }
+
+    private function storeOutletWarehouseScope(Request $request, array $data): void
+    {
+        $outletId    = (string) ($data['outlet_id'] ?? '');
+        $warehouseId = (string) ($data['warehouse_id'] ?? '');
+
+        if ($outletId === '' || $warehouseId === '') {
+            throw ValidationException::withMessages(['warehouse_id' => 'Please select an outlet and warehouse.']);
+        }
+
+        if (! Warehouse::query()->whereKey($warehouseId)->where('outlet_id', $outletId)->where('type', 'outlet')->exists()) {
+            throw ValidationException::withMessages(['warehouse_id' => 'The selected warehouse is not available.']);
+        }
+
+        $request->session()->put('current_scope_type', 'outlet_warehouse');
+        $request->session()->put('current_outlet_id', $outletId);
+        $request->session()->put('current_node_id', $warehouseId);
+        $request->session()->forget('current_department_id');
+    }
+
+    private function storeOutletDepartmentScope(Request $request, array $data): void
+    {
+        $outletId     = (string) ($data['outlet_id'] ?? '');
+        $departmentId = (string) ($data['department_id'] ?? '');
+
+        if ($outletId === '' || $departmentId === '') {
+            throw ValidationException::withMessages(['department_id' => 'Please select an outlet and department.']);
+        }
+
+        if (! OutletDepartment::query()->whereKey($departmentId)->where('outlet_id', $outletId)->exists()) {
+            throw ValidationException::withMessages(['department_id' => 'The selected department is not available.']);
+        }
+
+        $request->session()->put('current_scope_type', 'outlet_department');
+        $request->session()->put('current_outlet_id', $outletId);
+        $request->session()->put('current_department_id', $departmentId);
+        $request->session()->forget('current_node_id');
+    }
+
+    private function storeDepartmentWarehouseScope(Request $request, array $data): void
+    {
+        $outletId     = (string) ($data['outlet_id'] ?? '');
+        $departmentId = (string) ($data['department_id'] ?? '');
+        $warehouseId  = (string) ($data['warehouse_id'] ?? '');
+
+        if ($outletId === '' || $departmentId === '' || $warehouseId === '') {
+            throw ValidationException::withMessages(['warehouse_id' => 'Please select an outlet, department, and warehouse.']);
+        }
+
+        if (! Warehouse::query()->whereKey($warehouseId)->where('outlet_department_id', $departmentId)->where('type', 'department')->exists()) {
+            throw ValidationException::withMessages(['warehouse_id' => 'The selected warehouse is not available.']);
+        }
+
+        $request->session()->put('current_scope_type', 'department_warehouse');
+        $request->session()->put('current_outlet_id', $outletId);
+        $request->session()->put('current_department_id', $departmentId);
+        $request->session()->put('current_node_id', $warehouseId);
     }
 
     private function assertActorCanAccessScope(User $actor, array $data): void
@@ -142,27 +199,31 @@ class ScopeSelectionService
         $assignments = UserRoleAssignment::where('user_id', $actor->id)
             ->where('is_active', true)
             ->where('scope_type', '!=', 'global')
-            ->get(['scope_type', 'outlet_id', 'warehouse_id']);
+            ->get(['scope_type', 'outlet_id', 'outlet_department_id', 'warehouse_id']);
 
-        $allowedOutletIds    = $assignments->whereNotNull('outlet_id')->pluck('outlet_id')->toArray();
-        $allowedWarehouseIds = $assignments->whereNotNull('warehouse_id')->pluck('warehouse_id')->toArray();
+        $allowedOutletIds    = $assignments->whereNotNull('outlet_id')->pluck('outlet_id')->unique()->values()->toArray();
+        $allowedDeptIds      = $assignments->whereNotNull('outlet_department_id')->pluck('outlet_department_id')->unique()->values()->toArray();
+        $allowedWarehouseIds = $assignments->whereNotNull('warehouse_id')->pluck('warehouse_id')->unique()->values()->toArray();
 
-        if ($data['scope_type'] === 'outlet') {
-            if (! in_array((int) ($data['outlet_id'] ?? 0), $allowedOutletIds, true)) {
-                throw ValidationException::withMessages([
-                    'outlet_id' => 'You do not have access to the selected outlet.',
-                ]);
-            }
-        } else {
-            $warehouse         = Warehouse::query()->select(['id', 'outlet_id'])->find($data['warehouse_id'] ?? null);
-            $inDirectWarehouse = in_array((int) ($data['warehouse_id'] ?? 0), $allowedWarehouseIds, true);
-            $inOutletWarehouse = $warehouse && in_array((int) $warehouse->outlet_id, $allowedOutletIds, true);
+        $outletId     = (int) ($data['outlet_id'] ?? 0);
+        $departmentId = (int) ($data['department_id'] ?? 0);
+        $warehouseId  = (int) ($data['warehouse_id'] ?? 0);
 
-            if (! $inDirectWarehouse && ! $inOutletWarehouse) {
-                throw ValidationException::withMessages([
-                    'warehouse_id' => 'You do not have access to the selected warehouse.',
-                ]);
-            }
+        $hasOutlet    = in_array($outletId, $allowedOutletIds, true);
+        $hasDept      = in_array($departmentId, $allowedDeptIds, true);
+        $hasWarehouse = in_array($warehouseId, $allowedWarehouseIds, true);
+
+        $error = match ($data['scope_type']) {
+            'central_warehouse'    => ! $hasWarehouse,
+            'outlet'               => ! $hasOutlet,
+            'outlet_warehouse'     => ! $hasOutlet && ! $hasWarehouse,
+            'outlet_department'    => ! $hasOutlet && ! $hasDept,
+            'department_warehouse' => ! $hasOutlet && ! $hasDept && ! $hasWarehouse,
+            default                => true,
+        };
+
+        if ($error) {
+            throw ValidationException::withMessages(['scope_type' => 'You do not have access to the selected scope.']);
         }
     }
 }

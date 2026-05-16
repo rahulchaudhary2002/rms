@@ -66,10 +66,10 @@ class HandleInertiaRequests extends Middleware
             return ['user' => null, 'roles' => [], 'permissions' => [], 'can' => []];
         }
 
-        [$scopeType, $scopeId] = $this->resolveCurrentScope($request);
+        [$scopeType, $outletId, $warehouseId] = $this->resolveCurrentScope($request);
 
-        $permissions = $this->accessControl->getUserPermissions($user, $scopeType, $scopeId);
-        $roles = $this->accessControl->getUserRoles($user, $scopeType, $scopeId)
+        $permissions = $this->accessControl->getUserPermissions($user, $scopeType, $outletId, $warehouseId);
+        $roles = $this->accessControl->getUserRoles($user, $scopeType, $outletId, $warehouseId)
             ->map(fn ($role) => ['id' => $role->id, 'name' => $role->name, 'slug' => $role->slug, 'level' => $role->level])
             ->values()
             ->all();
@@ -83,23 +83,26 @@ class HandleInertiaRequests extends Middleware
     }
 
     /**
-     * @return array{0: string, 1: int|null}
+     * @return array{0: string, 1: int|null, 2: int|null}
      */
     private function resolveCurrentScope(Request $request): array
     {
         $scopeType = (string) $request->session()->get('current_scope_type', 'global');
-        $nodeId = $request->session()->get('current_node_id');
-        $outletId = $request->session()->get('current_outlet_id');
+        $nodeId    = $request->session()->get('current_node_id');
+        $outletId  = $request->session()->get('current_outlet_id');
 
-        if ($scopeType === 'warehouse' && $nodeId) {
-            return ['warehouse', (int) $nodeId];
+        $warehouseScopes = ['central_warehouse', 'outlet_warehouse', 'department_warehouse'];
+        $outletScopes    = ['outlet', 'outlet_department'];
+
+        if (in_array($scopeType, $warehouseScopes) && $nodeId) {
+            return [$scopeType, $outletId ? (int) $outletId : null, (int) $nodeId];
         }
 
-        if ($scopeType === 'outlet' && $outletId) {
-            return ['outlet', (int) $outletId];
+        if (in_array($scopeType, $outletScopes) && $outletId) {
+            return [$scopeType, (int) $outletId, null];
         }
 
-        return ['global', null];
+        return ['global', null, null];
     }
 
     /**
@@ -123,11 +126,12 @@ class HandleInertiaRequests extends Middleware
         $assignments = UserRoleAssignment::where('user_id', $user->id)
             ->where('is_active', true)
             ->where('scope_type', '!=', 'global')
-            ->get(['scope_type', 'outlet_id', 'warehouse_id']);
+            ->get(['scope_type', 'outlet_id', 'outlet_department_id', 'warehouse_id']);
 
         return [
-            'outlet'    => $assignments->whereNotNull('outlet_id')->pluck('outlet_id')->unique()->filter()->values()->toArray(),
-            'warehouse' => $assignments->whereNotNull('warehouse_id')->pluck('warehouse_id')->unique()->filter()->values()->toArray(),
+            'outlet'     => $assignments->whereNotNull('outlet_id')->pluck('outlet_id')->unique()->filter()->values()->toArray(),
+            'department' => $assignments->whereNotNull('outlet_department_id')->pluck('outlet_department_id')->unique()->filter()->values()->toArray(),
+            'warehouse'  => $assignments->whereNotNull('warehouse_id')->pluck('warehouse_id')->unique()->filter()->values()->toArray(),
         ];
     }
 
@@ -148,12 +152,13 @@ class HandleInertiaRequests extends Middleware
 
         return DB::table('outlets')
             ->when($allowed !== null, function ($q) use ($allowed) {
-                // Show outlets the user is directly assigned to, or that contain their assigned warehouses.
-                $outletIdsFromWarehouses = DB::table('warehouses')
-                    ->whereIn('id', $allowed['warehouse'])
-                    ->pluck('outlet_id');
-
-                $q->whereIn('id', array_merge($allowed['outlet'], $outletIdsFromWarehouses->toArray()));
+                $outletIdsFromDepts = Schema::hasTable('outlet_departments') && count($allowed['department']) > 0
+                    ? DB::table('outlet_departments')->whereIn('id', $allowed['department'])->pluck('outlet_id')->toArray()
+                    : [];
+                $outletIdsFromWarehouses = count($allowed['warehouse']) > 0
+                    ? DB::table('warehouses')->whereIn('id', $allowed['warehouse'])->pluck('outlet_id')->toArray()
+                    : [];
+                $q->whereIn('id', array_unique(array_merge($allowed['outlet'], $outletIdsFromDepts, $outletIdsFromWarehouses)));
             })
             ->orderBy('name')
             ->get(['id', 'name'])
@@ -182,9 +187,9 @@ class HandleInertiaRequests extends Middleware
 
         return DB::table('warehouses')
             ->when($allowed !== null, function ($q) use ($allowed) {
-                // Show warehouses in the user's assigned outlets, or directly assigned warehouses.
                 $q->where(function ($q2) use ($allowed) {
                     $q2->whereIn('outlet_id', $allowed['outlet'])
+                        ->orWhereIn('outlet_department_id', $allowed['department'])
                         ->orWhereIn('id', $allowed['warehouse']);
                 });
             })
@@ -209,115 +214,162 @@ class HandleInertiaRequests extends Middleware
         }
 
         if (! Schema::hasTable('warehouses') || ! Schema::hasTable('outlets')) {
-            return [
-                ...$this->emptyNodeSelection(),
-                'setup_completed' => true,
-                'selection_url' => '/scope-selection',
-            ];
+            return [...$this->emptyNodeSelection(), 'setup_completed' => true, 'selection_url' => '/scope-selection'];
         }
 
-        if (
-            ! Schema::hasColumns('warehouses', ['id', 'name', 'outlet_id']) ||
-            ! Schema::hasColumns('outlets', ['id', 'name'])
-        ) {
-            return [
-                ...$this->emptyNodeSelection(),
-                'setup_completed' => true,
-                'selection_url' => '/scope-selection',
-            ];
+        if (! Schema::hasColumns('warehouses', ['id', 'name', 'type', 'outlet_id']) || ! Schema::hasColumns('outlets', ['id', 'name'])) {
+            return [...$this->emptyNodeSelection(), 'setup_completed' => true, 'selection_url' => '/scope-selection'];
         }
 
-        $allowed = $this->allowedScopeIds($request);
+        $user            = $request->user();
+        $canSelectGlobal = $user && $this->accessControl->hasGlobalScopeRole($user);
+        $allowed         = $this->allowedScopeIds($request);
 
-        // Get warehouses with their outlets, filtered by the user's allowed scopes.
-        $warehouses = DB::table('warehouses')
-            ->leftJoin('outlets', 'outlets.id', '=', 'warehouses.outlet_id')
-            ->when($allowed !== null, function ($q) use ($allowed) {
-                $q->where(function ($q2) use ($allowed) {
-                    $q2->whereIn('warehouses.outlet_id', $allowed['outlet'])
-                        ->orWhereIn('warehouses.id', $allowed['warehouse']);
-                });
-            })
-            ->orderBy('outlets.name')
-            ->orderBy('warehouses.name')
-            ->get([
-                'warehouses.id as id',
-                'warehouses.name as node',
-                'warehouses.outlet_id as outlet_id',
-                'outlets.name as outlet',
-            ]);
+        // --- Compute allowed outlet IDs (direct + via dept/warehouse) ---
+        $allAllowedOutletIds = null;
+        if ($allowed !== null) {
+            $outletIdsFromDepts = Schema::hasTable('outlet_departments') && count($allowed['department']) > 0
+                ? DB::table('outlet_departments')->whereIn('id', $allowed['department'])->pluck('outlet_id')->toArray()
+                : [];
+            $outletIdsFromWarehouses = count($allowed['warehouse']) > 0
+                ? DB::table('warehouses')->whereIn('id', $allowed['warehouse'])->whereNotNull('outlet_id')->pluck('outlet_id')->toArray()
+                : [];
+            $allAllowedOutletIds = array_unique(array_merge($allowed['outlet'], $outletIdsFromDepts, $outletIdsFromWarehouses));
+        }
 
-        // nodeSelection items are real warehouses only; outlets come via page.props.outlets.
-        $items = $warehouses
-            ->map(fn ($warehouse) => [
-                'id'        => (string) ($warehouse->id ?? ''),
-                'outlet_id' => (string) ($warehouse->outlet_id ?? ''),
-                'outlet'    => (string) ($warehouse->outlet ?? ''),
-                'node'      => (string) ($warehouse->node ?? ''),
-            ])
+        // --- Central warehouses ---
+        $centralWarehouses = DB::table('warehouses')
+            ->where('type', 'central')
+            ->whereNull('deleted_at')
+            ->when($allowed !== null, fn ($q) => $q->whereIn('id', $allowed['warehouse']))
+            ->orderBy('name')
+            ->get(['id', 'name'])
+            ->map(fn ($w) => ['id' => (string) $w->id, 'name' => (string) $w->name])
             ->values()
             ->all();
 
-        $user = $request->user();
-        $canSelectGlobal = $user && $this->accessControl->hasGlobalScopeRole($user);
+        // --- Outlets ---
+        $outlets = DB::table('outlets')
+            ->when($allAllowedOutletIds !== null, fn ($q) => $q->whereIn('id', $allAllowedOutletIds))
+            ->orderBy('name')
+            ->get(['id', 'name']);
 
-        $sessionScopeType = $request->session()->get('current_scope_type');
-        $currentScopeType = (string) ($sessionScopeType ?? 'warehouse');
-        $currentNodeId = (string) $request->session()->get('current_node_id', '');
-        $currentOutletId = (string) $request->session()->get('current_outlet_id', '');
+        $outletIds = $outlets->pluck('id')->toArray();
 
-        if ($sessionScopeType === 'global') {
-            return [
-                'setup_completed'      => true,
-                'selection_url'        => '/scope-selection',
-                'setup_url'            => null,
-                'can_select_global'    => $canSelectGlobal,
-                'current_scope_type'   => 'global',
-                'current_outlet_id'    => null,
-                'current_outlet_label' => null,
-                'current_node_id'      => null,
-                'current_node_label'   => null,
-                'items'                => $items,
-            ];
-        }
+        // --- Outlet-direct warehouses (type = 'outlet', no department) ---
+        $outletWarehouses = count($outletIds) > 0
+            ? DB::table('warehouses')
+                ->where('type', 'outlet')
+                ->whereIn('outlet_id', $outletIds)
+                ->whereNull('outlet_department_id')
+                ->whereNull('deleted_at')
+                ->when($allowed !== null, fn ($q) => $q->where(function ($q2) use ($allowed) {
+                    $q2->whereIn('outlet_id', $allowed['outlet'])->orWhereIn('id', $allowed['warehouse']);
+                }))
+                ->orderBy('name')
+                ->get(['id', 'outlet_id', 'name'])
+            : collect();
 
-        $currentNode = $warehouses->first(fn ($warehouse) => (string) ($warehouse->id ?? '') === $currentNodeId);
-        $currentOutlet = null;
+        // --- Departments and their warehouses ---
+        $hasDeptTable = Schema::hasTable('outlet_departments');
+        $depts        = collect();
+        $deptWhs      = collect();
 
-        if ($currentNode !== null) {
-            $currentScopeType = 'warehouse';
-            $currentOutlet = (object) [
-                'id' => (string) ($currentNode->outlet_id ?? ''),
-                'name' => (string) ($currentNode->outlet ?? ''),
-            ];
-        } elseif ($currentOutletId !== '') {
-            $outlet = DB::table('outlets')
-                ->where('id', $currentOutletId)
-                ->first(['id', 'name']);
+        if ($hasDeptTable && count($outletIds) > 0) {
+            $depts = DB::table('outlet_departments')
+                ->whereIn('outlet_id', $outletIds)
+                ->whereNull('deleted_at')
+                ->when($allowed !== null, fn ($q) => $q->where(function ($q2) use ($allowed) {
+                    $q2->whereIn('outlet_id', $allowed['outlet'])->orWhereIn('id', $allowed['department']);
+                }))
+                ->orderBy('name')
+                ->get(['id', 'outlet_id', 'name']);
 
-            if ($outlet !== null) {
-                $currentScopeType = 'outlet';
-                $currentOutlet = $outlet;
+            $deptIds = $depts->pluck('id')->toArray();
+
+            if (count($deptIds) > 0) {
+                $deptWhs = DB::table('warehouses')
+                    ->where('type', 'department')
+                    ->whereIn('outlet_department_id', $deptIds)
+                    ->whereNull('deleted_at')
+                    ->when($allowed !== null, fn ($q) => $q->where(function ($q2) use ($allowed) {
+                        $q2->whereIn('outlet_id', $allowed['outlet'])
+                            ->orWhereIn('outlet_department_id', $allowed['department'])
+                            ->orWhereIn('id', $allowed['warehouse']);
+                    }))
+                    ->orderBy('name')
+                    ->get(['id', 'outlet_department_id', 'name']);
             }
         }
+
+        // --- Group by parent ---
+        $whByOutlet  = $outletWarehouses->groupBy('outlet_id');
+        $deptByOutlet = $depts->groupBy('outlet_id');
+        $whByDept    = $deptWhs->groupBy('outlet_department_id');
+
+        $outletData = $outlets->map(function ($outlet) use ($whByOutlet, $deptByOutlet, $whByDept) {
+            $directWhs = ($whByOutlet[$outlet->id] ?? collect())
+                ->map(fn ($w) => ['id' => (string) $w->id, 'name' => (string) $w->name])
+                ->values()->all();
+
+            $deptList = ($deptByOutlet[$outlet->id] ?? collect())->map(function ($dept) use ($whByDept) {
+                return [
+                    'id'         => (string) $dept->id,
+                    'name'       => (string) $dept->name,
+                    'warehouses' => ($whByDept[$dept->id] ?? collect())
+                        ->map(fn ($w) => ['id' => (string) $w->id, 'name' => (string) $w->name])
+                        ->values()->all(),
+                ];
+            })->values()->all();
+
+            return [
+                'id'          => (string) $outlet->id,
+                'name'        => (string) $outlet->name,
+                'warehouses'  => $directWhs,
+                'departments' => $deptList,
+            ];
+        })->values()->all();
+
+        // --- Current session state ---
+        $currentScopeType   = (string) $request->session()->get('current_scope_type', '');
+        $currentOutletId    = (string) $request->session()->get('current_outlet_id', '');
+        $currentDeptId      = (string) $request->session()->get('current_department_id', '');
+        $currentNodeId      = (string) $request->session()->get('current_node_id', '');
+        $currentLabel       = $this->resolveCurrentLabel($currentScopeType, $currentOutletId, $currentDeptId, $currentNodeId);
 
         return [
             'setup_completed'      => true,
             'selection_url'        => '/scope-selection',
             'setup_url'            => null,
             'can_select_global'    => $canSelectGlobal,
-            'current_scope_type'   => $currentOutlet !== null ? $currentScopeType : null,
-            'current_outlet_id'    => $currentOutlet !== null ? (string) ($currentOutlet->id ?? '') : null,
-            'current_outlet_label' => $currentOutlet !== null ? (string) ($currentOutlet->name ?? '') : null,
-            'current_node_id'      => $currentNode !== null ? (string) ($currentNode->id ?? '') : null,
-            'current_node_label'   => $currentNode !== null
-                ? trim(implode(' / ', array_filter([
-                    (string) ($currentNode->outlet ?? ''),
-                    (string) ($currentNode->node ?? ''),
-                ])))
-                : null,
-            'items' => $items,
+            'current_scope_type'   => $currentScopeType ?: null,
+            'current_outlet_id'    => $currentOutletId ?: null,
+            'current_department_id'=> $currentDeptId ?: null,
+            'current_node_id'      => $currentNodeId ?: null,
+            'current_label'        => $currentLabel,
+            'central_warehouses'   => $centralWarehouses,
+            'outlets'              => $outletData,
         ];
+    }
+
+    private function resolveCurrentLabel(string $scopeType, string $outletId, string $deptId, string $nodeId): ?string
+    {
+        if ($scopeType === 'global') {
+            return 'Global';
+        }
+
+        $outletName = $outletId ? DB::table('outlets')->where('id', $outletId)->value('name') : null;
+        $deptName   = $deptId ? (Schema::hasTable('outlet_departments') ? DB::table('outlet_departments')->where('id', $deptId)->value('name') : null) : null;
+        $whName     = $nodeId ? DB::table('warehouses')->where('id', $nodeId)->value('name') : null;
+
+        return match ($scopeType) {
+            'central_warehouse'    => $whName,
+            'outlet'               => $outletName,
+            'outlet_warehouse'     => implode(' / ', array_filter([$outletName, $whName])) ?: null,
+            'outlet_department'    => implode(' / ', array_filter([$outletName, $deptName])) ?: null,
+            'department_warehouse' => implode(' / ', array_filter([$outletName, $deptName, $whName])) ?: null,
+            default                => null,
+        };
     }
 
     /**
@@ -326,15 +378,17 @@ class HandleInertiaRequests extends Middleware
     private function emptyNodeSelection(): array
     {
         return [
-            'setup_completed' => false,
-            'selection_url' => null,
-            'setup_url' => null,
-            'current_scope_type' => null,
-            'current_outlet_id' => null,
-            'current_outlet_label' => null,
-            'current_node_id' => null,
-            'current_node_label' => null,
-            'items' => [],
+            'setup_completed'      => false,
+            'selection_url'        => null,
+            'setup_url'            => null,
+            'can_select_global'    => false,
+            'current_scope_type'   => null,
+            'current_outlet_id'    => null,
+            'current_department_id'=> null,
+            'current_node_id'      => null,
+            'current_label'        => null,
+            'central_warehouses'   => [],
+            'outlets'              => [],
         ];
     }
 }

@@ -127,31 +127,37 @@ class AccessControlService
     /**
      * Resolves the currently selected scope from the session.
      *
-     * @return array{type: string, outlet_id: int|null, warehouse_id: int|null}
+     * @return array{type: string, outlet_id: int|null, department_id: int|null, warehouse_id: int|null}
      */
     public function resolveSessionScope(Request $request): array
     {
-        $scopeType = (string) $request->session()->get('current_scope_type', 'global');
-        $nodeId    = $request->session()->get('current_node_id');
-        $outletId  = $request->session()->get('current_outlet_id');
+        $scopeType    = (string) $request->session()->get('current_scope_type', 'global');
+        $outletId     = $request->session()->get('current_outlet_id');
+        $departmentId = $request->session()->get('current_department_id');
+        $nodeId       = $request->session()->get('current_node_id');
 
-        if ($scopeType === 'warehouse' && $nodeId) {
+        $warehouseScopes = ['central_warehouse', 'outlet_warehouse', 'department_warehouse'];
+        $outletScopes    = ['outlet', 'outlet_department'];
+
+        if (in_array($scopeType, $warehouseScopes) && $nodeId) {
             return [
-                'type'         => 'warehouse',
-                'outlet_id'    => $outletId ? (int) $outletId : null,
-                'warehouse_id' => (int) $nodeId,
+                'type'          => $scopeType,
+                'outlet_id'     => $outletId ? (int) $outletId : null,
+                'department_id' => $departmentId ? (int) $departmentId : null,
+                'warehouse_id'  => (int) $nodeId,
             ];
         }
 
-        if ($scopeType === 'outlet' && $outletId) {
+        if (in_array($scopeType, $outletScopes) && $outletId) {
             return [
-                'type'         => 'outlet',
-                'outlet_id'    => (int) $outletId,
-                'warehouse_id' => null,
+                'type'          => $scopeType,
+                'outlet_id'     => (int) $outletId,
+                'department_id' => $departmentId ? (int) $departmentId : null,
+                'warehouse_id'  => null,
             ];
         }
 
-        return ['type' => 'global', 'outlet_id' => null, 'warehouse_id' => null];
+        return ['type' => 'global', 'outlet_id' => null, 'department_id' => null, 'warehouse_id' => null];
     }
 
     /**

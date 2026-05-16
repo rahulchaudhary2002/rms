@@ -1,399 +1,183 @@
 import { router, usePage } from '@inertiajs/react';
-import { store as outletsStore } from '@/routes/outlets';
 import { useEffect, useMemo, useRef, useState } from 'react';
-import type { FormEvent } from 'react';
-import { Button } from '@/components/ui/button';
-import {
-    Dialog,
-    DialogContent,
-    DialogDescription,
-    DialogFooter,
-    DialogHeader,
-    DialogTitle,
-} from '@/components/ui/dialog';
-import { Input } from '@/components/ui/input';
-import { SearchableSelect } from '@/components/ui/searchable-select';
 import { cn } from '@/lib/utils';
+import type { ScopeType } from '@/types';
 
-type SelectionScope = 'outlet' | 'warehouse' | 'global';
-
-type NodeItem = {
-    id: string;
-    outlet_id?: string;
-    outlet: string;
-    node: string;
-};
+type CentralWarehouse = { id: string; name: string };
+type DeptWarehouse    = { id: string; name: string };
+type Department       = { id: string; name: string; warehouses: DeptWarehouse[] };
+type OutletWarehouse  = { id: string; name: string };
+type OutletItem       = { id: string; name: string; warehouses: OutletWarehouse[]; departments: Department[] };
 
 type NodeSelectionData = {
     setup_completed: boolean;
     selection_url: string | null;
     can_select_global: boolean;
-    current_scope_type: SelectionScope | null;
+    current_scope_type: ScopeType | null;
     current_outlet_id: string | null;
-    current_outlet_label: string | null;
+    current_department_id: string | null;
     current_node_id: string | null;
-    current_node_label: string | null;
-    items: NodeItem[];
+    current_label: string | null;
+    central_warehouses: CentralWarehouse[];
+    outlets: OutletItem[];
 };
 
 type SharedProps = {
     nodeSelection?: NodeSelectionData;
-    outlets?: Array<{ id: string; name: string }>;
-    warehouses?: Array<{ id: string; outlet_id: string; name: string }>;
     auth?: { can: Record<string, boolean> };
-    errors?: {
-        create_outlet_name?: string;
-        create_warehouse_name?: string;
-    };
 };
 
-type OutletGroup = {
-    key: string;
-    id: string;
-    name: string;
-    nodes: NodeItem[];
+type Pending = {
+    scope_type: ScopeType | null;
+    outlet_id: string | null;
+    department_id: string | null;
+    warehouse_id: string | null;
 };
+
+const WAREHOUSE_SCOPES: ScopeType[] = ['central_warehouse', 'outlet_warehouse', 'department_warehouse'];
+const OUTLET_SCOPES: ScopeType[]    = ['outlet', 'outlet_department'];
+
+function pendingChanged(pending: Pending, ns: NodeSelectionData): boolean {
+    return (
+        pending.scope_type    !== ns.current_scope_type ||
+        pending.outlet_id     !== ns.current_outlet_id ||
+        pending.department_id !== ns.current_department_id ||
+        pending.warehouse_id  !== ns.current_node_id
+    );
+}
 
 export function OutletNodeSwitcher() {
-    const page = usePage<SharedProps>();
-    const nodeSelection = page.props.nodeSelection;
-    const can = page.props.auth?.can ?? {};
-    const canCreateWarehouse = can['warehouses-create'] ?? false;
-    const canCreateOutlet = can['outlets-create'] ?? false;
+    const page           = usePage<SharedProps>();
+    const nodeSelection  = page.props.nodeSelection;
     const canSelectGlobal = nodeSelection?.can_select_global ?? false;
 
+    const rootRef = useRef<HTMLDivElement>(null);
     const [open, setOpen] = useState(false);
-    const [pendingScopeType, setPendingScopeType] =
-        useState<SelectionScope | null>(
-            nodeSelection?.current_scope_type ?? null,
-        );
-    const [pendingOutletId, setPendingOutletId] = useState<string | null>(
-        nodeSelection?.current_outlet_id ?? null,
-    );
-    const [pendingNodeId, setPendingNodeId] = useState<string | null>(
-        nodeSelection?.current_node_id ?? null,
-    );
-    const [openOutlet, setOpenOutlet] = useState<string | null>(null);
+    const [pending, setPending] = useState<Pending>({
+        scope_type:    nodeSelection?.current_scope_type ?? null,
+        outlet_id:     nodeSelection?.current_outlet_id ?? null,
+        department_id: nodeSelection?.current_department_id ?? null,
+        warehouse_id:  nodeSelection?.current_node_id ?? null,
+    });
+    const [openOutlet, setOpenOutlet] = useState<string | null>(nodeSelection?.current_outlet_id ?? null);
+    const [openDept, setOpenDept]     = useState<string | null>(nodeSelection?.current_department_id ?? null);
     const [searchQuery, setSearchQuery] = useState('');
     const [processing, setProcessing] = useState(false);
-    const [createModalOpen, setCreateModalOpen] = useState(false);
-    const [selectedOutletId, setSelectedOutletId] = useState('');
-    const [createWarehouseName, setCreateWarehouseName] = useState('');
-    const [createProcessing, setCreateProcessing] = useState(false);
 
-    // Locally created records (not yet in shared props)
-    const [localOutlets, setLocalOutlets] = useState<{ id: string; name: string }[]>([]);
+    const centralWarehouses = nodeSelection?.central_warehouses ?? [];
+    const outlets           = nodeSelection?.outlets ?? [];
 
-    // Add-outlet sub-modal
-    const [addOutletModalOpen, setAddOutletModalOpen] = useState(false);
-    const [addOutletName, setAddOutletName] = useState('');
-    const [addOutletProcessing, setAddOutletProcessing] = useState(false);
-    const [addOutletError, setAddOutletError] = useState('');
+    const set = (patch: Partial<Pending>) => setPending((p) => ({ ...p, ...patch }));
 
-    const rootRef = useRef<HTMLDivElement>(null);
-    const createErrors = page.props.errors ?? {};
-
-    const hierarchy = useMemo<OutletGroup[]>(() => {
-        const outletMap = new Map<string, OutletGroup>();
-
-        for (const outlet of page.props.outlets ?? []) {
-            const outletName = outlet.name || 'Unknown Outlet';
-            const outletKey = outletName.toLowerCase();
-
-            if (!outletMap.has(outletKey)) {
-                outletMap.set(outletKey, {
-                    key: outletKey,
-                    id: outlet.id,
-                    name: outletName,
-                    nodes: [],
-                });
+    // Flat list of all items for search
+    type FlatItem = { type: ScopeType; label: string; outletId: string | null; deptId: string | null; warehouseId: string | null; outletName?: string; deptName?: string };
+    const allItems = useMemo<FlatItem[]>(() => {
+        const list: FlatItem[] = [];
+        for (const wh of centralWarehouses) {
+            list.push({ type: 'central_warehouse', label: wh.name, outletId: null, deptId: null, warehouseId: wh.id });
+        }
+        for (const o of outlets) {
+            list.push({ type: 'outlet', label: o.name, outletId: o.id, deptId: null, warehouseId: null });
+            for (const wh of o.warehouses) {
+                list.push({ type: 'outlet_warehouse', label: wh.name, outletId: o.id, deptId: null, warehouseId: wh.id, outletName: o.name });
+            }
+            for (const d of o.departments) {
+                list.push({ type: 'outlet_department', label: d.name, outletId: o.id, deptId: d.id, warehouseId: null, outletName: o.name });
+                for (const wh of d.warehouses) {
+                    list.push({ type: 'department_warehouse', label: wh.name, outletId: o.id, deptId: d.id, warehouseId: wh.id, deptName: d.name });
+                }
             }
         }
+        return list;
+    }, [centralWarehouses, outlets]);
 
-        for (const node of nodeSelection?.items ?? []) {
-            if (!node.id || !node.node) continue;
-
-            const outletName = node.outlet || 'Unknown Outlet';
-            const outletKey = outletName.toLowerCase();
-
-            if (!outletMap.has(outletKey)) {
-                outletMap.set(outletKey, {
-                    key: outletKey,
-                    id: node.outlet_id ?? '',
-                    name: outletName,
-                    nodes: [],
-                });
-            }
-
-            outletMap.get(outletKey)?.nodes.push(node);
-        }
-
-        return Array.from(outletMap.values());
-    }, [nodeSelection?.items, page.props.outlets]);
-
-    const filteredHierarchy = useMemo<OutletGroup[]>(() => {
+    const filteredItems = useMemo<FlatItem[]>(() => {
         const term = searchQuery.trim().toLowerCase();
-
-        if (term === '') {
-            return hierarchy;
-        }
-
-        return hierarchy
-            .map((outlet) => {
-                const outletMatches = outlet.name.toLowerCase().includes(term);
-                const nodes = outlet.nodes.filter((node) => {
-                    return (
-                        outletMatches ||
-                        node.node.toLowerCase().includes(term)
-                    );
-                });
-
-                return nodes.length > 0 ? { ...outlet, nodes } : null;
-            })
-            .filter((outlet): outlet is OutletGroup => outlet !== null);
-    }, [hierarchy, searchQuery]);
-
-    const outletOptions = useMemo(() => {
-        const outlets = new Map<string, string>();
-
-        for (const outlet of page.props.outlets ?? []) {
-            if (outlet.id !== '' && !outlets.has(outlet.id)) {
-                outlets.set(outlet.id, outlet.name || 'Unknown Outlet');
-            }
-        }
-
-        for (const node of nodeSelection?.items ?? []) {
-            const outletId = node.outlet_id ?? '';
-
-            if (outletId !== '' && !outlets.has(outletId)) {
-                outlets.set(outletId, node.outlet || 'Unknown Outlet');
-            }
-        }
-
-        const fromProps = Array.from(outlets.entries()).map(([id, name]) => ({ id, name }));
-        const localIds = new Set(fromProps.map((o) => o.id));
-        const extras = localOutlets.filter((o) => !localIds.has(o.id));
-
-        return [...fromProps, ...extras];
-    }, [nodeSelection?.items, page.props.outlets, localOutlets]);
+        if (!term) return [];
+        return allItems.filter((item) => item.label.toLowerCase().includes(term) || (item.outletName ?? '').toLowerCase().includes(term) || (item.deptName ?? '').toLowerCase().includes(term));
+    }, [allItems, searchQuery]);
 
     useEffect(() => {
-        if (!open) {
-            return;
-        }
-
-        const handleMouseDown = (event: MouseEvent) => {
-            if (
-                rootRef.current &&
-                !rootRef.current.contains(event.target as Node)
-            ) {
-                setOpen(false);
-            }
+        if (!open) return;
+        const handleMouseDown = (e: MouseEvent) => {
+            if (rootRef.current && !rootRef.current.contains(e.target as Node)) setOpen(false);
         };
-
-        const handleKeyDown = (event: KeyboardEvent) => {
-            if (event.key === 'Escape') {
-                setOpen(false);
-            }
-        };
-
+        const handleKeyDown = (e: KeyboardEvent) => { if (e.key === 'Escape') setOpen(false); };
         document.addEventListener('mousedown', handleMouseDown);
         document.addEventListener('keydown', handleKeyDown);
-
-        return () => {
-            document.removeEventListener('mousedown', handleMouseDown);
-            document.removeEventListener('keydown', handleKeyDown);
-        };
+        return () => { document.removeEventListener('mousedown', handleMouseDown); document.removeEventListener('keydown', handleKeyDown); };
     }, [open]);
 
     const handleSwitcherToggle = () => {
         if (!open) {
-            const currentScopeType = nodeSelection?.current_scope_type ?? null;
-            const currentOutletId  = nodeSelection?.current_outlet_id ?? null;
-            const currentNodeId    = nodeSelection?.current_node_id ?? null;
-
             setSearchQuery('');
-            setPendingScopeType(currentScopeType);
-            setPendingOutletId(currentOutletId);
-            setPendingNodeId(currentNodeId);
-
-            // Auto-expand the outlet that contains the active scope
-            if (hierarchy.length > 0) {
-                let targetKey: string | null = null;
-
-                if (currentScopeType === 'outlet' && currentOutletId !== null) {
-                    targetKey = hierarchy.find((o) => o.id === currentOutletId)?.key ?? null;
-                } else if (currentScopeType === 'warehouse' && currentNodeId !== null) {
-                    const node = nodeSelection?.items.find((n) => n.id === currentNodeId);
-                    if (node) {
-                        targetKey = hierarchy.find((o) => o.id === node.outlet_id)?.key ?? null;
-                    }
-                }
-
-                setOpenOutlet(targetKey ?? hierarchy[0].key);
-            }
+            setPending({
+                scope_type:    nodeSelection?.current_scope_type ?? null,
+                outlet_id:     nodeSelection?.current_outlet_id ?? null,
+                department_id: nodeSelection?.current_department_id ?? null,
+                warehouse_id:  nodeSelection?.current_node_id ?? null,
+            });
+            setOpenOutlet(nodeSelection?.current_outlet_id ?? (outlets[0]?.id ?? null));
+            setOpenDept(nodeSelection?.current_department_id ?? null);
         }
-
         setOpen((v) => !v);
     };
 
-    const handleOutletToggle = (outletKey: string) => {
-        if (searchQuery.trim() !== '') {
-            return;
-        }
-
-        setOpenOutlet((current) => (current === outletKey ? null : outletKey));
-    };
-
     const handleApplySelection = () => {
-        if (
-            !nodeSelection?.selection_url ||
-            pendingScopeType === null ||
-            processing
-        ) {
-            return;
-        }
+        if (!nodeSelection?.selection_url || pending.scope_type === null || processing) return;
 
         setProcessing(true);
+        const needsOutlet    = OUTLET_SCOPES.includes(pending.scope_type) || WAREHOUSE_SCOPES.includes(pending.scope_type);
+        const needsDept      = pending.scope_type === 'outlet_department' || pending.scope_type === 'department_warehouse';
+        const needsWarehouse = WAREHOUSE_SCOPES.includes(pending.scope_type);
 
         router.post(
             nodeSelection.selection_url,
             {
-                scope_type: pendingScopeType,
-                outlet_id: pendingScopeType === 'outlet' ? pendingOutletId : null,
-                warehouse_id: pendingScopeType === 'warehouse' ? pendingNodeId : null,
-                redirect_to: window.location.pathname,
+                scope_type:    pending.scope_type,
+                outlet_id:     needsOutlet    ? pending.outlet_id     : null,
+                department_id: needsDept      ? pending.department_id : null,
+                warehouse_id:  needsWarehouse ? pending.warehouse_id  : null,
+                redirect_to:   window.location.pathname,
             } as Record<string, string | null>,
             {
                 preserveScroll: true,
-                onFinish: () => {
-                    setProcessing(false);
-                    setOpen(false);
-                    setSearchQuery('');
-                },
+                onFinish: () => { setProcessing(false); setOpen(false); setSearchQuery(''); },
             },
         );
     };
 
-    const createNodeUrl = nodeSelection?.selection_url
-        ? `${nodeSelection.selection_url.replace(/\/$/, '')}/nodes`
-        : null;
+    if (!nodeSelection) return null;
 
-    const handleOpenCreateModal = () => {
-        setOpen(false);
-        setCreateModalOpen(true);
+    const currentLabel = nodeSelection.current_label ?? (nodeSelection.current_scope_type === 'global' ? 'Global' : null);
+    const selectionUnchanged = nodeSelection ? !pendingChanged(pending, nodeSelection) : true;
+
+    const scopeIcon = (type: ScopeType | null): string => {
+        if (type === 'global')               return 'language';
+        if (type === 'central_warehouse')    return 'inventory_2';
+        if (type === 'outlet')               return 'storefront';
+        if (type === 'outlet_warehouse')     return 'inventory_2';
+        if (type === 'outlet_department')    return 'meeting_room';
+        if (type === 'department_warehouse') return 'inventory_2';
+        return 'account_tree';
     };
 
-    const handleRegisterWarehouse = (event: FormEvent<HTMLFormElement>) => {
-        event.preventDefault();
+    const itemIcon = (type: ScopeType): string => scopeIcon(type);
 
-        if (!createNodeUrl || createProcessing) {
-            return;
-        }
+    const isItemSelected = (item: FlatItem) =>
+        pending.scope_type    === item.type &&
+        pending.outlet_id     === item.outletId &&
+        pending.department_id === item.deptId &&
+        pending.warehouse_id  === item.warehouseId;
 
-        setCreateProcessing(true);
-
-        router.post(
-            createNodeUrl,
-            {
-                create_outlet_id: selectedOutletId !== '' ? selectedOutletId : '',
-                create_outlet_name: '',
-                create_warehouse_name: createWarehouseName,
-                redirect_to: window.location.pathname,
-            },
-            {
-                preserveScroll: true,
-                onSuccess: () => {
-                    setCreateModalOpen(false);
-                    setSelectedOutletId('');
-                    setCreateWarehouseName('');
-                    setLocalOutlets([]);
-                },
-                onError: () => setCreateModalOpen(true),
-                onFinish: () => setCreateProcessing(false),
-            },
-        );
-    };
-
-    const handleCreateOutlet = async (event: FormEvent<HTMLFormElement>) => {
-        event.preventDefault();
-
-        if (!addOutletName.trim() || addOutletProcessing) return;
-
-        setAddOutletProcessing(true);
-        setAddOutletError('');
-
-        try {
-            const csrfToken =
-                document.querySelector<HTMLMetaElement>('meta[name="csrf-token"]')?.content ?? '';
-
-            const response = await fetch(outletsStore.url(), {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                    Accept: 'application/json',
-                    'X-CSRF-TOKEN': csrfToken,
-                },
-                body: JSON.stringify({ name: addOutletName.trim() }),
-            });
-
-            const data = (await response.json()) as { id?: string; name?: string; errors?: Record<string, string[]> };
-
-            if (!response.ok) {
-                const msg = data.errors?.name?.[0] ?? 'Failed to create outlet.';
-                setAddOutletError(msg);
-                return;
-            }
-
-            const created = { id: data.id!, name: data.name! };
-            setLocalOutlets((prev) => [...prev, created]);
-            setSelectedOutletId(created.id);
-            setAddOutletModalOpen(false);
-            setAddOutletName('');
-        } catch {
-            setAddOutletError('Network error. Please try again.');
-        } finally {
-            setAddOutletProcessing(false);
-        }
-    };
-
-    if (!nodeSelection) {
-        return null;
-    }
-
-    const selectedNode = nodeSelection.items.find(
-        (node) => node.id === (nodeSelection.current_node_id ?? ''),
-    );
-    const currentLabel =
-        nodeSelection.current_scope_type === 'global'
-            ? 'Global'
-            : nodeSelection.current_node_label
-              ? nodeSelection.current_node_label
-              : nodeSelection.current_outlet_label
-                ? nodeSelection.current_outlet_label
-                : selectedNode
-                  ? `${selectedNode.outlet} / ${selectedNode.node}`
-                  : null;
-    const selectionUnchanged =
-        pendingScopeType === nodeSelection.current_scope_type &&
-        pendingOutletId === nodeSelection.current_outlet_id &&
-        pendingNodeId === nodeSelection.current_node_id;
-
-    const selectOutlet = (outlet: OutletGroup) => {
-        setPendingScopeType('outlet');
-        setPendingOutletId(outlet.id);
-        setPendingNodeId(null);
-    };
-
-    const selectWarehouse = (node: NodeItem) => {
-        if (!node.id) return;
-        setPendingScopeType('warehouse');
-        setPendingOutletId(node.outlet_id ?? null);
-        setPendingNodeId(node.id);
+    const selectItem = (item: FlatItem) => {
+        set({ scope_type: item.type, outlet_id: item.outletId, department_id: item.deptId, warehouse_id: item.warehouseId });
+        if (item.outletId) setOpenOutlet(item.outletId);
     };
 
     return (
         <div ref={rootRef} className="relative w-full max-w-xl min-w-0">
+            {/* Trigger */}
             <button
                 type="button"
                 className="flex h-10 w-full min-w-0 items-center gap-2 rounded-lg bg-muted px-2 text-left transition-all hover:bg-accent focus:ring-2 focus:ring-primary/20 focus:outline-none sm:px-3 lg:h-11 lg:gap-3 lg:px-4"
@@ -402,7 +186,7 @@ export function OutletNodeSwitcher() {
                 onClick={handleSwitcherToggle}
             >
                 <span className="material-symbols-outlined shrink-0 text-primary">
-                    account_tree
+                    {scopeIcon(nodeSelection.current_scope_type)}
                 </span>
                 <div className="flex min-w-0 flex-1 flex-col">
                     <p className="truncate text-[9px] leading-none font-bold tracking-wider text-muted-foreground/60 uppercase">
@@ -412,384 +196,244 @@ export function OutletNodeSwitcher() {
                         {currentLabel ?? 'Select scope'}
                     </p>
                 </div>
-                <span
-                    className={cn(
-                        'material-symbols-outlined ml-auto shrink-0 text-lg text-muted-foreground transition-transform',
-                        open && 'rotate-180',
-                    )}
-                >
+                <span className={cn('material-symbols-outlined ml-auto shrink-0 text-lg text-muted-foreground transition-transform', open && 'rotate-180')}>
                     expand_more
                 </span>
             </button>
 
-            <div
-                className={cn(
-                    'fixed top-16 right-4 left-4 z-[60] mt-2 origin-top-left overflow-hidden rounded-xl border border-border bg-popover text-popover-foreground shadow-2xl transition-all duration-200 sm:absolute sm:top-full sm:right-auto sm:left-0 sm:w-[min(calc(100vw-2rem),30rem)]',
-                    open
-                        ? 'visible scale-100 opacity-100'
-                        : 'invisible scale-95 opacity-0',
-                )}
-            >
-                <div className="border-b border-border bg-muted p-4">
+            {/* Dropdown */}
+            <div className={cn(
+                'fixed top-16 right-4 left-4 z-[60] mt-2 origin-top-left overflow-hidden rounded-xl border border-border bg-popover text-popover-foreground shadow-2xl transition-all duration-200 sm:absolute sm:top-full sm:right-auto sm:left-0 sm:w-[min(calc(100vw-2rem),30rem)]',
+                open ? 'visible scale-100 opacity-100' : 'invisible scale-95 opacity-0',
+            )}>
+                {/* Search */}
+                <div className="border-b border-border bg-muted p-3">
                     <div className="relative">
-                        <span className="material-symbols-outlined absolute top-1/2 left-3 -translate-y-1/2 text-sm text-muted-foreground">
-                            search
-                        </span>
+                        <span className="material-symbols-outlined absolute top-1/2 left-3 -translate-y-1/2 text-sm text-muted-foreground">search</span>
                         <input
                             type="text"
                             value={searchQuery}
-                            onChange={(event) => setSearchQuery(event.target.value)}
-                            placeholder="Search outlet or warehouse..."
+                            onChange={(e) => setSearchQuery(e.target.value)}
+                            placeholder="Search..."
                             className="w-full rounded-lg border border-input bg-background py-2 pr-4 pl-9 text-sm focus:border-ring focus:ring-1 focus:ring-ring"
                         />
                     </div>
                 </div>
 
-                <div className="max-h-[420px] space-y-1 overflow-y-auto p-2">
-                    {canSelectGlobal && (
-                        <>
-                            <button
-                                type="button"
-                                className={cn(
-                                    'flex w-full items-center gap-2 rounded-lg p-2 text-left transition-colors',
-                                    pendingScopeType === 'global'
-                                        ? 'bg-primary text-primary-foreground shadow-sm'
-                                        : 'hover:bg-muted',
-                                )}
-                                onClick={() => {
-                                    setPendingScopeType('global');
-                                    setPendingOutletId(null);
-                                    setPendingNodeId(null);
-                                }}
-                            >
-                                <span className={cn('material-symbols-outlined text-sm', pendingScopeType === 'global' ? '' : 'text-muted-foreground')}>
-                                    public
-                                </span>
-                                <span className="min-w-0 flex-1 text-sm font-semibold">Global</span>
-                                <span className={cn('text-xs', pendingScopeType === 'global' ? 'text-primary-foreground/70' : 'text-muted-foreground')}>
-                                    All outlets &amp; warehouses
-                                </span>
-                                {pendingScopeType === 'global' && (
-                                    <span className="material-symbols-outlined text-sm">check_circle</span>
-                                )}
-                            </button>
-                            {hierarchy.length > 0 && <div className="my-1 h-px bg-border" />}
-                        </>
-                    )}
-
-                    {hierarchy.length === 0 ? (
-                        <p className="p-3 text-sm text-muted-foreground">
-                            No warehouses are available.
-                        </p>
-                    ) : filteredHierarchy.length === 0 ? (
-                        <p className="p-3 text-sm text-muted-foreground">
-                            No warehouses match your search.
-                        </p>
+                <div className="max-h-[420px] overflow-y-auto p-2">
+                    {/* Search results */}
+                    {searchQuery.trim() !== '' ? (
+                        filteredItems.length === 0 ? (
+                            <p className="p-3 text-sm text-muted-foreground">No results found.</p>
+                        ) : (
+                            <div className="space-y-0.5">
+                                {filteredItems.map((item, i) => {
+                                    const selected = isItemSelected(item);
+                                    const sub = item.outletName ? (item.deptName ? `${item.outletName} / ${item.deptName}` : item.outletName) : undefined;
+                                    return (
+                                        <button
+                                            key={i}
+                                            type="button"
+                                            className={cn(
+                                                'flex w-full items-center gap-2 rounded-lg p-2 text-left transition-colors',
+                                                selected ? 'bg-primary text-primary-foreground' : 'hover:bg-muted',
+                                            )}
+                                            onClick={() => selectItem(item)}
+                                        >
+                                            <span className={cn('material-symbols-outlined text-sm shrink-0', selected ? '' : 'text-muted-foreground')}>
+                                                {itemIcon(item.type)}
+                                            </span>
+                                            <span className="min-w-0 flex-1">
+                                                <span className="block truncate text-sm font-medium">{item.label}</span>
+                                                {sub && <span className={cn('block truncate text-xs', selected ? 'text-primary-foreground/70' : 'text-muted-foreground')}>{sub}</span>}
+                                            </span>
+                                            {selected && <span className="material-symbols-outlined text-sm">check_circle</span>}
+                                        </button>
+                                    );
+                                })}
+                            </div>
+                        )
                     ) : (
-                        filteredHierarchy.map((outlet, outletIndex) => {
-                            const hasWarehouses = outlet.nodes.length > 0;
-                            const outletExpanded =
-                                !hasWarehouses ||
-                                searchQuery.trim() !== '' ||
-                                openOutlet === outlet.key;
-                            const outletSelected =
-                                pendingScopeType === 'outlet' &&
-                                pendingOutletId === outlet.id;
+                        /* Hierarchical view */
+                        <div className="space-y-0.5">
+                            {/* Global */}
+                            {canSelectGlobal && (
+                                <>
+                                    <button
+                                        type="button"
+                                        className={cn(
+                                            'flex w-full items-center gap-2 rounded-lg p-2 text-left transition-colors',
+                                            pending.scope_type === 'global' ? 'bg-primary text-primary-foreground' : 'hover:bg-muted',
+                                        )}
+                                        onClick={() => set({ scope_type: 'global', outlet_id: null, department_id: null, warehouse_id: null })}
+                                    >
+                                        <span className={cn('material-symbols-outlined text-sm', pending.scope_type === 'global' ? '' : 'text-muted-foreground')}>language</span>
+                                        <span className="flex-1 text-sm font-semibold">Global</span>
+                                        <span className={cn('text-xs', pending.scope_type === 'global' ? 'text-primary-foreground/70' : 'text-muted-foreground')}>All outlets &amp; warehouses</span>
+                                        {pending.scope_type === 'global' && <span className="material-symbols-outlined text-sm">check_circle</span>}
+                                    </button>
+                                    {(centralWarehouses.length > 0 || outlets.length > 0) && <div className="my-1 h-px bg-border" />}
+                                </>
+                            )}
 
-                            return (
-                                <div key={outlet.key}>
-                                    {outletIndex > 0 && (
-                                        <div className="my-2 h-px bg-border" />
-                                    )}
+                            {/* Central warehouses */}
+                            {centralWarehouses.length > 0 && (
+                                <>
+                                    <p className="px-2 py-1 text-[10px] font-bold uppercase tracking-widest text-muted-foreground/50">Central Warehouses</p>
+                                    {centralWarehouses.map((wh) => {
+                                        const sel = pending.scope_type === 'central_warehouse' && pending.warehouse_id === wh.id;
+                                        return (
+                                            <button
+                                                key={wh.id}
+                                                type="button"
+                                                className={cn('flex w-full items-center gap-2 rounded-lg p-2 text-left transition-colors', sel ? 'bg-primary text-primary-foreground' : 'hover:bg-muted')}
+                                                onClick={() => set({ scope_type: 'central_warehouse', outlet_id: null, department_id: null, warehouse_id: wh.id })}
+                                            >
+                                                <span className={cn('material-symbols-outlined text-sm', sel ? '' : 'text-muted-foreground')}>inventory_2</span>
+                                                <span className="flex-1 truncate text-sm font-medium">{wh.name}</span>
+                                                {sel && <span className="material-symbols-outlined text-sm">check_circle</span>}
+                                            </button>
+                                        );
+                                    })}
+                                    {outlets.length > 0 && <div className="my-1 h-px bg-border" />}
+                                </>
+                            )}
 
-                                    {/* Outlet with no warehouses - show as a direct selectable row */}
-                                    {!hasWarehouses ? (
+                            {/* Outlets */}
+                            {outlets.length === 0 && centralWarehouses.length === 0 && !canSelectGlobal && (
+                                <p className="p-3 text-sm text-muted-foreground">No scopes available.</p>
+                            )}
+
+                            {outlets.map((outlet, idx) => {
+                                const outletSel  = pending.scope_type === 'outlet' && pending.outlet_id === outlet.id;
+                                const outletExp  = openOutlet === outlet.id;
+                                const hasChildren = outlet.warehouses.length > 0 || outlet.departments.length > 0;
+
+                                return (
+                                    <div key={outlet.id}>
+                                        {idx > 0 && <div className="my-1 h-px bg-border/50" />}
+
+                                        {/* Outlet */}
                                         <button
                                             type="button"
                                             className={cn(
                                                 'flex w-full items-center gap-2 rounded-lg p-2 text-left transition-colors',
-                                                outletSelected
-                                                    ? 'bg-primary text-primary-foreground shadow-sm'
-                                                    : 'hover:bg-muted',
+                                                outletSel ? 'bg-primary text-primary-foreground' : outletExp ? 'bg-primary/10' : 'hover:bg-muted',
                                             )}
-                                            onClick={() => selectOutlet(outlet)}
+                                            onClick={() => {
+                                                set({ scope_type: 'outlet', outlet_id: outlet.id, department_id: null, warehouse_id: null });
+                                                setOpenOutlet(outletExp && !outletSel ? null : outlet.id);
+                                            }}
                                         >
-                                            <span className={cn('material-symbols-outlined text-sm', outletSelected ? '' : 'text-muted-foreground')}>
-                                                storefront
-                                            </span>
-                                            <span className="min-w-0 flex-1 truncate text-sm font-semibold">
-                                                {outlet.name}
-                                            </span>
-                                            {outletSelected && (
-                                                <span className="material-symbols-outlined text-sm">check_circle</span>
-                                            )}
+                                            <span className={cn('material-symbols-outlined text-sm shrink-0', outletSel ? '' : outletExp ? 'text-primary' : 'text-muted-foreground')}>storefront</span>
+                                            <span className="flex-1 truncate text-sm font-semibold">{outlet.name}</span>
+                                            <span className={cn('shrink-0 rounded px-1 py-0.5 text-[9px] font-bold uppercase tracking-wide', outletSel ? 'bg-white/20 text-white' : 'bg-muted-foreground/10 text-muted-foreground')}>Outlet</span>
+                                            {outletSel
+                                                ? <span className="material-symbols-outlined text-sm shrink-0">check_circle</span>
+                                                : hasChildren && <span className={cn('material-symbols-outlined text-xs shrink-0 text-muted-foreground transition-transform', outletExp && 'rotate-90')}>chevron_right</span>
+                                            }
                                         </button>
-                                    ) : (
-                                        /* Outlet with warehouses - selectable header + collapsible warehouse list */
-                                        <>
-                                            <button
-                                                type="button"
-                                                className={cn(
-                                                    'flex w-full items-center gap-2 rounded-lg p-2 text-left transition-colors',
-                                                    outletSelected
-                                                        ? 'bg-primary text-primary-foreground shadow-sm'
-                                                        : 'hover:bg-muted',
-                                                    !outletSelected && outletExpanded && 'bg-primary/10',
-                                                )}
-                                                aria-expanded={outletExpanded}
-                                                onClick={() => {
-                                                    selectOutlet(outlet);
-                                                    setOpenOutlet(outlet.key);
-                                                }}
-                                            >
-                                                <span className={cn('material-symbols-outlined text-sm', outletSelected ? '' : outletExpanded ? 'text-primary' : 'text-muted-foreground')}>
-                                                    storefront
-                                                </span>
-                                                <span className="min-w-0 flex-1 truncate text-sm font-semibold">
-                                                    {outlet.name}
-                                                </span>
-                                                {outletSelected ? (
-                                                    <span className="material-symbols-outlined text-sm">check_circle</span>
-                                                ) : (
-                                                    <span className={cn('material-symbols-outlined text-xs text-muted-foreground transition-transform', outletExpanded && 'rotate-90')}>
-                                                        chevron_right
-                                                    </span>
-                                                )}
-                                            </button>
 
-                                            <div
-                                                className={cn(
-                                                    'grid transition-[grid-template-rows] duration-200 ease-in-out',
-                                                    outletExpanded ? 'grid-rows-[1fr]' : 'grid-rows-[0fr]',
-                                                )}
-                                            >
-                                                <div className="overflow-hidden">
-                                                    <div className="ml-6 space-y-1 border-l-2 border-primary/20">
+                                        {/* Children */}
+                                        <div className={cn('grid transition-[grid-template-rows] duration-200 ease-in-out', outletExp ? 'grid-rows-[1fr]' : 'grid-rows-[0fr]')}>
+                                            <div className="overflow-hidden">
+                                                <div className="ml-5 border-l-2 border-primary/20 pl-1 space-y-0.5 pb-1">
 
-                                                        {outlet.nodes.map((node) => {
-                                                            const warehouseSelected = pendingScopeType === 'warehouse' && pendingNodeId === node.id;
-                                                            return (
+                                                    {/* Outlet warehouses */}
+                                                    {outlet.warehouses.map((wh) => {
+                                                        const s = pending.scope_type === 'outlet_warehouse' && pending.warehouse_id === wh.id;
+                                                        return (
+                                                            <button
+                                                                key={wh.id}
+                                                                type="button"
+                                                                className={cn('ml-1 flex w-[calc(100%-0.25rem)] items-center gap-2 rounded-lg p-2 text-left transition-colors', s ? 'bg-primary text-primary-foreground' : 'text-muted-foreground hover:bg-muted')}
+                                                                onClick={() => set({ scope_type: 'outlet_warehouse', outlet_id: outlet.id, department_id: null, warehouse_id: wh.id })}
+                                                            >
+                                                                <span className="material-symbols-outlined text-sm shrink-0">inventory_2</span>
+                                                                <span className="flex-1 truncate text-xs font-medium">{wh.name}</span>
+                                                                <span className={cn('shrink-0 rounded px-1 py-0.5 text-[9px] font-bold uppercase tracking-wide', s ? 'bg-white/20 text-white' : 'bg-muted-foreground/10 text-muted-foreground')}>Warehouse</span>
+                                                                {s && <span className="material-symbols-outlined text-sm">check_circle</span>}
+                                                            </button>
+                                                        );
+                                                    })}
+
+                                                    {/* Departments */}
+                                                    {outlet.departments.map((dept) => {
+                                                        const deptSel = pending.scope_type === 'outlet_department' && pending.department_id === dept.id;
+                                                        const deptExp = openDept === dept.id;
+                                                        const hasDeptWh = dept.warehouses.length > 0;
+
+                                                        return (
+                                                            <div key={dept.id}>
+                                                                {/* Department row */}
                                                                 <button
                                                                     type="button"
-                                                                    key={node.id}
-                                                                    className={cn(
-                                                                        'ml-2 flex w-[calc(100%-0.5rem)] items-center justify-between gap-2 rounded-lg p-2 text-left transition-colors',
-                                                                        warehouseSelected
-                                                                            ? 'bg-primary text-primary-foreground shadow-sm'
-                                                                            : 'text-muted-foreground hover:bg-muted',
-                                                                    )}
-                                                                    onClick={() => selectWarehouse(node)}
+                                                                    className={cn('ml-1 flex w-[calc(100%-0.25rem)] items-center gap-2 rounded-lg p-2 text-left transition-colors', deptSel ? 'bg-primary text-primary-foreground' : deptExp ? 'bg-primary/10' : 'text-muted-foreground hover:bg-muted')}
+                                                                    onClick={() => {
+                                                                        set({ scope_type: 'outlet_department', outlet_id: outlet.id, department_id: dept.id, warehouse_id: null });
+                                                                        if (hasDeptWh) setOpenDept(deptExp && !deptSel ? null : dept.id);
+                                                                    }}
                                                                 >
-                                                                    <span className="flex min-w-0 items-center gap-2">
-                                                                        <span className="material-symbols-outlined text-sm">inventory_2</span>
-                                                                        <span className="truncate text-xs font-medium">{node.node}</span>
-                                                                    </span>
-                                                                    {warehouseSelected && (
-                                                                        <span className="material-symbols-outlined text-sm">check_circle</span>
-                                                                    )}
+                                                                    <span className={cn('material-symbols-outlined text-sm shrink-0', deptSel ? '' : deptExp ? 'text-primary' : '')}>meeting_room</span>
+                                                                    <span className="flex-1 truncate text-xs font-medium">{dept.name}</span>
+                                                                    <span className={cn('shrink-0 rounded px-1 py-0.5 text-[9px] font-bold uppercase tracking-wide', deptSel ? 'bg-white/20 text-white' : 'bg-muted-foreground/10 text-muted-foreground')}>Dept</span>
+                                                                    {deptSel
+                                                                        ? <span className="material-symbols-outlined text-sm">check_circle</span>
+                                                                        : hasDeptWh && <span className={cn('material-symbols-outlined text-xs text-muted-foreground transition-transform', deptExp && 'rotate-90')}>chevron_right</span>
+                                                                    }
                                                                 </button>
-                                                            );
-                                                        })}
-                                                    </div>
+
+                                                                {/* Dept warehouses accordion */}
+                                                                {hasDeptWh && (
+                                                                    <div className={cn('grid transition-[grid-template-rows] duration-200 ease-in-out', deptExp ? 'grid-rows-[1fr]' : 'grid-rows-[0fr]')}>
+                                                                        <div className="overflow-hidden">
+                                                                            <div className="ml-4 border-l-2 border-border/40 pl-1 space-y-0.5 pb-0.5">
+                                                                                {dept.warehouses.map((wh) => {
+                                                                                    const s = pending.scope_type === 'department_warehouse' && pending.warehouse_id === wh.id;
+                                                                                    return (
+                                                                                        <button
+                                                                                            key={wh.id}
+                                                                                            type="button"
+                                                                                            className={cn('ml-1 flex w-[calc(100%-0.25rem)] items-center gap-2 rounded-lg p-2 text-left transition-colors', s ? 'bg-primary text-primary-foreground' : 'text-muted-foreground hover:bg-muted')}
+                                                                                            onClick={() => set({ scope_type: 'department_warehouse', outlet_id: outlet.id, department_id: dept.id, warehouse_id: wh.id })}
+                                                                                        >
+                                                                                            <span className="material-symbols-outlined text-sm shrink-0">inventory_2</span>
+                                                                                            <span className="flex-1 truncate text-xs font-medium">{wh.name}</span>
+                                                                                            <span className={cn('shrink-0 rounded px-1 py-0.5 text-[9px] font-bold uppercase tracking-wide', s ? 'bg-white/20 text-white' : 'bg-muted-foreground/10 text-muted-foreground')}>Warehouse</span>
+                                                                                            {s && <span className="material-symbols-outlined text-sm">check_circle</span>}
+                                                                                        </button>
+                                                                                    );
+                                                                                })}
+                                                                            </div>
+                                                                        </div>
+                                                                    </div>
+                                                                )}
+                                                            </div>
+                                                        );
+                                                    })}
                                                 </div>
                                             </div>
-                                        </>
-                                    )}
-                                </div>
-                            );
-                        })
+                                        </div>
+                                    </div>
+                                );
+                            })}
+                        </div>
                     )}
                 </div>
 
+                {/* Footer */}
                 <div className="border-t border-border bg-muted p-3">
-                    <div className={cn('grid gap-2', canCreateWarehouse ? 'grid-cols-2' : 'grid-cols-1')}>
-                        {canCreateWarehouse && (
-                            <button
-                                type="button"
-                                className="flex min-w-0 items-center justify-center gap-2 rounded-lg bg-card px-3 py-2.5 text-xs font-bold text-primary transition-colors hover:bg-accent"
-                                onClick={handleOpenCreateModal}
-                                disabled={!createNodeUrl}
-                            >
-                                <span className="material-symbols-outlined text-sm">
-                                    add_circle
-                                </span>
-                                <span className="truncate">Register Warehouse</span>
-                            </button>
-                        )}
-
-                        <button
-                            type="button"
-                            className="flex min-w-0 items-center justify-center gap-2 rounded-lg bg-primary px-3 py-2.5 text-xs font-bold text-primary-foreground shadow-sm transition-colors hover:bg-primary/90"
-                            onClick={handleApplySelection}
-                            disabled={
-                                pendingScopeType === null ||
-                                selectionUnchanged ||
-                                processing
-                            }
-                        >
-                            <span className="material-symbols-outlined text-sm">
-                                check
-                            </span>
-                            {processing ? 'Applying...' : 'Apply'}
-                        </button>
-                    </div>
+                    <button
+                        type="button"
+                        className="flex w-full min-w-0 items-center justify-center gap-2 rounded-lg bg-primary px-3 py-2.5 text-xs font-bold text-primary-foreground shadow-sm transition-colors hover:bg-primary/90 disabled:opacity-50"
+                        onClick={handleApplySelection}
+                        disabled={pending.scope_type === null || selectionUnchanged || processing}
+                    >
+                        <span className="material-symbols-outlined text-sm">check</span>
+                        {processing ? 'Applying...' : 'Apply'}
+                    </button>
                 </div>
             </div>
-
-            {/* Register Warehouse Modal */}
-            <Dialog open={createModalOpen} onOpenChange={setCreateModalOpen}>
-                <DialogContent>
-                    <form onSubmit={handleRegisterWarehouse} className="space-y-5">
-                        <DialogHeader>
-                            <DialogTitle>Register New Warehouse</DialogTitle>
-                            <DialogDescription>
-                                Select or create an outlet, then select or
-                                create a warehouse to register.
-                            </DialogDescription>
-                        </DialogHeader>
-
-                        <div className="space-y-4">
-                            <div>
-                                <label
-                                    className="mb-1 block text-sm font-medium text-foreground"
-                                    htmlFor="create_outlet_select"
-                                >
-                                    Outlet
-                                </label>
-                                <SearchableSelect
-                                    id="create_outlet_select"
-                                    value={selectedOutletId}
-                                    placeholder="Search or select outlet"
-                                    addNewLabel={canCreateOutlet ? 'Add outlet' : undefined}
-                                    onAddNew={canCreateOutlet ? (query) => {
-                                        setAddOutletName(query);
-                                        setAddOutletError('');
-                                        setAddOutletModalOpen(true);
-                                    } : undefined}
-                                    onChange={(event) => {
-                                        setSelectedOutletId(event.target.value);
-                                    }}
-                                    required
-                                >
-                                    <option value="">Select outlet</option>
-                                    {outletOptions.map((outlet) => (
-                                        <option key={outlet.id} value={outlet.id}>
-                                            {outlet.name}
-                                        </option>
-                                    ))}
-                                </SearchableSelect>
-                            </div>
-
-                            <div>
-                                <label
-                                    className="mb-1 block text-sm font-medium text-foreground"
-                                    htmlFor="create_warehouse_name"
-                                >
-                                    Warehouse
-                                </label>
-                                <Input
-                                    id="create_warehouse_name"
-                                    value={createWarehouseName}
-                                    onChange={(event) =>
-                                        setCreateWarehouseName(event.target.value)
-                                    }
-                                    className="h-11 rounded-lg"
-                                    placeholder="Enter warehouse name"
-                                    required
-                                />
-                                {createErrors.create_warehouse_name && (
-                                    <p className="mt-1 text-sm text-destructive">
-                                        {createErrors.create_warehouse_name}
-                                    </p>
-                                )}
-                            </div>
-                        </div>
-
-                        <DialogFooter>
-                            <Button
-                                type="button"
-                                variant="secondary"
-                                className="h-11"
-                                onClick={() => setCreateModalOpen(false)}
-                            >
-                                Cancel
-                            </Button>
-                            <Button
-                                type="submit"
-                                className="h-11"
-                                disabled={createProcessing}
-                            >
-                                {createProcessing ? 'Registering...' : 'Register Warehouse'}
-                            </Button>
-                        </DialogFooter>
-                    </form>
-                </DialogContent>
-            </Dialog>
-
-            {/* Add Outlet Sub-Modal */}
-            <Dialog
-                open={addOutletModalOpen}
-                onOpenChange={(open) => {
-                    setAddOutletModalOpen(open);
-                    if (!open) {
-                        setAddOutletError('');
-                    }
-                }}
-            >
-                <DialogContent className="z-[110]">
-                    <form onSubmit={handleCreateOutlet} className="space-y-5">
-                        <DialogHeader>
-                            <DialogTitle>Add Outlet</DialogTitle>
-                            <DialogDescription>
-                                Enter a name for the new outlet.
-                            </DialogDescription>
-                        </DialogHeader>
-
-                        <div>
-                            <label
-                                className="mb-1 block text-sm font-medium text-foreground"
-                                htmlFor="add_outlet_name"
-                            >
-                                Outlet Name
-                            </label>
-                            <Input
-                                id="add_outlet_name"
-                                value={addOutletName}
-                                onChange={(event) => setAddOutletName(event.target.value)}
-                                className="h-11 rounded-lg"
-                                placeholder="Enter outlet name"
-                                required
-                                autoFocus
-                            />
-                            {addOutletError && (
-                                <p className="mt-1 text-sm text-destructive">
-                                    {addOutletError}
-                                </p>
-                            )}
-                        </div>
-
-                        <DialogFooter>
-                            <Button
-                                type="button"
-                                variant="secondary"
-                                className="h-11"
-                                onClick={() => setAddOutletModalOpen(false)}
-                            >
-                                Cancel
-                            </Button>
-                            <Button
-                                type="submit"
-                                className="h-11"
-                                disabled={addOutletProcessing}
-                            >
-                                {addOutletProcessing ? 'Creating...' : 'Create Outlet'}
-                            </Button>
-                        </DialogFooter>
-                    </form>
-                </DialogContent>
-            </Dialog>
-
         </div>
     );
 }
-
