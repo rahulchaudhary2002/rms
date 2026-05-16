@@ -333,11 +333,13 @@ class HandleInertiaRequests extends Middleware
                 ->map(fn ($w) => ['id' => (string) $w->id, 'name' => (string) $w->name])
                 ->values()->all();
 
-            $deptList = ($deptByOutlet[$outlet->id] ?? collect())->map(function ($dept) use ($whByDept, $allowed, $directDeptIds) {
+            $deptList = ($deptByOutlet[$outlet->id] ?? collect())->map(function ($dept) use ($whByDept, $allowed, $directDeptIds, $directOutletIds) {
                 return [
                     'id'         => (string) $dept->id,
                     'name'       => (string) $dept->name,
-                    'selectable' => $allowed === null || in_array((int) $dept->id, $directDeptIds),
+                    'selectable' => $allowed === null
+                        || in_array((int) $dept->id, $directDeptIds)
+                        || in_array((int) $dept->outlet_id, $directOutletIds),
                     'warehouses' => ($whByDept[$dept->id] ?? collect())
                         ->map(fn ($w) => ['id' => (string) $w->id, 'name' => (string) $w->name])
                         ->values()->all(),

@@ -218,11 +218,14 @@ class ScopeSelectionService
         $warehouseId  = (int) ($data['warehouse_id'] ?? 0);
 
         $error = match ($data['scope_type']) {
+            // strict: only a direct outlet assignment grants outlet scope
             'central_warehouse'    => ! in_array($warehouseId, $allowedCentralWhIds, true),
             'outlet'               => ! in_array($outletId, $allowedOutletIds, true),
-            'outlet_warehouse'     => ! in_array($warehouseId, $allowedOutletWhIds, true),
-            'outlet_department'    => ! in_array($departmentId, $allowedDeptIds, true),
-            'department_warehouse' => ! in_array($warehouseId, $allowedDeptWhIds, true),
+
+            // sub-scopes: a parent-level assignment also grants access (containment is verified in the store* methods)
+            'outlet_warehouse'     => ! in_array($warehouseId, $allowedOutletWhIds, true)   && ! in_array($outletId, $allowedOutletIds, true),
+            'outlet_department'    => ! in_array($departmentId, $allowedDeptIds, true)       && ! in_array($outletId, $allowedOutletIds, true),
+            'department_warehouse' => ! in_array($warehouseId, $allowedDeptWhIds, true)      && ! in_array($departmentId, $allowedDeptIds, true) && ! in_array($outletId, $allowedOutletIds, true),
             default                => true,
         };
 
