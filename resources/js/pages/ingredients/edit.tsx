@@ -1,11 +1,12 @@
 import { Head, Link, useForm } from '@inertiajs/react';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { FormSection } from '@/components/form-section';
 import { PageHeader } from '@/components/page-header';
 import {
     QuickCreateIngredientCategoryModal,
     QuickCreateUnitModal,
 } from '@/components/quick-create-modals';
+import { DropzoneUploader } from '@/components/ui/dropzone-uploader';
 import { FormField } from '@/components/ui/form-field';
 import { Input } from '@/components/ui/input';
 import { SearchableSelect } from '@/components/ui/searchable-select';
@@ -45,7 +46,9 @@ export default function IngredientsEdit({
 }: Props) {
     const { can } = useCan();
     const [modal, setModal] = useState<'category' | 'unit' | null>(null);
-    const { data, setData, put, processing, errors } = useForm({
+    const [previewUrl, setPreviewUrl] = useState<string | null>(null);
+    const [currentImageUrl, setCurrentImageUrl] = useState<string | null>(ingredient.image_url ?? null);
+    const { data, setData, post, processing, errors } = useForm({
         ingredient_category_id:
             ingredient.ingredient_category_id !== null
                 ? String(ingredient.ingredient_category_id)
@@ -54,6 +57,9 @@ export default function IngredientsEdit({
         slug: ingredient.slug,
         code: ingredient.code,
         barcode: ingredient.barcode ?? '',
+        image: null as File | null,
+        remove_image: false,
+        _method: 'PUT',
         type: ingredient.type,
         base_unit_id: String(ingredient.base_unit_id),
         default_purchase_unit_id:
@@ -65,13 +71,37 @@ export default function IngredientsEdit({
                 ? String(ingredient.default_usage_unit_id)
                 : '',
         minimum_stock: ingredient.minimum_stock,
-        reorder_stock: ingredient.reorder_stock,
+        reorder_level: ingredient.reorder_level,
+        reorder_quantity: ingredient.reorder_quantity,
         costing_method: ingredient.costing_method,
         is_perishable: ingredient.is_perishable,
         track_expiry: ingredient.track_expiry,
         description: ingredient.description ?? '',
         is_active: ingredient.is_active,
     });
+
+    useEffect(() => {
+        return () => {
+            if (previewUrl) URL.revokeObjectURL(previewUrl);
+        };
+    }, [previewUrl]);
+
+    function holdImage(files: File[]) {
+        const file = files[0] ?? null;
+        if (previewUrl) URL.revokeObjectURL(previewUrl);
+        setData('image', file);
+        setData('remove_image', false);
+        setPreviewUrl(file ? URL.createObjectURL(file) : null);
+    }
+
+    function removeImage(e: React.MouseEvent) {
+        e.stopPropagation();
+        if (previewUrl) URL.revokeObjectURL(previewUrl);
+        setData('image', null);
+        setData('remove_image', true);
+        setPreviewUrl(null);
+        setCurrentImageUrl(null);
+    }
 
     function slugify(value: string) {
         return value
@@ -98,7 +128,7 @@ export default function IngredientsEdit({
 
     function submit(e: React.FormEvent) {
         e.preventDefault();
-        put(ingredientsUpdate.url(ingredient.id));
+        post(ingredientsUpdate.url(ingredient.id), { forceFormData: true });
     }
 
     return (
@@ -237,6 +267,34 @@ export default function IngredientsEdit({
                 </FormSection>
 
                 <FormSection
+                    title="Image"
+                    description="Upload an image to represent this ingredient."
+                >
+                    <FormField label="Image (optional)" error={errors.image}>
+                        <DropzoneUploader
+                            accept="image/*"
+                            multiple={false}
+                            disabled={processing}
+                            onFiles={holdImage}
+                            className="min-h-56 p-4"
+                            preview={(previewUrl || currentImageUrl) && (
+                                <div className="relative w-full overflow-hidden rounded-lg border border-border bg-card">
+                                    <img src={previewUrl ?? currentImageUrl ?? ''} alt={ingredient.name} className="h-44 w-full object-cover" />
+                                    <button
+                                        type="button"
+                                        onClick={removeImage}
+                                        className="absolute top-2 right-2 inline-flex items-center gap-1 rounded-md bg-black/70 px-2.5 py-1.5 text-xs font-bold text-white transition-colors hover:bg-black"
+                                    >
+                                        <span className="material-symbols-outlined text-[15px]">close</span>
+                                        Remove
+                                    </button>
+                                </div>
+                            )}
+                        />
+                    </FormField>
+                </FormSection>
+
+                <FormSection
                     title="Units"
                     description="Update the base unit and optional default units."
                 >
@@ -346,17 +404,32 @@ export default function IngredientsEdit({
                         </FormField>
 
                         <FormField
-                            label="Reorder Stock"
-                            htmlFor="reorder_stock"
-                            error={errors.reorder_stock}
+                            label="Reorder Level"
+                            htmlFor="reorder_level"
+                            error={errors.reorder_level}
                         >
                             <Input
-                                id="reorder_stock"
+                                id="reorder_level"
                                 type="number"
                                 min="0"
                                 step="0.0001"
-                                value={data.reorder_stock}
-                                onChange={(e) => setData('reorder_stock', e.target.value)}
+                                value={data.reorder_level}
+                                onChange={(e) => setData('reorder_level', e.target.value)}
+                            />
+                        </FormField>
+
+                        <FormField
+                            label="Reorder Quantity"
+                            htmlFor="reorder_quantity"
+                            error={errors.reorder_quantity}
+                        >
+                            <Input
+                                id="reorder_quantity"
+                                type="number"
+                                min="0"
+                                step="0.0001"
+                                value={data.reorder_quantity}
+                                onChange={(e) => setData('reorder_quantity', e.target.value)}
                             />
                         </FormField>
 

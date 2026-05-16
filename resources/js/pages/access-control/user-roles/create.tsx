@@ -164,7 +164,7 @@ export default function UserRolesCreate({ users, roles, outlets, departments, wa
                                         <span className="font-semibold text-foreground capitalize">
                                             {selectedRole.level.replace(/_/g, ' ')}
                                         </span>
-                                        <span className="ml-1.5 text-muted-foreground">— set by role level</span>
+                                        <span className="ml-1.5 text-muted-foreground">- set by role level</span>
                                     </>
                                 ) : (
                                     'Select a role first'

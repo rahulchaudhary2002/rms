@@ -235,8 +235,14 @@ export default function IngredientsIndex({ ingredients, categories, filters }: P
                                 <tr key={ingredient.id} className="group transition-colors hover:bg-muted dark:hover:bg-stone-900/50">
                                     <td className="px-6 py-4">
                                         <div className="flex items-center gap-3">
-                                            <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary">
-                                                <span className="material-symbols-outlined text-[18px]">nutrition</span>
+                                            <div className="h-9 w-9 shrink-0 overflow-hidden rounded-lg">
+                                                {ingredient.image_url ? (
+                                                    <img src={ingredient.image_url} alt={ingredient.name} className="h-full w-full object-cover" />
+                                                ) : (
+                                                    <div className="flex h-full w-full items-center justify-center bg-primary/10 text-primary">
+                                                        <span className="material-symbols-outlined text-[18px]">nutrition</span>
+                                                    </div>
+                                                )}
                                             </div>
                                             <div>
                                                 <Link href={ingredientsEdit.url(ingredient.id)} className="block font-bold text-gray-900 transition-colors hover:text-primary dark:text-gray-100">

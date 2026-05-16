@@ -201,7 +201,7 @@ function AssignRoleModal({ open, onClose, userId, roles, outlets, departments, w
                     <FormField label="Scope" error={errors.scope_type}>
                         <div className={cn('flex h-11 items-center rounded-lg border border-input bg-muted/40 px-3 text-sm', !selectedRole && 'text-muted-foreground')}>
                             {selectedRole
-                                ? <><span className="font-semibold capitalize text-foreground">{selectedRole.level.replace(/_/g, ' ')}</span><span className="ml-1.5 text-muted-foreground">— set by role level</span></>
+                                ? <><span className="font-semibold capitalize text-foreground">{selectedRole.level.replace(/_/g, ' ')}</span><span className="ml-1.5 text-muted-foreground">- set by role level</span></>
                                 : 'Select a role first'
                             }
                         </div>

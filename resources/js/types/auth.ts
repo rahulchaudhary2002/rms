@@ -136,12 +136,15 @@ export type Ingredient = {
     slug: string;
     code: string;
     barcode: string | null;
+    image: string | null;
+    image_url: string | null;
     type: IngredientType;
     base_unit_id: number;
     default_purchase_unit_id: number | null;
     default_usage_unit_id: number | null;
     minimum_stock: string;
-    reorder_stock: string;
+    reorder_level: string;
+    reorder_quantity: string;
     costing_method: CostingMethod;
     is_perishable: boolean;
     track_expiry: boolean;

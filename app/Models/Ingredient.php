@@ -25,12 +25,14 @@ class Ingredient extends Model
         'slug',
         'code',
         'barcode',
+        'image',
         'type',
         'base_unit_id',
         'default_purchase_unit_id',
         'default_usage_unit_id',
         'minimum_stock',
-        'reorder_stock',
+        'reorder_level',
+        'reorder_quantity',
         'costing_method',
         'is_perishable',
         'track_expiry',
@@ -38,11 +40,27 @@ class Ingredient extends Model
         'is_active',
     ];
 
+    protected $appends = ['image_url'];
+
+    public function getImageUrlAttribute(): ?string
+    {
+        if (! $this->image) {
+            return null;
+        }
+
+        if (str_starts_with($this->image, 'http') || str_starts_with($this->image, '/')) {
+            return $this->image;
+        }
+
+        return '/media/'.ltrim($this->image, '/');
+    }
+
     protected function casts(): array
     {
         return [
-            'minimum_stock' => 'decimal:4',
-            'reorder_stock' => 'decimal:4',
+            'minimum_stock'    => 'decimal:4',
+            'reorder_level'    => 'decimal:4',
+            'reorder_quantity' => 'decimal:4',
             'is_perishable' => 'boolean',
             'track_expiry'  => 'boolean',
             'is_active'     => 'boolean',

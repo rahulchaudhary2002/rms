@@ -341,11 +341,11 @@ export default function AddonsIndex({ addons, filters }: Props) {
                                                 {addon.group.name}
                                             </Link>
                                         ) : (
-                                            <span className="text-sm text-muted-foreground">—</span>
+                                            <span className="text-sm text-muted-foreground">-</span>
                                         )}
                                     </td>
                                     <td className="px-6 py-4 text-sm text-muted-foreground dark:text-stone-400">
-                                        {addon.price != null ? `Rs. ${Number(addon.price).toFixed(2)}` : '—'}
+                                        {addon.price != null ? `Rs. ${Number(addon.price).toFixed(2)}` : '-'}
                                     </td>
                                     <td className="px-6 py-4">
                                         <span className={cn(

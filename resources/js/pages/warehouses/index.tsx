@@ -298,10 +298,10 @@ export default function WarehousesIndex({ warehouseList: warehouses, outlets, fi
                                         </span>
                                     </td>
                                     <td className="px-6 py-4 text-sm text-muted-foreground dark:text-stone-400">
-                                        {warehouse.outlet?.name ?? <span className="italic opacity-50">—</span>}
+                                        {warehouse.outlet?.name ?? <span className="italic opacity-50">-</span>}
                                     </td>
                                     <td className="px-6 py-4 text-sm text-muted-foreground dark:text-stone-400">
-                                        {warehouse.department?.name ?? <span className="italic opacity-50">—</span>}
+                                        {warehouse.department?.name ?? <span className="italic opacity-50">-</span>}
                                     </td>
                                     <td className="px-6 py-4">
                                         <button

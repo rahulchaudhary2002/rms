@@ -22,6 +22,7 @@ return new class extends Migration
             $table->string('code', 80)->unique();
 
             $table->string('barcode')->nullable()->unique();
+            $table->string('image')->nullable();
 
             /**
              * Ingredient type
@@ -82,8 +83,11 @@ return new class extends Migration
             $table->decimal('minimum_stock', 18, 4)->default(0);
             // Alert when stock goes below this quantity
 
-            $table->decimal('reorder_stock', 18, 4)->default(0);
-            // Suggested reorder quantity / reorder level
+            $table->decimal('reorder_level', 18, 4)->default(0);
+            // When stock reaches this level, system should suggest reorder
+
+            $table->decimal('reorder_quantity', 18, 4)->default(0);
+            // Suggested quantity to purchase/order
 
             /**
              * Costing method for stock valuation and COGS calculation.

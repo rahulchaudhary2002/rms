@@ -6,6 +6,8 @@ use App\Models\Ingredient;
 use App\Models\IngredientCategory;
 use App\Models\Unit;
 use App\Services\Concerns\PaginatesQuery;
+use Illuminate\Http\UploadedFile;
+use Illuminate\Support\Facades\Storage;
 
 class IngredientService
 {
@@ -52,6 +54,10 @@ class IngredientService
     {
         $data = $this->prepareData($data);
 
+        if (($data['image'] ?? null) instanceof UploadedFile) {
+            $data['image'] = $data['image']->store('ingredients', 'public');
+        }
+
         return Ingredient::create($data);
     }
 
@@ -59,11 +65,31 @@ class IngredientService
     {
         $data = $this->prepareData($data);
 
+        if (($data['image'] ?? null) instanceof UploadedFile) {
+            if ($ingredient->image) {
+                Storage::disk('public')->delete($ingredient->image);
+            }
+
+            $data['image'] = $data['image']->store('ingredients', 'public');
+        } elseif ($data['remove_image'] ?? false) {
+            if ($ingredient->image) {
+                Storage::disk('public')->delete($ingredient->image);
+            }
+
+            $data['image'] = null;
+        }
+
+        unset($data['remove_image']);
+
         $ingredient->update($data);
     }
 
     public function deleteIngredient(Ingredient $ingredient): void
     {
+        if ($ingredient->image) {
+            Storage::disk('public')->delete($ingredient->image);
+        }
+
         $ingredient->delete();
     }
 

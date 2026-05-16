@@ -158,7 +158,7 @@ export default function ScopeSelection() {
                 <PageHeader
                     breadcrumbs={[{ label: 'Dashboard', href: dashboard.url() }, { label: 'Scope Selection' }]}
                     title="Select working scope"
-                    description="Choose the context you want to work in — global, a central warehouse, an outlet, a department, or a specific warehouse."
+                    description="Choose the context you want to work in - global, a central warehouse, an outlet, a department, or a specific warehouse."
                 />
 
                 <form
@@ -258,7 +258,7 @@ export default function ScopeSelection() {
 
                                                             return (
                                                                 <div key={dept.id}>
-                                                                    {/* Department row — accordion if it has warehouses */}
+                                                                    {/* Department row - accordion if it has warehouses */}
                                                                     <ScopeButton
                                                                         icon="meeting_room"
                                                                         label={dept.name}
