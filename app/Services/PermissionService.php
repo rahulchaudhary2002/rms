@@ -3,15 +3,21 @@
 namespace App\Services;
 
 use App\Models\Permission;
+use App\Services\AccessControlService;
 use App\Services\Concerns\PaginatesQuery;
 
 class PermissionService
 {
     use PaginatesQuery;
 
-    public function getIndexData(array $filters): array
+    public function __construct(private AccessControlService $accessControl) {}
+
+    public function getIndexData(array $filters, string $currentScopeType = 'global'): array
     {
+        $allowedLevels = $this->accessControl->resolveAllowedLevelsForScope($currentScopeType);
+
         $query = Permission::query()
+            ->when($allowedLevels !== null, fn ($b) => $b->whereIn('level', $allowedLevels))
             ->when($filters['search'] !== '', function ($b) use ($filters) {
                 $search = '%'.$filters['search'].'%';
                 $b->where(fn ($q) => $q->where('name', 'like', $search)->orWhere('slug', 'like', $search));

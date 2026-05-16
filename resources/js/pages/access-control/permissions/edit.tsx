@@ -11,9 +11,10 @@ import type { Permission } from '@/types';
 
 const COMMON_ACTIONS = ['view', 'create', 'update', 'delete', 'approve', 'export', 'manage'];
 
-type Props = { permission: Permission };
+type LevelOption = { type: string; label: string };
+type Props = { permission: Permission; levelOptions: LevelOption[] };
 
-export default function PermissionsEdit({ permission }: Props) {
+export default function PermissionsEdit({ permission, levelOptions }: Props) {
     const { data, setData, put, processing, errors } = useForm({
         name: permission.name,
         slug: permission.slug,
@@ -90,15 +91,12 @@ export default function PermissionsEdit({ permission }: Props) {
                         <FormField label="Level" error={errors.level}>
                             <SearchableSelect
                                 value={data.level}
-                                disabled={permission.is_system}
+                                disabled={permission.is_system || levelOptions.length <= 1}
                                 onChange={(e) => setData('level', e.target.value as Permission['level'])}
                             >
-                                <option value="global">Global</option>
-                                <option value="central_warehouse">Central Warehouse</option>
-                                <option value="outlet">Outlet</option>
-                                <option value="outlet_warehouse">Outlet Warehouse</option>
-                                <option value="outlet_department">Outlet Department</option>
-                                <option value="department_warehouse">Department Warehouse</option>
+                                {levelOptions.map((opt) => (
+                                    <option key={opt.type} value={opt.type}>{opt.label}</option>
+                                ))}
                             </SearchableSelect>
                         </FormField>
 

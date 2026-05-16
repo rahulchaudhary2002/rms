@@ -10,13 +10,18 @@ import { SearchableSelect } from '@/components/ui/searchable-select';
 
 const COMMON_ACTIONS = ['view', 'create', 'update', 'delete', 'approve', 'export', 'manage'];
 
-export default function PermissionsCreate() {
+type LevelOption = { type: string; label: string };
+type Props = { levelOptions: LevelOption[] };
+
+export default function PermissionsCreate({ levelOptions }: Props) {
+    const defaultLevel = levelOptions[0]?.type ?? 'global';
+
     const { data, setData, post, processing, errors } = useForm({
         name: '',
         slug: '',
         module: '',
         action: '',
-        level: 'global',
+        level: defaultLevel,
         description: '',
         is_active: true,
     });
@@ -96,13 +101,14 @@ export default function PermissionsCreate() {
                         </FormField>
 
                         <FormField label="Level" error={errors.level}>
-                            <SearchableSelect value={data.level} onChange={(e) => setData('level', e.target.value)}>
-                                <option value="global">Global</option>
-                                <option value="central_warehouse">Central Warehouse</option>
-                                <option value="outlet">Outlet</option>
-                                <option value="outlet_warehouse">Outlet Warehouse</option>
-                                <option value="outlet_department">Outlet Department</option>
-                                <option value="department_warehouse">Department Warehouse</option>
+                            <SearchableSelect
+                                value={data.level}
+                                disabled={levelOptions.length <= 1}
+                                onChange={(e) => setData('level', e.target.value)}
+                            >
+                                {levelOptions.map((opt) => (
+                                    <option key={opt.type} value={opt.type}>{opt.label}</option>
+                                ))}
                             </SearchableSelect>
                         </FormField>
 
