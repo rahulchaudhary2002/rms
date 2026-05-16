@@ -1,6 +1,7 @@
 import { Head, Link, router } from '@inertiajs/react';
 import { Filter } from 'lucide-react';
 import { useEffect, useMemo, useRef, useState } from 'react';
+import { useConfirm } from '@/hooks/use-confirm';
 import { PageHeader } from '@/components/page-header';
 import { dashboard } from '@/routes';
 import {
@@ -55,6 +56,7 @@ function cleanPaginationLabel(label: string): string {
 }
 
 export default function WarehousesIndex({ warehouseList: warehouses, outlets, filters }: Props) {
+    const { confirm, dialog } = useConfirm();
     const [form, setForm] = useState({
         search:    filters.search    ?? '',
         outlet_id: filters.outlet_id ?? '',
@@ -100,9 +102,7 @@ export default function WarehousesIndex({ warehouseList: warehouses, outlets, fi
     }, []);
 
     function confirmDelete(warehouse: Warehouse) {
-        if (confirm(`Delete warehouse "${warehouse.name}"? This cannot be undone.`)) {
-            router.delete(warehousesDestroy.url(warehouse.id));
-        }
+        confirm(`Delete warehouse "${warehouse.name}"? This cannot be undone.`, () => router.delete(warehousesDestroy.url(warehouse.id)), { title: 'Delete Warehouse', confirmLabel: 'Delete', variant: 'danger' });
     }
 
     function handleToggleActive(warehouse: Warehouse) {
@@ -341,6 +341,7 @@ export default function WarehousesIndex({ warehouseList: warehouses, outlets, fi
                     </table>
                 </div>
             </TableCard>
+            {dialog}
         </>
     );
 }

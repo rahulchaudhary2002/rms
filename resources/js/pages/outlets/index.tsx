@@ -1,5 +1,6 @@
 import { Head, Link, router } from '@inertiajs/react';
 import { useMemo, useState } from 'react';
+import { useConfirm } from '@/hooks/use-confirm';
 import { PageHeader } from '@/components/page-header';
 import { dashboard } from '@/routes';
 import {
@@ -38,6 +39,7 @@ function cleanPaginationLabel(label: string): string {
 }
 
 export default function OutletsIndex({ outletList: outlets, filters }: Props) {
+    const { confirm, dialog } = useConfirm();
     const [form, setForm] = useState({
         search:   filters.search   ?? '',
         per_page: filters.per_page ?? '10',
@@ -63,9 +65,7 @@ export default function OutletsIndex({ outletList: outlets, filters }: Props) {
     });
 
     function confirmDelete(outlet: Outlet) {
-        if (confirm(`Delete outlet "${outlet.name}"? This cannot be undone.`)) {
-            router.delete(outletsDestroy.url(outlet.id));
-        }
+        confirm(`Delete outlet "${outlet.name}"? This cannot be undone.`, () => router.delete(outletsDestroy.url(outlet.id)), { title: 'Delete Outlet', confirmLabel: 'Delete', variant: 'danger' });
     }
 
     return (
@@ -195,6 +195,7 @@ export default function OutletsIndex({ outletList: outlets, filters }: Props) {
                     </table>
                 </div>
             </TableCard>
+            {dialog}
         </>
     );
 }

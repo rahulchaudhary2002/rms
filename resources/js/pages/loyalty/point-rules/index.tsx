@@ -1,6 +1,7 @@
 import { Head, Link, router } from '@inertiajs/react';
 import { Filter } from 'lucide-react';
 import { useEffect, useMemo, useRef, useState } from 'react';
+import { useConfirm } from '@/hooks/use-confirm';
 import { ActionDropdown } from '@/components/action-dropdown';
 import { Can } from '@/components/can';
 import { PageHeader } from '@/components/page-header';
@@ -98,6 +99,7 @@ function EarnSummary({ rule }: { rule: LoyaltyPointRule }) {
 }
 
 export default function LoyaltyPointRulesIndex({ rules, scopeOutlets, filters }: Props) {
+    const { confirm, dialog } = useConfirm();
     const [form, setForm] = useState({
         search: filters.search ?? '',
         type: filters.type ?? '',
@@ -164,9 +166,7 @@ export default function LoyaltyPointRulesIndex({ rules, scopeOutlets, filters }:
     });
 
     function confirmDelete(rule: LoyaltyPointRule) {
-        if (confirm(`Delete rule "${rule.name}"? This cannot be undone.`)) {
-            router.delete(rulesDestroy.url(rule.id));
-        }
+        confirm(`Delete rule "${rule.name}"? This cannot be undone.`, () => router.delete(rulesDestroy.url(rule.id)), { title: 'Delete Rule', confirmLabel: 'Delete', variant: 'danger' });
     }
 
     function toggleStatus(rule: LoyaltyPointRule) {
@@ -470,6 +470,7 @@ export default function LoyaltyPointRulesIndex({ rules, scopeOutlets, filters }:
                     </table>
                 </div>
             </TableCard>
+            {dialog}
         </>
     );
 }

@@ -1,6 +1,7 @@
 import { Head, Link, router } from '@inertiajs/react';
 import { Filter } from 'lucide-react';
 import { useEffect, useMemo, useRef, useState } from 'react';
+import { useConfirm } from '@/hooks/use-confirm';
 import { PageHeader } from '@/components/page-header';
 import { dashboard } from '@/routes';
 import { index as rolesIndex, create as rolesCreate, show as rolesShow, edit as rolesEdit, destroy as rolesDestroy } from '@/routes/access-control/roles';
@@ -36,6 +37,7 @@ function cleanPaginationLabel(label: string): string {
 }
 
 export default function RolesIndex({ roles, filters }: Props) {
+    const { confirm, dialog } = useConfirm();
     const [form, setForm] = useState({
         search: filters.search ?? '',
         level: filters.level ?? '',
@@ -116,9 +118,7 @@ export default function RolesIndex({ roles, filters }: Props) {
     });
 
     function confirmDelete(role: Role) {
-        if (confirm(`Delete role "${role.name}"? This cannot be undone.`)) {
-            router.delete(rolesDestroy.url(role.id));
-        }
+        confirm(`Delete role "${role.name}"? This cannot be undone.`, () => router.delete(rolesDestroy.url(role.id)), { title: 'Delete Role', confirmLabel: 'Delete', variant: 'danger' });
     }
 
     return (
@@ -381,6 +381,7 @@ export default function RolesIndex({ roles, filters }: Props) {
                     </table>
                 </div>
             </TableCard>
+            {dialog}
         </>
     );
 }

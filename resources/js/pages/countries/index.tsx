@@ -1,6 +1,7 @@
 import { Head, Link, router } from '@inertiajs/react';
 import { Filter } from 'lucide-react';
 import { useEffect, useMemo, useRef, useState } from 'react';
+import { useConfirm } from '@/hooks/use-confirm';
 import { PageHeader } from '@/components/page-header';
 import { dashboard } from '@/routes';
 import { index as countriesIndex, create as countriesCreate, edit as countriesEdit, destroy as countriesDestroy, toggleActive as countriesToggleActive } from '@/routes/countries';
@@ -35,6 +36,7 @@ function cleanPaginationLabel(label: string): string {
 }
 
 export default function CountriesIndex({ countries, filters }: Props) {
+    const { confirm, dialog } = useConfirm();
     const [form, setForm] = useState({
         search:    filters.search    ?? '',
         is_active: filters.is_active ?? '',
@@ -86,9 +88,7 @@ export default function CountriesIndex({ countries, filters }: Props) {
     });
 
     function confirmDelete(country: Country) {
-        if (confirm(`Delete country "${country.name}"? This cannot be undone.`)) {
-            router.delete(countriesDestroy.url(country.id));
-        }
+        confirm(`Delete country "${country.name}"? This cannot be undone.`, () => router.delete(countriesDestroy.url(country.id)), { title: 'Delete Country', confirmLabel: 'Delete', variant: 'danger' });
     }
 
     function toggleActive(country: Country) {
@@ -265,6 +265,7 @@ export default function CountriesIndex({ countries, filters }: Props) {
                     </table>
                 </div>
             </TableCard>
+            {dialog}
         </>
     );
 }

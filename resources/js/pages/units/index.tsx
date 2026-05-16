@@ -1,6 +1,7 @@
 import { Head, Link, router } from '@inertiajs/react';
 import { Filter } from 'lucide-react';
 import { useEffect, useMemo, useRef, useState } from 'react';
+import { useConfirm } from '@/hooks/use-confirm';
 import { PageHeader } from '@/components/page-header';
 import { dashboard } from '@/routes';
 import { index as unitsIndex, create as unitsCreate, edit as unitsEdit, destroy as unitsDestroy, toggleActive as unitsToggleActive } from '@/routes/units';
@@ -42,6 +43,7 @@ const unitTypeColors: Record<string, string> = {
 };
 
 export default function UnitsIndex({ units, filters }: Props) {
+    const { confirm, dialog } = useConfirm();
     const [form, setForm] = useState({
         search:    filters.search    ?? '',
         type:      filters.type      ?? '',
@@ -94,9 +96,7 @@ export default function UnitsIndex({ units, filters }: Props) {
     });
 
     function confirmDelete(unit: Unit) {
-        if (confirm(`Delete unit "${unit.name}"? This cannot be undone.`)) {
-            router.delete(unitsDestroy.url(unit.id));
-        }
+        confirm(`Delete unit "${unit.name}"? This cannot be undone.`, () => router.delete(unitsDestroy.url(unit.id)), { title: 'Delete Unit', confirmLabel: 'Delete', variant: 'danger' });
     }
 
     function toggleActive(unit: Unit) {
@@ -297,6 +297,7 @@ export default function UnitsIndex({ units, filters }: Props) {
                     </table>
                 </div>
             </TableCard>
+            {dialog}
         </>
     );
 }

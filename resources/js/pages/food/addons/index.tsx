@@ -1,6 +1,7 @@
 import { Head, Link, router } from '@inertiajs/react';
 import { Filter } from 'lucide-react';
 import { useEffect, useMemo, useRef, useState } from 'react';
+import { useConfirm } from '@/hooks/use-confirm';
 import { ActionDropdown } from '@/components/action-dropdown';
 import { Can } from '@/components/can';
 import { PageHeader } from '@/components/page-header';
@@ -61,6 +62,7 @@ const addonCreateUrl = () => '/addons/create';
 const groupShowUrl = (id: number) => `/addon-groups/${id}`;
 
 export default function AddonsIndex({ addons, filters }: Props) {
+    const { confirm, dialog } = useConfirm();
     const [form, setForm] = useState({
         search: filters.search ?? '',
         is_active: filters.is_active ?? '',
@@ -390,11 +392,7 @@ export default function AddonsIndex({ addons, filters }: Props) {
                                                     label: 'Delete add-on',
                                                     icon: 'delete',
                                                     variant: 'danger' as const,
-                                                    onClick: () => {
-                                                        if (confirm('Delete this add-on?')) {
-                                                            router.delete(`/addons/${addon.id}`);
-                                                        }
-                                                    },
+                                                    onClick: () => confirm('Delete this add-on?', () => router.delete(`/addons/${addon.id}`), { title: 'Delete Add-on', confirmLabel: 'Delete', variant: 'danger' }),
                                                 },
                                             ]}
                                         />
@@ -405,6 +403,7 @@ export default function AddonsIndex({ addons, filters }: Props) {
                     </table>
                 </div>
             </TableCard>
+            {dialog}
         </>
     );
 }

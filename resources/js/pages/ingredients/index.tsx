@@ -1,6 +1,7 @@
 import { Head, Link, router } from '@inertiajs/react';
 import { Filter } from 'lucide-react';
 import { useEffect, useMemo, useRef, useState } from 'react';
+import { useConfirm } from '@/hooks/use-confirm';
 import { PageHeader } from '@/components/page-header';
 import { dashboard } from '@/routes';
 import { index as ingredientsIndex, create as ingredientsCreate, edit as ingredientsEdit, destroy as ingredientsDestroy, toggleActive as ingredientsToggleActive } from '@/routes/ingredients';
@@ -43,6 +44,7 @@ function cleanPaginationLabel(label: string): string {
 }
 
 export default function IngredientsIndex({ ingredients, categories, filters }: Props) {
+    const { confirm, dialog } = useConfirm();
     const [form, setForm] = useState({
         search:                  filters.search                  ?? '',
         ingredient_category_id:  filters.ingredient_category_id  ?? '',
@@ -95,9 +97,7 @@ export default function IngredientsIndex({ ingredients, categories, filters }: P
     });
 
     function confirmDelete(ingredient: Ingredient) {
-        if (confirm(`Delete ingredient "${ingredient.name}"? This cannot be undone.`)) {
-            router.delete(ingredientsDestroy.url(ingredient.id));
-        }
+        confirm(`Delete ingredient "${ingredient.name}"? This cannot be undone.`, () => router.delete(ingredientsDestroy.url(ingredient.id)), { title: 'Delete Ingredient', confirmLabel: 'Delete', variant: 'danger' });
     }
 
     function toggleActive(ingredient: Ingredient) {
@@ -313,6 +313,7 @@ export default function IngredientsIndex({ ingredients, categories, filters }: P
                     </table>
                 </div>
             </TableCard>
+            {dialog}
         </>
     );
 }

@@ -1,5 +1,6 @@
 import { Head, Link, useForm, router } from '@inertiajs/react';
 import { useState } from 'react';
+import { useConfirm } from '@/hooks/use-confirm';
 import { PageHeader } from '@/components/page-header';
 import { QuickCreateOutletDepartmentModal, QuickCreateOutletModal, QuickCreateWarehouseModal } from '@/components/quick-create-modals';
 import { AsyncResourceSelect } from '@/components/ui/async-resource-select';
@@ -536,18 +537,19 @@ const tabList: { id: Tab; label: string; icon: string }[] = [
 ];
 
 export default function UserShow({ user, roles, permissions, outlets, departments, warehouses, scopeTypes, resourceTypes, allowedScopes, allowedResourceIds, allowedScopeTypes, currentScope }: Props) {
+    const { confirm, dialog } = useConfirm();
     const [activeTab, setActiveTab] = useState<Tab>('overview');
     const [modal, setModal] = useState<'role' | 'override' | 'resource' | null>(null);
     const returnUrl = usersShow.url(user.id);
 
     function confirmDeleteRole(id: number) {
-        if (confirm('Remove this role assignment?')) router.delete(urDestroy.url(id));
+        confirm('Remove this role assignment?', () => router.delete(urDestroy.url(id)), { title: 'Remove Role', confirmLabel: 'Remove', variant: 'danger' });
     }
     function confirmDeleteOverride(id: number) {
-        if (confirm('Remove this permission override?')) router.delete(upoDestroy.url(id));
+        confirm('Remove this permission override?', () => router.delete(upoDestroy.url(id)), { title: 'Remove Override', confirmLabel: 'Remove', variant: 'danger' });
     }
     function confirmDeleteResource(id: number) {
-        if (confirm('Remove this resource permission?')) router.delete(urpDestroy.url(id));
+        confirm('Remove this resource permission?', () => router.delete(urpDestroy.url(id)), { title: 'Remove Resource Permission', confirmLabel: 'Remove', variant: 'danger' });
     }
 
     return (
@@ -843,6 +845,7 @@ export default function UserShow({ user, roles, permissions, outlets, department
                 allowedResourceIds={allowedResourceIds}
                 returnUrl={returnUrl}
             />
+            {dialog}
         </>
     );
 }

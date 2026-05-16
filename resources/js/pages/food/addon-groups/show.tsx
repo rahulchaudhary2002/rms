@@ -1,5 +1,6 @@
 import { Head, Link, router } from '@inertiajs/react';
 import { useState } from 'react';
+import { useConfirm } from '@/hooks/use-confirm';
 import { Can } from '@/components/can';
 import { PageHeader } from '@/components/page-header';
 import { cn } from '@/lib/utils';
@@ -39,6 +40,7 @@ function EmptyRow({ cols, label }: { cols: number; label: string }) {
 }
 
 function AddonsTable({ addons }: { addons: Addon[] }) {
+    const { confirm, dialog } = useConfirm();
     return (
         <div className="rounded-xl border border-border bg-card">
             <div className="flex items-center justify-between border-b border-border px-6 py-4">
@@ -87,11 +89,7 @@ function AddonsTable({ addons }: { addons: Addon[] }) {
                                             className="rounded p-1.5 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground">
                                             <span className="material-symbols-outlined text-[18px]">{addon.is_active ? 'toggle_off' : 'toggle_on'}</span>
                                         </button>
-                                        <button type="button" title="Delete add-on" onClick={() => {
-                                            if (confirm(`Delete add-on "${addon.name}"?`)) {
-                                                router.delete(`/addons/${addon.id}`);
-                                            }
-                                        }}
+                                        <button type="button" title="Delete add-on" onClick={() => confirm(`Delete add-on "${addon.name}"?`, () => router.delete(`/addons/${addon.id}`), { title: 'Delete Add-on', confirmLabel: 'Delete', variant: 'danger' })}
                                             className="rounded p-1.5 text-muted-foreground transition-colors hover:bg-destructive/10 hover:text-destructive">
                                             <span className="material-symbols-outlined text-[18px]">delete</span>
                                         </button>
@@ -102,11 +100,13 @@ function AddonsTable({ addons }: { addons: Addon[] }) {
                     </tbody>
                 </table>
             </div>
+            {dialog}
         </div>
     );
 }
 
 export default function AddonGroupShow({ group }: Props) {
+    const { confirm, dialog } = useConfirm();
     const [activeTab, setActiveTab] = useState<Tab>('overview');
     const addons = group.addons ?? [];
     const tabList: { id: Tab; label: string; icon: string; count?: number }[] = [
@@ -209,16 +209,13 @@ export default function AddonGroupShow({ group }: Props) {
                     <span className="material-symbols-outlined text-[18px]">{group.is_active ? 'toggle_off' : 'toggle_on'}</span>
                     {group.is_active ? 'Deactivate' : 'Activate'}
                 </button>
-                <button type="button" onClick={() => {
-                    if (confirm(`Delete add-on group "${group.name}"?`)) {
-                        router.delete(groupsDestroy.url(group.id));
-                    }
-                }}
+                <button type="button" onClick={() => confirm(`Delete add-on group "${group.name}"?`, () => router.delete(groupsDestroy.url(group.id)), { title: 'Delete Add-on Group', confirmLabel: 'Delete', variant: 'danger' })}
                     className="inline-flex items-center gap-2 rounded-lg border border-destructive/30 px-4 py-2.5 text-sm font-semibold text-destructive transition-colors hover:bg-destructive/10">
                     <span className="material-symbols-outlined text-[18px]">delete</span>
                     Delete Group
                 </button>
             </div>
+            {dialog}
         </>
     );
 }

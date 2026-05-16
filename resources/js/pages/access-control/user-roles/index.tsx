@@ -4,6 +4,7 @@ import { dashboard } from '@/routes';
 import { index as rolesIndex } from '@/routes/access-control/roles';
 import { index as urIndex, create as urCreate, destroy as urDestroy, update as urUpdate } from '@/routes/access-control/user-roles';
 import { useEffect, useMemo, useRef, useState } from 'react';
+import { useConfirm } from '@/hooks/use-confirm';
 import { PageHeader } from '@/components/page-header';
 import { Can } from '@/components/can';
 import { Badge } from '@/components/ui/badge';
@@ -58,6 +59,7 @@ function cleanPaginationLabel(label: string): string {
 }
 
 export default function UserRolesIndex({ assignments, users, roles, filters }: Props) {
+    const { confirm, dialog } = useConfirm();
     const [form, setForm] = useState({
         search: filters.search ?? '',
         user_id: filters.user_id ?? '',
@@ -134,9 +136,7 @@ export default function UserRolesIndex({ assignments, users, roles, filters }: P
     });
 
     function confirmDelete(assignment: Assignment) {
-        if (confirm(`Remove role "${assignment.role?.name}" from "${assignment.user?.name}"? This cannot be undone.`)) {
-            router.delete(urDestroy.url(assignment.id), { preserveScroll: true });
-        }
+        confirm(`Remove role "${assignment.role?.name}" from "${assignment.user?.name}"? This cannot be undone.`, () => router.delete(urDestroy.url(assignment.id), { preserveScroll: true }), { title: 'Remove Role', confirmLabel: 'Remove', variant: 'danger' });
     }
 
     function toggleActive(assignment: Assignment) {
@@ -400,6 +400,7 @@ export default function UserRolesIndex({ assignments, users, roles, filters }: P
                     </table>
                 </div>
             </TableCard>
+            {dialog}
         </>
     );
 }

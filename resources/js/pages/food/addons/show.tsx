@@ -1,5 +1,6 @@
 import { Head, Link, router, useForm } from '@inertiajs/react';
 import { useState } from 'react';
+import { useConfirm } from '@/hooks/use-confirm';
 import { PageHeader } from '@/components/page-header';
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { FormField } from '@/components/ui/form-field';
@@ -45,6 +46,7 @@ function EmptyRow({ cols, label }: { cols: number; label: string }) {
 }
 
 function RecipeTab({ addon, ingredients, units }: Props) {
+    const { confirm, dialog } = useConfirm();
     const [modal, setModal] = useState(false);
     const form = useForm({ ingredient_id: '', unit_id: '', quantity: '', wastage_quantity: '0', is_active: true });
     const recipes = addon.recipes ?? [];
@@ -96,11 +98,7 @@ function RecipeTab({ addon, ingredients, units }: Props) {
                                     <td className="px-6 py-3 text-sm text-muted-foreground">{recipe.unit?.short_name ?? '-'}</td>
                                     <td className="px-6 py-3"><StatusBadge active={recipe.is_active} /></td>
                                     <td className="px-6 py-3 text-right">
-                                        <button type="button" onClick={() => {
-                                            if (confirm('Remove this recipe line?')) {
-                                                router.delete(`/addons/${addon.id}/recipes/${recipe.id}`, { preserveScroll: true });
-                                            }
-                                        }}
+                                        <button type="button" onClick={() => confirm('Remove this recipe line?', () => router.delete(`/addons/${addon.id}/recipes/${recipe.id}`, { preserveScroll: true }), { title: 'Remove Recipe Line', confirmLabel: 'Remove', variant: 'danger' })}
                                             className="rounded p-1.5 text-muted-foreground transition-colors hover:bg-destructive/10 hover:text-destructive">
                                             <span className="material-symbols-outlined text-[18px]">delete</span>
                                         </button>
@@ -153,6 +151,7 @@ function RecipeTab({ addon, ingredients, units }: Props) {
                     </form>
                 </DialogContent>
             </Dialog>
+            {dialog}
         </>
     );
 }

@@ -4,6 +4,7 @@ import { dashboard } from '@/routes';
 import { index as rolesIndex } from '@/routes/access-control/roles';
 import { index as usersIndex, create as usersCreate, show as usersShow, edit as usersEdit, destroy as usersDestroy } from '@/routes/users';
 import { useEffect, useMemo, useRef, useState } from 'react';
+import { useConfirm } from '@/hooks/use-confirm';
 import { PageHeader } from '@/components/page-header';
 import { TableCard, TableSearchInput } from '@/components/table-card';
 import { ActionDropdown } from '@/components/action-dropdown';
@@ -45,6 +46,7 @@ function cleanLabel(label: string) {
 }
 
 export default function UsersIndex({ users, filters }: Props) {
+    const { confirm, dialog } = useConfirm();
     const [form, setForm] = useState({
         search: filters.search ?? '',
         verified: filters.verified ?? '',
@@ -96,9 +98,7 @@ export default function UsersIndex({ users, filters }: Props) {
     });
 
     function confirmDelete(user: User) {
-        if (confirm(`Delete user "${user.name}"? This cannot be undone.`)) {
-            router.delete(usersDestroy.url(user.id));
-        }
+        confirm(`Delete user "${user.name}"? This cannot be undone.`, () => router.delete(usersDestroy.url(user.id)), { title: 'Delete User', confirmLabel: 'Delete', variant: 'danger' });
     }
 
     return (
@@ -308,6 +308,7 @@ export default function UsersIndex({ users, filters }: Props) {
                     </table>
                 </div>
             </TableCard>
+            {dialog}
         </>
     );
 }

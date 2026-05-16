@@ -1,5 +1,6 @@
 import { Head, Link, router, useForm } from '@inertiajs/react';
 import { useState } from 'react';
+import { useConfirm } from '@/hooks/use-confirm';
 import { FormSection } from '@/components/form-section';
 import { PageHeader } from '@/components/page-header';
 import { FormField } from '@/components/ui/form-field';
@@ -369,6 +370,7 @@ function OutletPricesTab({ food, scopeOutlets }: { food: Food; scopeOutlets: Out
 // ── Variants tab ───────────────────────────────────────────────────────────────
 
 function VariantsTab({ food, scopeOutlets }: { food: Food; scopeOutlets: Outlet[] }) {
+    const { confirm, dialog } = useConfirm();
     const [modal, setModal] = useState<'add' | { type: 'edit'; variant: FoodVariant } | null>(null);
     const [expandedOutletId, setExpandedOutletId] = useState<number | null>(null);
     const [savingVarOutlet, setSavingVarOutlet] = useState<string | null>(null);
@@ -426,7 +428,7 @@ function VariantsTab({ food, scopeOutlets }: { food: Food; scopeOutlets: Outlet[
                                             className="rounded p-1.5 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground">
                                             <span className="material-symbols-outlined text-[18px]">{v.is_active ? 'toggle_off' : 'toggle_on'}</span>
                                         </button>
-                                        <button type="button" onClick={() => { if (confirm('Delete this variant?')) router.delete(variantsDestroy.url({ food: food.id, food_variant: v.id })); }}
+                                        <button type="button" onClick={() => confirm('Delete this variant?', () => router.delete(variantsDestroy.url({ food: food.id, food_variant: v.id })), { title: 'Delete Variant', confirmLabel: 'Delete', variant: 'danger' })}
                                             title="Delete" className="rounded p-1.5 text-muted-foreground transition-colors hover:bg-destructive/10 hover:text-destructive">
                                             <span className="material-symbols-outlined text-[18px]">delete</span>
                                         </button>
@@ -567,6 +569,7 @@ function VariantsTab({ food, scopeOutlets }: { food: Food; scopeOutlets: Outlet[
                     </form>
                 </DialogContent>
             </Dialog>
+            {dialog}
         </>
     );
 }
@@ -679,6 +682,7 @@ function AddonGroupsTab({ food, addonGroups }: { food: Food; addonGroups: Pick<A
 // ── Recipes tab ────────────────────────────────────────────────────────────────
 
 function RecipesTab({ food, ingredients, units }: { food: Food; ingredients: Pick<Ingredient, 'id' | 'name'>[]; units: Unit[] }) {
+    const { confirm, dialog } = useConfirm();
     const [modal, setModal] = useState(false);
     const form = useForm({ ingredient_id: '', unit_id: '', quantity: '', wastage_quantity: '0', food_variant_id: '' });
     const recipes = food.all_recipes ?? [];
@@ -697,7 +701,7 @@ function RecipesTab({ food, ingredients, units }: { food: Food; ingredients: Pic
                                 <td className="px-6 py-3 font-mono text-sm text-muted-foreground">{r.wastage_quantity}</td>
                                 <td className="px-6 py-3 text-sm text-muted-foreground">{r.unit?.short_name ?? '-'}</td>
                                 <td className="px-6 py-3 text-right">
-                                    <button type="button" onClick={() => { if (confirm('Remove this recipe line?')) router.delete(recipesDestroy.url({ food: food.id, food_recipe: r.id }), { preserveScroll: true }); }}
+                                    <button type="button" onClick={() => confirm('Remove this recipe line?', () => router.delete(recipesDestroy.url({ food: food.id, food_recipe: r.id }), { preserveScroll: true }), { title: 'Remove Recipe Line', confirmLabel: 'Remove', variant: 'danger' })}
                                         className="rounded p-1.5 text-muted-foreground transition-colors hover:bg-destructive/10 hover:text-destructive">
                                         <span className="material-symbols-outlined text-[18px]">delete</span>
                                     </button>
@@ -744,6 +748,7 @@ function RecipesTab({ food, ingredients, units }: { food: Food; ingredients: Pic
                     </form>
                 </DialogContent>
             </Dialog>
+            {dialog}
         </>
     );
 }
@@ -751,6 +756,7 @@ function RecipesTab({ food, ingredients, units }: { food: Food; ingredients: Pic
 // ── Schedule tab ───────────────────────────────────────────────────────────────
 
 function ScheduleTab({ food, scopeOutlets }: { food: Food; scopeOutlets: Outlet[] }) {
+    const { confirm, dialog } = useConfirm();
     const [modal, setModal] = useState(false);
     const schedules = food.availability_schedules ?? [];
     const form = useForm({ outlet_id: '', day_of_week: 'monday' as typeof DAYS[number], start_time: '', end_time: '', is_available: true });
@@ -774,7 +780,7 @@ function ScheduleTab({ food, scopeOutlets }: { food: Food; scopeOutlets: Outlet[
                                     </span>
                                 </td>
                                 <td className="px-6 py-3 text-right">
-                                    <button type="button" onClick={() => { if (confirm('Remove this schedule?')) router.delete(schedulesDestroy.url({ food: food.id, schedule: s.id }), { preserveScroll: true }); }}
+                                    <button type="button" onClick={() => confirm('Remove this schedule?', () => router.delete(schedulesDestroy.url({ food: food.id, schedule: s.id }), { preserveScroll: true }), { title: 'Remove Schedule', confirmLabel: 'Remove', variant: 'danger' })}
                                         className="rounded p-1.5 text-muted-foreground transition-colors hover:bg-destructive/10 hover:text-destructive">
                                         <span className="material-symbols-outlined text-[18px]">delete</span>
                                     </button>
@@ -820,6 +826,7 @@ function ScheduleTab({ food, scopeOutlets }: { food: Food; scopeOutlets: Outlet[
                     </form>
                 </DialogContent>
             </Dialog>
+            {dialog}
         </>
     );
 }
@@ -827,6 +834,7 @@ function ScheduleTab({ food, scopeOutlets }: { food: Food; scopeOutlets: Outlet[
 // ── Images tab ─────────────────────────────────────────────────────────────────
 
 function ImagesTab({ food }: { food: Food }) {
+    const { confirm, dialog } = useConfirm();
     const images = food.images ?? [];
     const [uploading, setUploading] = useState(false);
 
@@ -900,11 +908,7 @@ function ImagesTab({ food }: { food: Food }) {
                                     </button>
                                     <button
                                         type="button"
-                                        onClick={() => {
-                                            if (confirm('Delete this image?')) {
-                                                router.delete(imagesDestroy.url({ food: food.id, image: img.id }), { preserveScroll: true });
-                                            }
-                                        }}
+                                        onClick={() => confirm('Delete this image?', () => router.delete(imagesDestroy.url({ food: food.id, image: img.id }), { preserveScroll: true }), { title: 'Delete Image', confirmLabel: 'Delete', variant: 'danger' })}
                                         className="inline-flex items-center gap-1.5 rounded-md px-2.5 py-1.5 text-xs font-bold text-destructive transition-colors hover:bg-destructive/10"
                                     >
                                         <span className="material-symbols-outlined text-[16px]">delete</span>
@@ -922,6 +926,7 @@ function ImagesTab({ food }: { food: Food }) {
                     No images yet. Use the uploader above to add images.
                 </div>
             )}
+            {dialog}
         </div>
     );
 }
@@ -929,6 +934,7 @@ function ImagesTab({ food }: { food: Food }) {
 // ── Combo Items tab ────────────────────────────────────────────────────────────
 
 function ComboItemsTab({ food, allFoods }: { food: Food; allFoods: Pick<Food, 'id' | 'name' | 'item_type'>[] }) {
+    const { confirm, dialog } = useConfirm();
     const [modal, setModal] = useState(false);
     const items = food.combo_items ?? [];
     const comboVariants = food.variants ?? [];
@@ -950,7 +956,7 @@ function ComboItemsTab({ food, allFoods }: { food: Food; allFoods: Pick<Food, 'i
                                 <td className="px-6 py-3 text-sm text-muted-foreground">{item.food_variant?.name ?? <span className="italic">Any</span>}</td>
                                 <td className="px-6 py-3 font-mono text-sm">{item.quantity}</td>
                                 <td className="px-6 py-3 text-right">
-                                    <button type="button" onClick={() => { if (confirm('Remove from combo?')) router.delete(comboItemsDestroy.url({ food: food.id, combo_item: item.id }), { preserveScroll: true }); }}
+                                    <button type="button" onClick={() => confirm('Remove from combo?', () => router.delete(comboItemsDestroy.url({ food: food.id, combo_item: item.id }), { preserveScroll: true }), { title: 'Remove from Combo', confirmLabel: 'Remove', variant: 'danger' })}
                                         className="rounded p-1.5 text-muted-foreground transition-colors hover:bg-destructive/10 hover:text-destructive">
                                         <span className="material-symbols-outlined text-[18px]">delete</span>
                                     </button>
@@ -993,6 +999,7 @@ function ComboItemsTab({ food, allFoods }: { food: Food; allFoods: Pick<Food, 'i
                     </form>
                 </DialogContent>
             </Dialog>
+            {dialog}
         </>
     );
 }

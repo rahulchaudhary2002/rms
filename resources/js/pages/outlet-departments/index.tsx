@@ -1,6 +1,7 @@
 import { Head, Link, router } from '@inertiajs/react';
 import { Filter } from 'lucide-react';
 import { useEffect, useMemo, useRef, useState } from 'react';
+import { useConfirm } from '@/hooks/use-confirm';
 import { PageHeader } from '@/components/page-header';
 import { dashboard } from '@/routes';
 import {
@@ -62,6 +63,7 @@ function cleanPaginationLabel(label: string): string {
 }
 
 export default function OutletDepartmentsIndex({ departments, outlets, filters }: Props) {
+    const { confirm, dialog } = useConfirm();
     const [form, setForm] = useState({
         search:    filters.search    ?? '',
         outlet_id: filters.outlet_id ?? '',
@@ -115,9 +117,7 @@ export default function OutletDepartmentsIndex({ departments, outlets, filters }
     });
 
     function confirmDelete(department: OutletDepartment) {
-        if (confirm(`Delete department "${department.name}"? This cannot be undone.`)) {
-            router.delete(departmentsDestroy.url(department.id));
-        }
+        confirm(`Delete department "${department.name}"? This cannot be undone.`, () => router.delete(departmentsDestroy.url(department.id)), { title: 'Delete Department', confirmLabel: 'Delete', variant: 'danger' });
     }
 
     function toggleActive(department: OutletDepartment) {
@@ -321,6 +321,7 @@ export default function OutletDepartmentsIndex({ departments, outlets, filters }
                     </table>
                 </div>
             </TableCard>
+            {dialog}
         </>
     );
 }

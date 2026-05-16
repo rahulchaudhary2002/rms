@@ -4,6 +4,7 @@ import { dashboard } from '@/routes';
 import { index as rolesIndex } from '@/routes/access-control/roles';
 import { index as urpIndex, create as urpCreate, destroy as urpDestroy, update as urpUpdate } from '@/routes/access-control/user-resource-permissions';
 import { useEffect, useMemo, useRef, useState } from 'react';
+import { useConfirm } from '@/hooks/use-confirm';
 import { PageHeader } from '@/components/page-header';
 import { Can } from '@/components/can';
 import { Button } from '@/components/ui/button';
@@ -52,6 +53,7 @@ function cleanPaginationLabel(label: string): string {
 }
 
 export default function UserResourcePermissionsIndex({ resourcePerms, users, permissions, resourceTypes, filters }: Props) {
+    const { confirm, dialog } = useConfirm();
     const [form, setForm] = useState({
         search: filters.search ?? '',
         user_id: filters.user_id ?? '',
@@ -129,9 +131,7 @@ export default function UserResourcePermissionsIndex({ resourcePerms, users, per
     });
 
     function confirmDelete(rp: ResourcePerm) {
-        if (confirm(`Remove resource permission for "${rp.user?.name}"? This cannot be undone.`)) {
-            router.delete(urpDestroy.url(rp.id), { preserveScroll: true });
-        }
+        confirm(`Remove resource permission for "${rp.user?.name}"? This cannot be undone.`, () => router.delete(urpDestroy.url(rp.id), { preserveScroll: true }), { title: 'Remove Resource Permission', confirmLabel: 'Remove', variant: 'danger' });
     }
 
     function toggleActive(rp: ResourcePerm) {
@@ -358,6 +358,7 @@ export default function UserResourcePermissionsIndex({ resourcePerms, users, per
                     </table>
                 </div>
             </TableCard>
+            {dialog}
         </>
     );
 }

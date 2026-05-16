@@ -1,6 +1,7 @@
 import { Head, Link, router } from '@inertiajs/react';
 import { Filter } from 'lucide-react';
 import { useEffect, useMemo, useRef, useState } from 'react';
+import { useConfirm } from '@/hooks/use-confirm';
 import { PageHeader } from '@/components/page-header';
 import { Can } from '@/components/can';
 import { Badge } from '@/components/ui/badge';
@@ -39,6 +40,7 @@ function cleanPaginationLabel(label: string): string {
 }
 
 export default function PermissionsIndex({ permissions, modules, actions, filters }: Props) {
+    const { confirm, dialog } = useConfirm();
     const [form, setForm] = useState({
         search: filters.search ?? '',
         module: filters.module ?? '',
@@ -121,9 +123,7 @@ export default function PermissionsIndex({ permissions, modules, actions, filter
     });
 
     function confirmDelete(permission: Permission) {
-        if (confirm(`Delete permission "${permission.slug}"? This cannot be undone.`)) {
-            router.delete(permissionsDestroy.url(permission.id));
-        }
+        confirm(`Delete permission "${permission.slug}"? This cannot be undone.`, () => router.delete(permissionsDestroy.url(permission.id)), { title: 'Delete Permission', confirmLabel: 'Delete', variant: 'danger' });
     }
 
     return (
@@ -382,6 +382,7 @@ export default function PermissionsIndex({ permissions, modules, actions, filter
                     </table>
                 </div>
             </TableCard>
+            {dialog}
         </>
     );
 }

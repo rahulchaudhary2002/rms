@@ -1,6 +1,7 @@
 import { Head, Link, router } from '@inertiajs/react';
 import { Filter } from 'lucide-react';
 import { useEffect, useMemo, useRef, useState } from 'react';
+import { useConfirm } from '@/hooks/use-confirm';
 import { ActionDropdown } from '@/components/action-dropdown';
 import { Can } from '@/components/can';
 import { PageHeader } from '@/components/page-header';
@@ -79,6 +80,7 @@ function StatusBadge({ active }: { active: boolean }) {
 }
 
 export default function FoodsIndex({ foods, categories, scopeOutlets, filters }: Props) {
+    const { confirm, dialog } = useConfirm();
     const [form, setForm] = useState({
         search: filters.search ?? '',
         category_id: filters.category_id ?? '',
@@ -153,9 +155,7 @@ export default function FoodsIndex({ foods, categories, scopeOutlets, filters }:
     };
 
     function confirmDelete(food: Food) {
-        if (confirm(`Delete food item "${food.name}"? This cannot be undone.`)) {
-            router.delete(foodsDestroy.url(food.id));
-        }
+        confirm(`Delete food item "${food.name}"? This cannot be undone.`, () => router.delete(foodsDestroy.url(food.id)), { title: 'Delete Food', confirmLabel: 'Delete', variant: 'danger' });
     }
 
     return (
@@ -432,6 +432,7 @@ export default function FoodsIndex({ foods, categories, scopeOutlets, filters }:
                     </table>
                 </div>
             </TableCard>
+            {dialog}
         </>
     );
 }

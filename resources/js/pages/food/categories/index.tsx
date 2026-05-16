@@ -1,6 +1,7 @@
 import { Head, Link, router } from '@inertiajs/react';
 import { Filter } from 'lucide-react';
 import { useEffect, useMemo, useRef, useState } from 'react';
+import { useConfirm } from '@/hooks/use-confirm';
 import { ActionDropdown } from '@/components/action-dropdown';
 import { Can } from '@/components/can';
 import { PageHeader } from '@/components/page-header';
@@ -60,6 +61,7 @@ function StatusBadge({ active }: { active: boolean }) {
 }
 
 export default function FoodCategoriesIndex({ categories, parentCategories, filters }: Props) {
+    const { confirm, dialog } = useConfirm();
     const [form, setForm] = useState({
         search: filters.search ?? '',
         parent_id: filters.parent_id ?? '',
@@ -342,7 +344,7 @@ export default function FoodCategoriesIndex({ categories, parentCategories, filt
                                             actions={[
                                                 { id: `edit-${cat.id}`, label: 'Edit category', icon: 'edit', href: categoriesEdit.url(cat.id) },
                                                 { id: `toggle-${cat.id}`, label: cat.is_active ? 'Deactivate' : 'Activate', icon: cat.is_active ? 'toggle_off' : 'toggle_on', onClick: () => router.patch(categoriesToggleStatus.url(cat.id)) },
-                                                { id: `delete-${cat.id}`, label: 'Delete category', icon: 'delete', variant: 'danger' as const, onClick: () => { if (confirm('Delete this category?')) router.delete(categoriesDestroy.url(cat.id)); } },
+                                                { id: `delete-${cat.id}`, label: 'Delete category', icon: 'delete', variant: 'danger' as const, onClick: () => confirm('Delete this category?', () => router.delete(categoriesDestroy.url(cat.id)), { title: 'Delete Category', confirmLabel: 'Delete', variant: 'danger' }) },
                                             ]}
                                         />
                                     </td>
@@ -352,6 +354,7 @@ export default function FoodCategoriesIndex({ categories, parentCategories, filt
                     </table>
                 </div>
             </TableCard>
+            {dialog}
         </>
     );
 }

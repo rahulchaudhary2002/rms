@@ -4,6 +4,7 @@ import { dashboard } from '@/routes';
 import { index as rolesIndex } from '@/routes/access-control/roles';
 import { index as upoIndex, create as upoCreate, destroy as upoDestroy, update as upoUpdate } from '@/routes/access-control/user-permission-overrides';
 import { useEffect, useMemo, useRef, useState } from 'react';
+import { useConfirm } from '@/hooks/use-confirm';
 import { PageHeader } from '@/components/page-header';
 import { Can } from '@/components/can';
 import { Button } from '@/components/ui/button';
@@ -59,6 +60,7 @@ function cleanPaginationLabel(label: string): string {
 }
 
 export default function UserPermissionOverridesIndex({ overrides, users, permissions, filters }: Props) {
+    const { confirm, dialog } = useConfirm();
     const [form, setForm] = useState({
         search: filters.search ?? '',
         user_id: filters.user_id ?? '',
@@ -136,9 +138,7 @@ export default function UserPermissionOverridesIndex({ overrides, users, permiss
     });
 
     function confirmDelete(o: Override) {
-        if (confirm(`Remove override for "${o.user?.name}"? This cannot be undone.`)) {
-            router.delete(upoDestroy.url(o.id), { preserveScroll: true });
-        }
+        confirm(`Remove override for "${o.user?.name}"? This cannot be undone.`, () => router.delete(upoDestroy.url(o.id), { preserveScroll: true }), { title: 'Remove Override', confirmLabel: 'Remove', variant: 'danger' });
     }
 
     function toggleActive(o: Override) {
@@ -374,6 +374,7 @@ export default function UserPermissionOverridesIndex({ overrides, users, permiss
                     </table>
                 </div>
             </TableCard>
+            {dialog}
         </>
     );
 }

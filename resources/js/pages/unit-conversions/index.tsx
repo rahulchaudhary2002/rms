@@ -1,6 +1,7 @@
 import { Head, Link, router } from '@inertiajs/react';
 import { Filter } from 'lucide-react';
 import { useEffect, useMemo, useRef, useState } from 'react';
+import { useConfirm } from '@/hooks/use-confirm';
 import { PageHeader } from '@/components/page-header';
 import { dashboard } from '@/routes';
 import { index as conversionsIndex, create as conversionsCreate, edit as conversionsEdit, destroy as conversionsDestroy, toggleActive as conversionsToggleActive } from '@/routes/unit-conversions';
@@ -34,6 +35,7 @@ function cleanPaginationLabel(label: string): string {
 }
 
 export default function UnitConversionsIndex({ conversions, filters }: Props) {
+    const { confirm, dialog } = useConfirm();
     const [form, setForm] = useState({
         from_unit_id: filters.from_unit_id ?? '',
         to_unit_id:   filters.to_unit_id   ?? '',
@@ -80,9 +82,7 @@ export default function UnitConversionsIndex({ conversions, filters }: Props) {
 
     function confirmDelete(conversion: UnitConversion) {
         const label = `${conversion.from_unit?.name} → ${conversion.to_unit?.name}`;
-        if (confirm(`Delete conversion "${label}"? This cannot be undone.`)) {
-            router.delete(conversionsDestroy.url(conversion.id));
-        }
+        confirm(`Delete conversion "${label}"? This cannot be undone.`, () => router.delete(conversionsDestroy.url(conversion.id)), { title: 'Delete Conversion', confirmLabel: 'Delete', variant: 'danger' });
     }
 
     function toggleActive(conversion: UnitConversion) {
@@ -252,6 +252,7 @@ export default function UnitConversionsIndex({ conversions, filters }: Props) {
                     </table>
                 </div>
             </TableCard>
+            {dialog}
         </>
     );
 }
