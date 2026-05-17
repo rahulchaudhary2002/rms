@@ -195,6 +195,14 @@ function buildDynamicGroups(auth: Auth): MenuGroup[] {
         groups.push({ id: 'ingredients', label: 'Master Data', title: 'Ingredients', icon: 'nutrition', items });
     }
 
+    if (canAny(['outlets-view', 'outlet-departments-view', 'warehouses-view'])) {
+        const items: MenuItem[] = [];
+        if (can('outlets-view')) items.push({ title: 'Outlets', href: outletsIndex.url(), icon: 'store', activeMatch: [outletsIndex.url()] });
+        if (can('outlet-departments-view')) items.push({ title: 'Departments', href: outletDepartmentsIndex.url(), icon: 'door_open', activeMatch: [outletDepartmentsIndex.url()] });
+        if (can('warehouses-view')) items.push({ title: 'Warehouses', href: warehousesIndex.url(), icon: 'warehouse', activeMatch: [warehousesIndex.url()] });
+        groups.push({ id: 'outlets', label: 'Master Data', title: 'Outlets', icon: 'storefront', items });
+    }
+
     if (canAny([
         'inventory-view',
         'inventory-manage',
@@ -215,14 +223,6 @@ function buildDynamicGroups(auth: Auth): MenuGroup[] {
         if (can('ingredient-stock-adjustments-view')) items.push({ title: 'Stock Adjustments', href: stockAdjustmentsIndex.url(), icon: 'difference', activeMatch: [stockAdjustmentsIndex.url()] });
         if (can('ingredient-stock-counts-view')) items.push({ title: 'Stock Counts', href: stockCountsIndex.url(), icon: 'fact_check', activeMatch: [stockCountsIndex.url()] });
         groups.push({ id: 'inventory', label: 'Inventory', title: 'Inventory', icon: 'inventory_2', items });
-    }
-
-    if (canAny(['outlets-view', 'outlet-departments-view', 'warehouses-view'])) {
-        const items: MenuItem[] = [];
-        if (can('outlets-view')) items.push({ title: 'Outlets', href: outletsIndex.url(), icon: 'store', activeMatch: [outletsIndex.url()] });
-        if (can('outlet-departments-view')) items.push({ title: 'Departments', href: outletDepartmentsIndex.url(), icon: 'door_open', activeMatch: [outletDepartmentsIndex.url()] });
-        if (can('warehouses-view')) items.push({ title: 'Warehouses', href: warehousesIndex.url(), icon: 'warehouse', activeMatch: [warehousesIndex.url()] });
-        groups.push({ id: 'outlets', label: 'Master Data', title: 'Outlets', icon: 'storefront', items });
     }
 
     if (canAny(['users-manage', 'roles-view', 'permissions-view', 'access-control-manage'])) {
