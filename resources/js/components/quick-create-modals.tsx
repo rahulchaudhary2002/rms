@@ -22,6 +22,7 @@ import { store as outletsStore } from '@/routes/outlets';
 import { store as statesStore } from '@/routes/states';
 import { store as unitsStore } from '@/routes/units';
 import { store as usersStore } from '@/routes/users';
+import { store as suppliersStore } from '@/routes/suppliers';
 import { store as warehousesStore } from '@/routes/warehouses';
 import type { Country } from '@/types';
 
@@ -837,12 +838,12 @@ export function QuickCreateOutletDepartmentModal({
 export function QuickCreateWarehouseModal({
     open,
     onClose,
-    outlets,
+    outlets = [],
     defaultOutletId = '',
 }: {
     open: boolean;
     onClose: () => void;
-    outlets: OutletOption[];
+    outlets?: OutletOption[];
     defaultOutletId?: string;
 }) {
     const { data, setData, post, processing, errors, reset } = useForm({
@@ -980,6 +981,57 @@ export function QuickCreateAddonGroupModal({
                         </SearchableSelect>
                     </FormField>
                     <ModalActions processing={processing} submitLabel="Create Group" onCancel={close} />
+                </form>
+            </DialogContent>
+        </Dialog>
+    );
+}
+
+export function QuickCreateSupplierModal({
+    open,
+    onClose,
+}: {
+    open: boolean;
+    onClose: () => void;
+}) {
+    const { data, setData, post, processing, errors, reset } = useForm({
+        name: '',
+        code: '',
+        contact_person: '',
+        phone: '',
+        email: '',
+        pan_vat_no: '',
+        address: '',
+        is_active: true,
+        _redirect: currentUrl(),
+    });
+
+    function close() { reset(); onClose(); }
+    function submit(e: React.FormEvent) {
+        e.preventDefault();
+        post(suppliersStore.url(), { preserveScroll: true, preserveState: true, onSuccess: close });
+    }
+
+    return (
+        <Dialog open={open} onOpenChange={(o) => { if (!o) close(); }}>
+            <DialogContent className="max-w-md bg-card">
+                <DialogHeader><DialogTitle>Add Supplier</DialogTitle></DialogHeader>
+                <form onSubmit={submit} className="space-y-4">
+                    <FormField label="Name" error={errors.name}>
+                        <Input value={data.name} onChange={(e) => setData('name', e.target.value)} placeholder="e.g. ABC Traders" />
+                    </FormField>
+                    <div className="grid grid-cols-2 gap-4">
+                        <FormField label="Code" error={errors.code}>
+                            <Input value={data.code} onChange={(e) => setData('code', e.target.value)} placeholder="Optional" />
+                        </FormField>
+                        <FormField label="Phone" error={errors.phone}>
+                            <Input value={data.phone} onChange={(e) => setData('phone', e.target.value)} placeholder="Phone number" />
+                        </FormField>
+                    </div>
+                    <FormField label="Contact Person" error={errors.contact_person}>
+                        <Input value={data.contact_person} onChange={(e) => setData('contact_person', e.target.value)} placeholder="Contact person name" />
+                    </FormField>
+                    <ModalActions processing={processing} submitLabel="Create Supplier" onCancel={close} />
                 </form>
             </DialogContent>
         </Dialog>

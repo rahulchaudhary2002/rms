@@ -1,10 +1,12 @@
 import { Head, Link, router, useForm } from '@inertiajs/react';
 import { useState } from 'react';
-import { PageHeader } from '@/components/page-header';
 import { FormSection } from '@/components/form-section';
+import { PageHeader } from '@/components/page-header';
+import { QuickCreateSupplierModal } from '@/components/quick-create-modals';
 import { FormField } from '@/components/ui/form-field';
 import { Input } from '@/components/ui/input';
 import { SearchableSelect } from '@/components/ui/searchable-select';
+import { useCan } from '@/hooks/use-can';
 import { dashboard } from '@/routes';
 import {
     index as paymentsIndex,
@@ -34,6 +36,8 @@ type AllocationRow = {
 type InvoiceOption = Pick<PurchaseInvoice, 'id' | 'invoice_no' | 'due_amount' | 'grand_total'> & { supplier_invoice_no?: string | null };
 
 export default function SupplierPaymentsCreate({ suppliers }: Props) {
+    const { can } = useCan();
+    const [modal, setModal] = useState<'supplier' | null>(null);
     const [invoices, setInvoices] = useState<InvoiceOption[]>([]);
     const [allocations, setAllocations] = useState<AllocationRow[]>([]);
     const [loadingInvoices, setLoadingInvoices] = useState(false);
@@ -110,6 +114,8 @@ export default function SupplierPaymentsCreate({ suppliers }: Props) {
                                 <SearchableSelect
                                     value={data.supplier_id}
                                     onChange={(e) => handleSupplierChange(e.target.value)}
+                                    onAddNew={can('suppliers-create') ? () => setModal('supplier') : undefined}
+                                    addNewLabel="Add Supplier"
                                 >
                                     <option value="">Select supplier…</option>
                                     {suppliers.map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}
@@ -241,6 +247,7 @@ export default function SupplierPaymentsCreate({ suppliers }: Props) {
                         </button>
                     </div>
             </form>
+            <QuickCreateSupplierModal open={modal === 'supplier'} onClose={() => setModal(null)} />
         </>
     );
 }

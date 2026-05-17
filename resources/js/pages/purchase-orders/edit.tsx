@@ -1,10 +1,12 @@
 import { Head, Link, useForm } from '@inertiajs/react';
 import { useState } from 'react';
-import { PageHeader } from '@/components/page-header';
 import { FormSection } from '@/components/form-section';
+import { PageHeader } from '@/components/page-header';
+import { QuickCreateSupplierModal, QuickCreateWarehouseModal } from '@/components/quick-create-modals';
 import { FormField } from '@/components/ui/form-field';
 import { Input } from '@/components/ui/input';
 import { SearchableSelect } from '@/components/ui/searchable-select';
+import { useCan } from '@/hooks/use-can';
 import { dashboard } from '@/routes';
 import {
     index as ordersIndex,
@@ -48,6 +50,8 @@ function fmt(n: number): string {
 }
 
 export default function PurchaseOrdersEdit({ order, suppliers, warehouses, ingredients, units }: Props) {
+    const { can } = useCan();
+    const [modal, setModal] = useState<'supplier' | 'warehouse' | null>(null);
     const initialItems: ItemRow[] = (order.items ?? []).map((it) => ({
         ingredient_id:   String(it.ingredient_id),
         unit_id:         String(it.unit_id),
@@ -135,6 +139,8 @@ export default function PurchaseOrdersEdit({ order, suppliers, warehouses, ingre
                                 <SearchableSelect
                                     value={data.supplier_id}
                                     onChange={(e) => setData('supplier_id', e.target.value)}
+                                    onAddNew={can('suppliers-create') ? () => setModal('supplier') : undefined}
+                                    addNewLabel="Add Supplier"
                                 >
                                     <option value="">Select supplier…</option>
                                     {suppliers.map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}
@@ -144,6 +150,8 @@ export default function PurchaseOrdersEdit({ order, suppliers, warehouses, ingre
                                 <SearchableSelect
                                     value={data.warehouse_id}
                                     onChange={(e) => setData('warehouse_id', e.target.value)}
+                                    onAddNew={can('warehouses-create') ? () => setModal('warehouse') : undefined}
+                                    addNewLabel="Add Warehouse"
                                 >
                                     <option value="">Select warehouse…</option>
                                     {warehouses.map((w) => <option key={w.id} value={w.id}>{w.name}</option>)}
@@ -325,6 +333,8 @@ export default function PurchaseOrdersEdit({ order, suppliers, warehouses, ingre
                         </button>
                     </div>
             </form>
+            <QuickCreateSupplierModal open={modal === 'supplier'} onClose={() => setModal(null)} />
+            <QuickCreateWarehouseModal open={modal === 'warehouse'} onClose={() => setModal(null)} />
         </>
     );
 }

@@ -1,10 +1,12 @@
 import { Head, Link, useForm } from '@inertiajs/react';
 import { useState } from 'react';
-import { PageHeader } from '@/components/page-header';
 import { FormSection } from '@/components/form-section';
+import { PageHeader } from '@/components/page-header';
+import { QuickCreateSupplierModal, QuickCreateWarehouseModal } from '@/components/quick-create-modals';
 import { FormField } from '@/components/ui/form-field';
 import { Input } from '@/components/ui/input';
 import { SearchableSelect } from '@/components/ui/searchable-select';
+import { useCan } from '@/hooks/use-can';
 import { dashboard } from '@/routes';
 import {
     index as receivesIndex,
@@ -88,6 +90,8 @@ function itemsFromPurchaseOrder(order?: PurchaseOrderPrefill | null): ItemRow[] 
 }
 
 export default function PurchaseReceivesCreate({ suppliers, warehouses, ingredients, purchaseOrders, prefill }: Props) {
+    const { can } = useCan();
+    const [modal, setModal] = useState<'supplier' | 'warehouse' | null>(null);
     const prefillItems = itemsFromPurchaseOrder(prefill);
 
     const [items, setItems] = useState<ItemRow[]>(prefillItems.length ? prefillItems : [emptyItem()]);
@@ -199,6 +203,8 @@ export default function PurchaseReceivesCreate({ suppliers, warehouses, ingredie
                                     value={data.supplier_id}
                                     onChange={(e) => setData('supplier_id', e.target.value)}
                                     disabled={isPurchaseOrderReceive}
+                                    onAddNew={!isPurchaseOrderReceive && can('suppliers-create') ? () => setModal('supplier') : undefined}
+                                    addNewLabel="Add Supplier"
                                 >
                                     <option value="">Select supplier…</option>
                                     {suppliers.map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}
@@ -209,6 +215,8 @@ export default function PurchaseReceivesCreate({ suppliers, warehouses, ingredie
                                     value={data.warehouse_id}
                                     onChange={(e) => setData('warehouse_id', e.target.value)}
                                     disabled={isPurchaseOrderReceive}
+                                    onAddNew={!isPurchaseOrderReceive && can('warehouses-create') ? () => setModal('warehouse') : undefined}
+                                    addNewLabel="Add Warehouse"
                                 >
                                     <option value="">Select warehouse…</option>
                                     {warehouses.map((w) => <option key={w.id} value={w.id}>{w.name}</option>)}
@@ -345,6 +353,8 @@ export default function PurchaseReceivesCreate({ suppliers, warehouses, ingredie
                         </button>
                     </div>
             </form>
+            <QuickCreateSupplierModal open={modal === 'supplier'} onClose={() => setModal(null)} />
+            <QuickCreateWarehouseModal open={modal === 'warehouse'} onClose={() => setModal(null)} />
         </>
     );
 }
