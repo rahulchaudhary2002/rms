@@ -52,6 +52,7 @@ class RolesAndPermissionsSeeder extends Seeder
         'ingredient-batches',
         'ingredient-stock-transfers',
         'ingredient-wastages',
+        'ingredient-stock-outs',
         'ingredient-stock-adjustments',
         'ingredient-stock-counts',
     ];
@@ -84,6 +85,8 @@ class RolesAndPermissionsSeeder extends Seeder
         ['module' => 'ingredient-stock-transfers',         'action' => 'cancel',              'name' => 'Ingredient Stock Transfers Cancel'],
 
         ['module' => 'ingredient-wastages',                'action' => 'cancel',              'name' => 'Ingredient Wastages Cancel'],
+
+        ['module' => 'ingredient-stock-outs',              'action' => 'cancel',              'name' => 'Ingredient Stock Outs Cancel'],
 
         ['module' => 'ingredient-stock-adjustments',       'action' => 'cancel',              'name' => 'Ingredient Stock Adjustments Cancel'],
 
@@ -322,6 +325,13 @@ class RolesAndPermissionsSeeder extends Seeder
             'ingredient-wastages-update',
             'ingredient-wastages-cancel',
             'ingredient-wastages-export',
+            'ingredient-stock-outs-view',
+            'ingredient-stock-outs-create',
+            'ingredient-stock-outs-update',
+            'ingredient-stock-outs-approve',
+            'ingredient-stock-outs-cancel',
+            'ingredient-stock-outs-delete',
+            'ingredient-stock-outs-export',
             'ingredient-stock-counts-view',
             'ingredient-stock-counts-create',
             'ingredient-stock-counts-update',
@@ -342,6 +352,8 @@ class RolesAndPermissionsSeeder extends Seeder
             'ingredient-stock-transfers-receive',
             'ingredient-wastages-view',
             'ingredient-wastages-create',
+            'ingredient-stock-outs-view',
+            'ingredient-stock-outs-create',
             'ingredient-stock-adjustments-view',
             'ingredient-stock-counts-view',
             'ingredient-stock-counts-create',
@@ -356,6 +368,8 @@ class RolesAndPermissionsSeeder extends Seeder
             'ingredient-stock-transfers-view',
             'ingredient-wastages-view',
             'ingredient-wastages-create',
+            'ingredient-stock-outs-view',
+            'ingredient-stock-outs-create',
             'ingredient-stock-counts-view',
         ]);
     }

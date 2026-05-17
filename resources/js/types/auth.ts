@@ -594,6 +594,42 @@ export type IngredientWastage = {
     updated_at: string;
 };
 
+export type StockOutPurpose = 'production_use' | 'kitchen_use' | 'sample' | 'distribution' | 'other';
+export type StockOutStatus = 'draft' | 'approved' | 'cancelled';
+
+export type IngredientStockOutItem = {
+    id: number;
+    ingredient_stock_out_id: number;
+    ingredient_id: number;
+    ingredient_batch_id: number | null;
+    quantity: string;
+    unit_cost: string;
+    total_cost: string;
+    ingredient?: Pick<Ingredient, 'id' | 'name' | 'code'> & { base_unit?: { id: number; name: string; short_name: string } };
+    batch?: { id: number; batch_no: string | null; expiry_date: string | null } | null;
+    created_at: string;
+    updated_at: string;
+};
+
+export type IngredientStockOut = {
+    id: number;
+    stock_out_no: string;
+    warehouse_id: number;
+    stock_out_date: string;
+    purpose: StockOutPurpose;
+    status: StockOutStatus;
+    remarks: string | null;
+    created_by: number | null;
+    approved_by: number | null;
+    approved_at: string | null;
+    warehouse?: Pick<Warehouse, 'id' | 'name'>;
+    items?: IngredientStockOutItem[];
+    createdBy?: Pick<User, 'id' | 'name'> | null;
+    approvedBy?: Pick<User, 'id' | 'name'> | null;
+    created_at: string;
+    updated_at: string;
+};
+
 export type IngredientStockTransfer = {
     id: number;
     transfer_no: string;

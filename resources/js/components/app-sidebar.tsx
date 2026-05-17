@@ -37,6 +37,7 @@ import { index as ingredientBatchesIndex } from '@/routes/ingredient-batches';
 import { index as inventoryTransactionsIndex } from '@/routes/ingredient-inventory-transactions';
 import { index as stockTransfersIndex } from '@/routes/ingredient-stock-transfers';
 import { index as wastagesIndex } from '@/routes/ingredient-wastages';
+import { index as stockOutsIndex } from '@/routes/ingredient-stock-outs';
 import { index as stockAdjustmentsIndex } from '@/routes/ingredient-stock-adjustments';
 import { index as stockCountsIndex } from '@/routes/ingredient-stock-counts';
 import { index as suppliersIndex } from '@/routes/suppliers';
@@ -217,6 +218,7 @@ function buildDynamicGroups(auth: Auth): MenuGroup[] {
         'ingredient-inventory-transactions-view',
         'ingredient-stock-transfers-view',
         'ingredient-wastages-view',
+        'ingredient-stock-outs-view',
         'ingredient-stock-adjustments-view',
         'ingredient-stock-counts-view',
     ])) {
@@ -226,6 +228,7 @@ function buildDynamicGroups(auth: Auth): MenuGroup[] {
         if (can('ingredient-inventory-transactions-view')) items.push({ title: 'Inventory Transactions', href: inventoryTransactionsIndex.url(), icon: 'format_list_bulleted', activeMatch: [inventoryTransactionsIndex.url()] });
         if (can('ingredient-stock-transfers-view')) items.push({ title: 'Stock Transfers', href: stockTransfersIndex.url(), icon: 'sync_alt', activeMatch: [stockTransfersIndex.url()] });
         if (can('ingredient-wastages-view')) items.push({ title: 'Wastages', href: wastagesIndex.url(), icon: 'delete_sweep', activeMatch: [wastagesIndex.url()] });
+        if (can('ingredient-stock-outs-view')) items.push({ title: 'Stock Outs', href: stockOutsIndex.url(), icon: 'output', activeMatch: [stockOutsIndex.url()] });
         if (can('ingredient-stock-adjustments-view')) items.push({ title: 'Stock Adjustments', href: stockAdjustmentsIndex.url(), icon: 'difference', activeMatch: [stockAdjustmentsIndex.url()] });
         if (can('ingredient-stock-counts-view')) items.push({ title: 'Stock Counts', href: stockCountsIndex.url(), icon: 'fact_check', activeMatch: [stockCountsIndex.url()] });
         groups.push({ id: 'inventory', label: 'Inventory', title: 'Inventory', icon: 'inventory_2', items });
