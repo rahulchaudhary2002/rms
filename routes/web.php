@@ -46,3 +46,4 @@ require __DIR__.'/ingredient-stock-transfers.php';
 require __DIR__.'/ingredient-wastages.php';
 require __DIR__.'/ingredient-stock-adjustments.php';
 require __DIR__.'/ingredient-stock-counts.php';
+require __DIR__.'/purchase.php';

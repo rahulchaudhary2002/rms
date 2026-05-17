@@ -4,23 +4,54 @@ import { createPortal } from 'react-dom';
 import { cn } from '@/lib/utils';
 
 type ActionItem = {
-    id: string | number;
+    id?: string | number;
     label: string;
     icon: string;
-    onClick?: (e: React.MouseEvent<HTMLButtonElement>) => void;
+    onClick?: (e?: React.MouseEvent<HTMLButtonElement>) => void;
     href?: string;
-    variant?: 'default' | 'danger';
+    variant?: 'default' | 'danger' | 'destructive';
+    permission?: string;
 };
 
-type Props = {
+type ControlledProps = {
     isOpen: boolean;
     itemId: string | number;
     itemLabel: string;
     onToggle: (id: string | number | null) => void;
-    actions: ActionItem[];
+    actions?: ActionItem[];
 };
 
-export function ActionDropdown({ isOpen, itemId, itemLabel, onToggle, actions }: Props) {
+type LegacyProps = {
+    open: boolean;
+    onOpenChange: (open: boolean) => void;
+    items?: ActionItem[];
+};
+
+type Props = ControlledProps | LegacyProps;
+
+export function ActionDropdown(props: Props) {
+    const isControlled = 'isOpen' in props;
+    const isOpen = isControlled ? props.isOpen : props.open;
+    const itemId = isControlled ? props.itemId : 'action-menu';
+    const itemLabel = isControlled ? props.itemLabel : 'item';
+    const actions = isControlled ? (props.actions ?? []) : (props.items ?? []);
+
+    const closeMenu = () => {
+        if (isControlled) {
+            props.onToggle(null);
+        } else {
+            props.onOpenChange(false);
+        }
+    };
+
+    const toggleMenu = () => {
+        if (isControlled) {
+            props.onToggle(itemId);
+        } else {
+            props.onOpenChange(!isOpen);
+        }
+    };
+
     const dropdownRef = useRef<HTMLDivElement>(null);
     const buttonRef = useRef<HTMLButtonElement>(null);
     const [menuPosition, setMenuPosition] = useState<{ top: number; right: number } | null>(null);
@@ -76,17 +107,17 @@ export function ActionDropdown({ isOpen, itemId, itemLabel, onToggle, actions }:
     useEffect(() => {
         if (!isOpen) return;
 
-        const handleClickOutside = () => onToggle(null);
+        const handleClickOutside = () => closeMenu();
 
         document.addEventListener('click', handleClickOutside);
         return () => document.removeEventListener('click', handleClickOutside);
-    }, [isOpen, onToggle]);
+    }, [isOpen]);
 
     const handleActionClick = (action: ActionItem) => {
         if (action.onClick) {
             action.onClick({} as React.MouseEvent<HTMLButtonElement>);
         }
-        onToggle(null);
+        closeMenu();
     };
 
     const menuContent = (
@@ -106,15 +137,15 @@ export function ActionDropdown({ isOpen, itemId, itemLabel, onToggle, actions }:
                     : 'pointer-events-none -translate-y-2 scale-95 opacity-0',
             )}
         >
-            {actions.map((action) =>
+            {actions.map((action, index) =>
                 action.href ? (
                     <Link
-                        key={action.id}
+                        key={String(action.id ?? `${action.label}-${index}`)}
                         href={action.href}
-                        onClick={() => onToggle(null)}
+                        onClick={() => closeMenu()}
                         className={cn(
                             'flex items-center gap-2 rounded-lg px-3 py-2 text-sm font-medium transition-colors',
-                            action.variant === 'danger'
+                            action.variant === 'danger' || action.variant === 'destructive'
                                 ? 'text-destructive hover:bg-destructive/10'
                                 : 'text-popover-foreground hover:bg-accent',
                         )}
@@ -124,12 +155,12 @@ export function ActionDropdown({ isOpen, itemId, itemLabel, onToggle, actions }:
                     </Link>
                 ) : (
                     <button
-                        key={action.id}
+                        key={String(action.id ?? `${action.label}-${index}`)}
                         type="button"
                         onClick={() => handleActionClick(action)}
                         className={cn(
                             'flex w-full items-center gap-2 rounded-lg px-3 py-2 text-sm font-medium transition-colors',
-                            action.variant === 'danger'
+                            action.variant === 'danger' || action.variant === 'destructive'
                                 ? 'text-destructive hover:bg-destructive/10'
                                 : 'text-popover-foreground hover:bg-accent',
                         )}
@@ -152,7 +183,7 @@ export function ActionDropdown({ isOpen, itemId, itemLabel, onToggle, actions }:
                     aria-expanded={isOpen}
                     onClick={(e) => {
                         e.stopPropagation();
-                        onToggle(itemId);
+                        toggleMenu();
                     }}
                     className={cn(
                         'inline-flex h-9 w-9 items-center justify-center rounded-lg transition-colors',

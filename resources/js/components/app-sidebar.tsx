@@ -39,6 +39,12 @@ import { index as stockTransfersIndex } from '@/routes/ingredient-stock-transfer
 import { index as wastagesIndex } from '@/routes/ingredient-wastages';
 import { index as stockAdjustmentsIndex } from '@/routes/ingredient-stock-adjustments';
 import { index as stockCountsIndex } from '@/routes/ingredient-stock-counts';
+import { index as suppliersIndex } from '@/routes/suppliers';
+import { index as purchaseOrdersIndex } from '@/routes/purchase-orders';
+import { index as purchaseReceivesIndex } from '@/routes/purchase-receives';
+import { index as purchaseInvoicesIndex } from '@/routes/purchase-invoices';
+import { index as supplierPaymentsIndex } from '@/routes/supplier-payments';
+import { index as purchaseReturnsIndex } from '@/routes/purchase-returns';
 import type { Auth } from '@/types';
 
 type ViewportMode = 'mobile' | 'medium' | 'large';
@@ -223,6 +229,24 @@ function buildDynamicGroups(auth: Auth): MenuGroup[] {
         if (can('ingredient-stock-adjustments-view')) items.push({ title: 'Stock Adjustments', href: stockAdjustmentsIndex.url(), icon: 'difference', activeMatch: [stockAdjustmentsIndex.url()] });
         if (can('ingredient-stock-counts-view')) items.push({ title: 'Stock Counts', href: stockCountsIndex.url(), icon: 'fact_check', activeMatch: [stockCountsIndex.url()] });
         groups.push({ id: 'inventory', label: 'Inventory', title: 'Inventory', icon: 'inventory_2', items });
+    }
+
+    if (canAny([
+        'suppliers-view',
+        'purchase-orders-view',
+        'purchase-receives-view',
+        'purchase-invoices-view',
+        'supplier-payments-view',
+        'purchase-returns-view',
+    ])) {
+        const items: MenuItem[] = [];
+        if (can('suppliers-view'))         items.push({ title: 'Suppliers',         href: suppliersIndex.url(),        icon: 'business',          activeMatch: [suppliersIndex.url()] });
+        if (can('purchase-orders-view'))   items.push({ title: 'Purchase Orders',   href: purchaseOrdersIndex.url(),   icon: 'shopping_cart',     activeMatch: [purchaseOrdersIndex.url()] });
+        if (can('purchase-receives-view')) items.push({ title: 'Purchase Receives', href: purchaseReceivesIndex.url(), icon: 'move_to_inbox',     activeMatch: [purchaseReceivesIndex.url()] });
+        if (can('purchase-invoices-view')) items.push({ title: 'Purchase Invoices', href: purchaseInvoicesIndex.url(), icon: 'receipt_long',      activeMatch: [purchaseInvoicesIndex.url()] });
+        if (can('supplier-payments-view')) items.push({ title: 'Supplier Payments', href: supplierPaymentsIndex.url(), icon: 'payments',          activeMatch: [supplierPaymentsIndex.url()] });
+        if (can('purchase-returns-view'))  items.push({ title: 'Purchase Returns',  href: purchaseReturnsIndex.url(),  icon: 'assignment_return', activeMatch: [purchaseReturnsIndex.url()] });
+        groups.push({ id: 'purchase', label: 'Inventory', title: 'Purchase', icon: 'local_shipping', items });
     }
 
     if (canAny(['users-manage', 'roles-view', 'permissions-view', 'access-control-manage'])) {

@@ -8,6 +8,7 @@ type FormFieldProps = {
     error?: string;
     description?: string;
     className?: string;
+    required?: boolean;
     children: React.ReactNode;
 };
 
@@ -17,6 +18,7 @@ function FormField({
     error,
     description,
     className,
+    required,
     children,
 }: FormFieldProps) {
     return (
@@ -26,7 +28,7 @@ function FormField({
                     htmlFor={htmlFor}
                     className="text-xs font-bold tracking-wider text-foreground/80 uppercase dark:text-foreground/70"
                 >
-                    {label}
+                    {label}{required && <span className="ml-0.5 text-red-500">*</span>}
                 </label>
                 {description && (
                     <span className="text-xs text-muted-foreground">{description}</span>

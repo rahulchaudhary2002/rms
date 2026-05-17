@@ -684,6 +684,235 @@ export type IngredientBatch = {
     updated_at: string;
 };
 
+export type Supplier = {
+    id: number;
+    name: string;
+    code: string | null;
+    contact_person: string | null;
+    phone: string | null;
+    email: string | null;
+    pan_vat_no: string | null;
+    address: string | null;
+    is_active: boolean;
+    created_at: string;
+    updated_at: string;
+};
+
+export type PurchaseOrderStatus = 'draft' | 'ordered' | 'partially_received' | 'received' | 'cancelled' | 'closed';
+
+export type PurchaseOrderItem = {
+    id: number;
+    purchase_order_id: number;
+    ingredient_id: number;
+    unit_id: number;
+    quantity: string;
+    received_quantity: string;
+    unit_price: string;
+    discount_amount: string;
+    tax_amount: string;
+    line_total: string;
+    notes: string | null;
+    ingredient?: Pick<Ingredient, 'id' | 'name' | 'code'> & { base_unit?: Pick<Unit, 'id' | 'name' | 'short_name'> };
+    unit?: Pick<Unit, 'id' | 'name' | 'short_name'>;
+    created_at: string;
+    updated_at: string;
+};
+
+export type PurchaseOrder = {
+    id: number;
+    supplier_id: number;
+    warehouse_id: number;
+    purchase_order_no: string;
+    order_date: string;
+    expected_delivery_date: string | null;
+    status: PurchaseOrderStatus;
+    subtotal: string;
+    discount_amount: string;
+    tax_amount: string;
+    shipping_amount: string;
+    grand_total: string;
+    notes: string | null;
+    created_by: number | null;
+    approved_by: number | null;
+    approved_at: string | null;
+    supplier?: Pick<Supplier, 'id' | 'name'>;
+    warehouse?: Pick<Warehouse, 'id' | 'name'>;
+    items?: PurchaseOrderItem[];
+    createdBy?: Pick<User, 'id' | 'name'> | null;
+    approvedBy?: Pick<User, 'id' | 'name'> | null;
+    created_at: string;
+    updated_at: string;
+};
+
+export type PurchaseReceiveStatus = 'draft' | 'posted' | 'cancelled';
+
+export type PurchaseReceiveItem = {
+    id: number;
+    purchase_receive_id: number;
+    purchase_order_item_id: number | null;
+    ingredient_id: number;
+    unit_id: number;
+    ordered_quantity: string;
+    received_quantity: string;
+    rejected_quantity: string;
+    accepted_quantity: string;
+    unit_price: string;
+    line_total: string;
+    batch_no: string | null;
+    manufactured_date: string | null;
+    expiry_date: string | null;
+    remarks: string | null;
+    ingredient?: Pick<Ingredient, 'id' | 'name' | 'code'> & { base_unit?: Pick<Unit, 'id' | 'name' | 'short_name'> };
+    unit?: Pick<Unit, 'id' | 'name' | 'short_name'>;
+    created_at: string;
+    updated_at: string;
+};
+
+export type PurchaseReceive = {
+    id: number;
+    purchase_order_id: number | null;
+    supplier_id: number;
+    warehouse_id: number;
+    receive_no: string;
+    received_date: string;
+    status: PurchaseReceiveStatus;
+    notes: string | null;
+    received_by: number | null;
+    posted_by: number | null;
+    posted_at: string | null;
+    supplier?: Pick<Supplier, 'id' | 'name'>;
+    warehouse?: Pick<Warehouse, 'id' | 'name'>;
+    purchaseOrder?: Pick<PurchaseOrder, 'id' | 'purchase_order_no'> | null;
+    items?: PurchaseReceiveItem[];
+    receivedBy?: Pick<User, 'id' | 'name'> | null;
+    postedBy?: Pick<User, 'id' | 'name'> | null;
+    created_at: string;
+    updated_at: string;
+};
+
+export type PurchaseInvoiceStatus = 'draft' | 'unpaid' | 'partially_paid' | 'paid' | 'cancelled';
+
+export type PurchaseInvoiceItem = {
+    id: number;
+    purchase_invoice_id: number;
+    ingredient_id: number;
+    unit_id: number;
+    quantity: string;
+    unit_price: string;
+    discount_amount: string;
+    tax_amount: string;
+    line_total: string;
+    ingredient?: Pick<Ingredient, 'id' | 'name' | 'code'> & { base_unit?: Pick<Unit, 'id' | 'name' | 'short_name'> };
+    unit?: Pick<Unit, 'id' | 'name' | 'short_name'>;
+    created_at: string;
+    updated_at: string;
+};
+
+export type PurchaseInvoice = {
+    id: number;
+    supplier_id: number;
+    purchase_order_id: number | null;
+    purchase_receive_id: number | null;
+    invoice_no: string;
+    supplier_invoice_no: string | null;
+    invoice_date: string;
+    due_date: string | null;
+    status: PurchaseInvoiceStatus;
+    subtotal: string;
+    discount_amount: string;
+    tax_amount: string;
+    shipping_amount: string;
+    grand_total: string;
+    paid_amount: string;
+    due_amount: string;
+    notes: string | null;
+    created_by: number | null;
+    supplier?: Pick<Supplier, 'id' | 'name'>;
+    purchaseOrder?: Pick<PurchaseOrder, 'id' | 'purchase_order_no'> | null;
+    purchaseReceive?: Pick<PurchaseReceive, 'id' | 'receive_no'> | null;
+    items?: PurchaseInvoiceItem[];
+    paymentAllocations?: SupplierPaymentAllocation[];
+    createdBy?: Pick<User, 'id' | 'name'> | null;
+    created_at: string;
+    updated_at: string;
+};
+
+export type PaymentMethod = 'cash' | 'bank' | 'cheque' | 'online' | 'credit' | 'other';
+
+export type SupplierPaymentAllocation = {
+    id: number;
+    supplier_payment_id: number;
+    purchase_invoice_id: number;
+    allocated_amount: string;
+    invoice?: Pick<PurchaseInvoice, 'id' | 'invoice_no' | 'invoice_date' | 'grand_total' | 'due_amount'>;
+    payment?: Pick<SupplierPayment, 'id' | 'payment_no' | 'payment_date' | 'payment_method'>;
+    created_at: string;
+    updated_at: string;
+};
+
+export type SupplierPayment = {
+    id: number;
+    supplier_id: number;
+    payment_no: string;
+    payment_date: string;
+    payment_method: PaymentMethod;
+    reference_no: string | null;
+    amount: string;
+    notes: string | null;
+    created_by: number | null;
+    supplier?: Pick<Supplier, 'id' | 'name'>;
+    allocations?: SupplierPaymentAllocation[];
+    createdBy?: Pick<User, 'id' | 'name'> | null;
+    created_at: string;
+    updated_at: string;
+};
+
+export type PurchaseReturnStatus = 'draft' | 'posted' | 'cancelled';
+
+export type PurchaseReturnItem = {
+    id: number;
+    purchase_return_id: number;
+    ingredient_id: number;
+    ingredient_batch_id: number | null;
+    unit_id: number;
+    quantity: string;
+    unit_price: string;
+    line_total: string;
+    reason: string | null;
+    ingredient?: Pick<Ingredient, 'id' | 'name' | 'code'> & { base_unit?: Pick<Unit, 'id' | 'name' | 'short_name'> };
+    unit?: Pick<Unit, 'id' | 'name' | 'short_name'>;
+    batch?: Pick<IngredientBatch, 'id' | 'batch_no'> | null;
+    created_at: string;
+    updated_at: string;
+};
+
+export type PurchaseReturn = {
+    id: number;
+    supplier_id: number;
+    warehouse_id: number;
+    purchase_receive_id: number | null;
+    purchase_invoice_id: number | null;
+    return_no: string;
+    return_date: string;
+    status: PurchaseReturnStatus;
+    subtotal: string;
+    tax_amount: string;
+    grand_total: string;
+    reason: string | null;
+    created_by: number | null;
+    posted_by: number | null;
+    posted_at: string | null;
+    supplier?: Pick<Supplier, 'id' | 'name'>;
+    warehouse?: Pick<Warehouse, 'id' | 'name'>;
+    purchaseReceive?: Pick<PurchaseReceive, 'id' | 'receive_no'> | null;
+    purchaseInvoice?: Pick<PurchaseInvoice, 'id' | 'invoice_no'> | null;
+    items?: PurchaseReturnItem[];
+    createdBy?: Pick<User, 'id' | 'name'> | null;
+    postedBy?: Pick<User, 'id' | 'name'> | null;
+    created_at: string;
+    updated_at: string;
+};
+
 export type TransactionType =
     | 'opening_stock'
     | 'purchase_receive'

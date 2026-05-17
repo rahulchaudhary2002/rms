@@ -56,6 +56,21 @@ class RolesAndPermissionsSeeder extends Seeder
         'ingredient-stock-counts',
     ];
 
+    private array $purchaseModules = [
+        'suppliers',
+        'purchase-orders',
+        'purchase-receives',
+        'purchase-invoices',
+        'supplier-payments',
+        'purchase-returns',
+    ];
+
+    private array $customPurchasePermissions = [
+        ['module' => 'purchase-orders',   'action' => 'approve', 'name' => 'Purchase Orders Approve'],
+        ['module' => 'purchase-receives', 'action' => 'post',    'name' => 'Purchase Receives Post'],
+        ['module' => 'purchase-returns',  'action' => 'post',    'name' => 'Purchase Returns Post'],
+    ];
+
     private array $customInventoryPermissions = [
         ['module' => 'inventory',                          'action' => 'view',                'name' => 'Inventory View'],
         ['module' => 'inventory',                          'action' => 'manage',              'name' => 'Inventory Manage'],
@@ -149,6 +164,7 @@ class RolesAndPermissionsSeeder extends Seeder
         DB::transaction(function () {
             $this->seedPermissions();
             $this->seedInventoryPermissions();
+            $this->seedPurchasePermissions();
             $this->seedRoles();
             $this->assignDefaultAdminPermissions();
             $this->assignInventoryRolePermissions();
@@ -201,6 +217,46 @@ class RolesAndPermissionsSeeder extends Seeder
             ->pluck('id');
 
         $admin->permissions()->syncWithoutDetaching($permissions);
+    }
+
+    private function seedPurchasePermissions(): void
+    {
+        $purchaseActions = ['view', 'create', 'edit', 'delete'];
+
+        foreach ($this->purchaseModules as $module) {
+            foreach ($purchaseActions as $action) {
+                $slug = "{$module}-{$action}";
+                $name = ucwords(str_replace('-', ' ', $module)) . ' ' . ucwords($action);
+
+                Permission::firstOrCreate(
+                    ['slug' => $slug],
+                    [
+                        'name'      => $name,
+                        'module'    => $module,
+                        'action'    => $action,
+                        'level'     => 'global',
+                        'is_system' => true,
+                        'is_active' => true,
+                    ]
+                );
+            }
+        }
+
+        foreach ($this->customPurchasePermissions as $permission) {
+            $slug = "{$permission['module']}-{$permission['action']}";
+
+            Permission::firstOrCreate(
+                ['slug' => $slug],
+                [
+                    'name'      => $permission['name'],
+                    'module'    => $permission['module'],
+                    'action'    => $permission['action'],
+                    'level'     => 'global',
+                    'is_system' => true,
+                    'is_active' => true,
+                ]
+            );
+        }
     }
 
     private function seedInventoryPermissions(): void
