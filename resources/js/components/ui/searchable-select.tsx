@@ -369,7 +369,7 @@ export function SearchableSelect({
                     }
                 }}
                 className={cn(
-                    'h-11 w-full rounded-lg border border-input bg-background px-3 pr-16 text-sm text-foreground transition-[color,box-shadow,border-color] outline-none',
+                    'h-11 w-full rounded-lg border border-input bg-background px-3 pr-16 text-sm text-foreground transition-[color,box-shadow,border-color] outline-none shadow-none',
                     'placeholder:text-muted-foreground',
                     'focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50',
                     'dark:bg-input/30',
