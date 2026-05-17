@@ -28,11 +28,11 @@ Route::middleware(['auth', 'verified', 'node.selected'])->group(function () {
         ->name('suppliers.show');
 
     Route::get('suppliers/{supplier}/edit', [SupplierController::class, 'edit'])
-        ->middleware('permission:suppliers-edit')
+        ->middleware('permission:suppliers-update')
         ->name('suppliers.edit');
 
     Route::put('suppliers/{supplier}', [SupplierController::class, 'update'])
-        ->middleware('permission:suppliers-edit')
+        ->middleware('permission:suppliers-update')
         ->name('suppliers.update');
 
     Route::delete('suppliers/{supplier}', [SupplierController::class, 'destroy'])
@@ -40,7 +40,7 @@ Route::middleware(['auth', 'verified', 'node.selected'])->group(function () {
         ->name('suppliers.destroy');
 
     Route::patch('suppliers/{supplier}/active', [SupplierController::class, 'toggleActive'])
-        ->middleware('permission:suppliers-edit')
+        ->middleware('permission:suppliers-update')
         ->name('suppliers.toggle-active');
 
     // Purchase Orders
@@ -61,11 +61,11 @@ Route::middleware(['auth', 'verified', 'node.selected'])->group(function () {
         ->name('purchase-orders.show');
 
     Route::get('purchase-orders/{purchaseOrder}/edit', [PurchaseOrderController::class, 'edit'])
-        ->middleware('permission:purchase-orders-edit')
+        ->middleware('permission:purchase-orders-update')
         ->name('purchase-orders.edit');
 
     Route::put('purchase-orders/{purchaseOrder}', [PurchaseOrderController::class, 'update'])
-        ->middleware('permission:purchase-orders-edit')
+        ->middleware('permission:purchase-orders-update')
         ->name('purchase-orders.update');
 
     Route::delete('purchase-orders/{purchaseOrder}', [PurchaseOrderController::class, 'destroy'])
@@ -77,7 +77,7 @@ Route::middleware(['auth', 'verified', 'node.selected'])->group(function () {
         ->name('purchase-orders.approve');
 
     Route::post('purchase-orders/{purchaseOrder}/cancel', [PurchaseOrderController::class, 'cancel'])
-        ->middleware('permission:purchase-orders-edit')
+        ->middleware('permission:purchase-orders-update')
         ->name('purchase-orders.cancel');
 
     // Purchase Receives
@@ -98,11 +98,11 @@ Route::middleware(['auth', 'verified', 'node.selected'])->group(function () {
         ->name('purchase-receives.show');
 
     Route::get('purchase-receives/{purchaseReceive}/edit', [PurchaseReceiveController::class, 'edit'])
-        ->middleware('permission:purchase-receives-edit')
+        ->middleware('permission:purchase-receives-update')
         ->name('purchase-receives.edit');
 
     Route::put('purchase-receives/{purchaseReceive}', [PurchaseReceiveController::class, 'update'])
-        ->middleware('permission:purchase-receives-edit')
+        ->middleware('permission:purchase-receives-update')
         ->name('purchase-receives.update');
 
     Route::delete('purchase-receives/{purchaseReceive}', [PurchaseReceiveController::class, 'destroy'])
@@ -114,7 +114,7 @@ Route::middleware(['auth', 'verified', 'node.selected'])->group(function () {
         ->name('purchase-receives.post');
 
     Route::post('purchase-receives/{purchaseReceive}/cancel', [PurchaseReceiveController::class, 'cancel'])
-        ->middleware('permission:purchase-receives-edit')
+        ->middleware('permission:purchase-receives-update')
         ->name('purchase-receives.cancel');
 
     // Purchase Invoices
@@ -135,11 +135,11 @@ Route::middleware(['auth', 'verified', 'node.selected'])->group(function () {
         ->name('purchase-invoices.show');
 
     Route::get('purchase-invoices/{purchaseInvoice}/edit', [PurchaseInvoiceController::class, 'edit'])
-        ->middleware('permission:purchase-invoices-edit')
+        ->middleware('permission:purchase-invoices-update')
         ->name('purchase-invoices.edit');
 
     Route::put('purchase-invoices/{purchaseInvoice}', [PurchaseInvoiceController::class, 'update'])
-        ->middleware('permission:purchase-invoices-edit')
+        ->middleware('permission:purchase-invoices-update')
         ->name('purchase-invoices.update');
 
     Route::delete('purchase-invoices/{purchaseInvoice}', [PurchaseInvoiceController::class, 'destroy'])
@@ -147,7 +147,7 @@ Route::middleware(['auth', 'verified', 'node.selected'])->group(function () {
         ->name('purchase-invoices.destroy');
 
     Route::post('purchase-invoices/{purchaseInvoice}/cancel', [PurchaseInvoiceController::class, 'cancel'])
-        ->middleware('permission:purchase-invoices-edit')
+        ->middleware('permission:purchase-invoices-update')
         ->name('purchase-invoices.cancel');
 
     // Supplier Payments
@@ -193,11 +193,11 @@ Route::middleware(['auth', 'verified', 'node.selected'])->group(function () {
         ->name('purchase-returns.show');
 
     Route::get('purchase-returns/{purchaseReturn}/edit', [PurchaseReturnController::class, 'edit'])
-        ->middleware('permission:purchase-returns-edit')
+        ->middleware('permission:purchase-returns-update')
         ->name('purchase-returns.edit');
 
     Route::put('purchase-returns/{purchaseReturn}', [PurchaseReturnController::class, 'update'])
-        ->middleware('permission:purchase-returns-edit')
+        ->middleware('permission:purchase-returns-update')
         ->name('purchase-returns.update');
 
     Route::delete('purchase-returns/{purchaseReturn}', [PurchaseReturnController::class, 'destroy'])
@@ -209,6 +209,6 @@ Route::middleware(['auth', 'verified', 'node.selected'])->group(function () {
         ->name('purchase-returns.post');
 
     Route::post('purchase-returns/{purchaseReturn}/cancel', [PurchaseReturnController::class, 'cancel'])
-        ->middleware('permission:purchase-returns-edit')
+        ->middleware('permission:purchase-returns-update')
         ->name('purchase-returns.cancel');
 });

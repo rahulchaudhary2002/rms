@@ -13,11 +13,11 @@ Route::middleware(['auth', 'verified', 'node.selected'])->group(function () {
         ->name('warehouses.create');
 
     Route::get('warehouses/{warehouse}/edit', [WarehouseController::class, 'edit'])
-        ->middleware('permission:warehouses-edit')
+        ->middleware('permission:warehouses-update')
         ->name('warehouses.edit');
 
     Route::put('warehouses/{warehouse}', [WarehouseController::class, 'update'])
-        ->middleware('permission:warehouses-edit')
+        ->middleware('permission:warehouses-update')
         ->name('warehouses.update');
 
     Route::delete('warehouses/{warehouse}', [WarehouseController::class, 'destroy'])
@@ -25,6 +25,6 @@ Route::middleware(['auth', 'verified', 'node.selected'])->group(function () {
         ->name('warehouses.destroy');
 
     Route::patch('warehouses/{warehouse}/toggle-active', [WarehouseController::class, 'toggleActive'])
-        ->middleware('permission:warehouses-edit')
+        ->middleware('permission:warehouses-update')
         ->name('warehouses.toggle-active');
 });
