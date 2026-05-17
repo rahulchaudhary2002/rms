@@ -21,6 +21,7 @@ class DatabaseSeeder extends Seeder
             OutletDepartmentsSeeder::class,
             WarehousesSeeder::class,
             IngredientsSeeder::class,
+            OpeningStockSeeder::class,
         ]);
     }
 }

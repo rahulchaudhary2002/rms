@@ -6,6 +6,7 @@ use App\Http\Concerns\ExtractsFilters;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Ingredients\IngredientWastage\StoreIngredientWastageRequest;
 use App\Http\Requests\Ingredients\IngredientWastage\UpdateIngredientWastageRequest;
+use App\Exceptions\InsufficientStockException;
 use App\Models\IngredientWastage;
 use App\Services\IngredientWastageService;
 use Illuminate\Http\RedirectResponse;
@@ -71,7 +72,11 @@ class IngredientWastageController extends Controller
 
     public function approve(Request $request, IngredientWastage $ingredientWastage): RedirectResponse
     {
-        $this->wastageService->approve($ingredientWastage, $request->user()->id);
+        try {
+            $this->wastageService->approve($ingredientWastage, $request->user()->id);
+        } catch (InsufficientStockException $e) {
+            return back()->withErrors(['approve' => $e->getMessage()]);
+        }
 
         return redirect()->route('ingredient-wastages.show', $ingredientWastage)
             ->with('success', 'Wastage approved. Stock has been deducted.');

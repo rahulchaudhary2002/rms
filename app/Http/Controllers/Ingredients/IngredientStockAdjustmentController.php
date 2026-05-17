@@ -6,6 +6,7 @@ use App\Http\Concerns\ExtractsFilters;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Ingredients\IngredientStockAdjustment\StoreIngredientStockAdjustmentRequest;
 use App\Http\Requests\Ingredients\IngredientStockAdjustment\UpdateIngredientStockAdjustmentRequest;
+use App\Exceptions\InsufficientStockException;
 use App\Models\IngredientStockAdjustment;
 use App\Services\IngredientStockAdjustmentService;
 use Illuminate\Http\RedirectResponse;
@@ -71,7 +72,11 @@ class IngredientStockAdjustmentController extends Controller
 
     public function approve(Request $request, IngredientStockAdjustment $ingredientStockAdjustment): RedirectResponse
     {
-        $this->adjustmentService->approve($ingredientStockAdjustment, $request->user()->id);
+        try {
+            $this->adjustmentService->approve($ingredientStockAdjustment, $request->user()->id);
+        } catch (InsufficientStockException $e) {
+            return back()->withErrors(['approve' => $e->getMessage()]);
+        }
 
         return redirect()->route('ingredient-stock-adjustments.show', $ingredientStockAdjustment)
             ->with('success', 'Adjustment approved. Stock has been updated.');

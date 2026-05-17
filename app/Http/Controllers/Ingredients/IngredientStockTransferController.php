@@ -8,6 +8,7 @@ use App\Http\Requests\Ingredients\IngredientStockTransfer\DispatchTransferReques
 use App\Http\Requests\Ingredients\IngredientStockTransfer\ReceiveTransferRequest;
 use App\Http\Requests\Ingredients\IngredientStockTransfer\StoreIngredientStockTransferRequest;
 use App\Http\Requests\Ingredients\IngredientStockTransfer\UpdateIngredientStockTransferRequest;
+use App\Exceptions\InsufficientStockException;
 use App\Models\IngredientStockTransfer;
 use App\Services\IngredientStockTransferService;
 use Illuminate\Http\RedirectResponse;
@@ -87,7 +88,11 @@ class IngredientStockTransferController extends Controller
 
     public function dispatch(DispatchTransferRequest $request, IngredientStockTransfer $ingredientStockTransfer): RedirectResponse
     {
-        $this->transferService->dispatch($ingredientStockTransfer, $request->validated(), $request->user()->id);
+        try {
+            $this->transferService->dispatch($ingredientStockTransfer, $request->validated(), $request->user()->id);
+        } catch (InsufficientStockException $e) {
+            return back()->withErrors(['dispatch' => $e->getMessage()]);
+        }
 
         return redirect()->route('ingredient-stock-transfers.show', $ingredientStockTransfer)
             ->with('success', 'Transfer dispatched. Stock has been deducted from the source warehouse.');

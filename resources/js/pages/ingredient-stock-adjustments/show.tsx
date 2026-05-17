@@ -31,7 +31,7 @@ type Props = {
 
 export default function IngredientStockAdjustmentsShow({ adjustment }: Props) {
     const { confirm, dialog } = useConfirm();
-    const { post, processing } = useForm({});
+    const { post, processing, errors } = useForm({});
 
     function handleAction(action: 'approve' | 'cancel' | 'destroy') {
         const messages = {
@@ -108,13 +108,18 @@ export default function IngredientStockAdjustmentsShow({ adjustment }: Props) {
                                     </button>
                                 </Can>
                                 <Can permission="ingredient-stock-adjustments-approve">
-                                    <button
-                                        onClick={() => handleAction('approve')}
-                                        disabled={processing}
-                                        className="rounded-lg bg-emerald-600 px-4 py-2 text-sm font-bold text-white shadow-sm transition-all hover:bg-emerald-700 disabled:opacity-60"
-                                    >
-                                        Approve &amp; Apply
-                                    </button>
+                                    <>
+                                        {errors.approve && (
+                                            <p className="rounded-md bg-red-50 px-3 py-2 text-sm text-red-700 dark:bg-red-900/20 dark:text-red-400">{errors.approve}</p>
+                                        )}
+                                        <button
+                                            onClick={() => handleAction('approve')}
+                                            disabled={processing}
+                                            className="rounded-lg bg-emerald-600 px-4 py-2 text-sm font-bold text-white shadow-sm transition-all hover:bg-emerald-700 disabled:opacity-60"
+                                        >
+                                            Approve &amp; Apply
+                                        </button>
+                                    </>
                                 </Can>
                             </>
                         )}

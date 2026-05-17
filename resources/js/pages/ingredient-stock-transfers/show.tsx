@@ -123,6 +123,9 @@ function DispatchPanel({ transfer }: { transfer: IngredientStockTransfer }) {
                     </tbody>
                 </table>
             </div>
+            {errors.dispatch && (
+                <p className="rounded-md bg-red-50 px-4 py-2.5 text-sm text-red-700 dark:bg-red-900/20 dark:text-red-400">{errors.dispatch}</p>
+            )}
             <div className="flex justify-end">
                 <button
                     type="submit"

@@ -7,8 +7,8 @@ use App\Models\IngredientBatch;
 use App\Models\IngredientInventoryTransaction;
 use App\Models\Warehouse;
 use App\Models\WarehouseIngredientStock;
+use App\Exceptions\InsufficientStockException;
 use Illuminate\Support\Facades\DB;
-use RuntimeException;
 
 class IngredientInventoryService
 {
@@ -100,9 +100,11 @@ class IngredientInventoryService
             $stock = $this->resolveStock($warehouse->id, $ingredient->id);
 
             if ((float) $stock->quantity < $quantity) {
-                throw new RuntimeException(
-                    "Insufficient stock for ingredient [{$ingredient->id}] in warehouse [{$warehouse->id}]. ".
-                    "Available: {$stock->quantity}, Requested: {$quantity}."
+                throw new InsufficientStockException(
+                    $ingredient->name,
+                    $warehouse->name,
+                    (float) $stock->quantity,
+                    $quantity,
                 );
             }
 
