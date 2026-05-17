@@ -38,7 +38,7 @@ class OutletDepartmentController extends Controller
     {
         $this->departmentService->createDepartment($request->validated());
 
-        return redirect()->route('outlet-departments.index')
+        return redirect($request->input('_redirect', route('outlet-departments.index')))
             ->with('success', 'Department created successfully.');
     }
 

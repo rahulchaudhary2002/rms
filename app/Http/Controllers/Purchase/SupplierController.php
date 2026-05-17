@@ -36,7 +36,7 @@ class SupplierController extends Controller
     {
         $supplier = $this->supplierService->createSupplier($request->validated());
 
-        return redirect()->route('suppliers.show', $supplier)
+        return redirect($request->input('_redirect', route('suppliers.show', $supplier)))
             ->with('success', 'Supplier created successfully.');
     }
 

@@ -38,7 +38,7 @@ class CityController extends Controller
     {
         $this->cityService->createCity($request->validated());
 
-        return redirect()->route('cities.index')
+        return redirect($request->input('_redirect', route('cities.index')))
             ->with('success', 'City created successfully.');
     }
 

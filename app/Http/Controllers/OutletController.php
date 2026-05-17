@@ -43,7 +43,7 @@ class OutletController extends Controller
             ], 201);
         }
 
-        return redirect()->route('outlets.index')
+        return redirect($request->input('_redirect', route('outlets.index')))
             ->with('success', 'Outlet created successfully.');
     }
 

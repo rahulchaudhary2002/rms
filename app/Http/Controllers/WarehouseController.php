@@ -45,7 +45,7 @@ class WarehouseController extends Controller
             ], 201);
         }
 
-        return redirect()->route('warehouses.index')
+        return redirect($request->input('_redirect', route('warehouses.index')))
             ->with('success', 'Warehouse created successfully.');
     }
 

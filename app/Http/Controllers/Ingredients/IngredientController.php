@@ -38,7 +38,7 @@ class IngredientController extends Controller
     {
         $this->ingredientService->createIngredient($request->validated());
 
-        return redirect()->route('ingredients.index')
+        return redirect($request->input('_redirect', route('ingredients.index')))
             ->with('success', 'Ingredient created successfully.');
     }
 
