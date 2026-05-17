@@ -18,6 +18,7 @@ type StockEntry = { quantity: string; average_cost: string };
 
 type Props = {
     warehouses: Pick<Warehouse, 'id' | 'name'>[];
+    defaultWarehouseId: string;
     ingredients: (Pick<Ingredient, 'id' | 'name' | 'code'> & { base_unit?: { id: number; name: string; short_name: string } })[];
     stockByIngredient: Record<string, StockEntry>;
 };
@@ -33,12 +34,12 @@ function emptyItem(): ItemRow {
     return { ingredient_id: '', ingredient_batch_id: '', counted_quantity: '', remarks: '' };
 }
 
-export default function IngredientStockCountsCreate({ warehouses, ingredients, stockByIngredient }: Props) {
+export default function IngredientStockCountsCreate({ warehouses, defaultWarehouseId, ingredients, stockByIngredient }: Props) {
     const [items, setItems] = useState<ItemRow[]>([emptyItem()]);
     const [currentStock, setCurrentStock] = useState<Record<string, StockEntry>>(stockByIngredient);
 
     const { data, setData, post, processing, errors } = useForm({
-        warehouse_id: '',
+        warehouse_id: defaultWarehouseId,
         count_date:   new Date().toISOString().slice(0, 10),
         remarks:      '',
         items:        items,

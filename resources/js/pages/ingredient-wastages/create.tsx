@@ -23,6 +23,7 @@ const REASON_LABELS: Record<WastageReason, string> = {
 
 type Props = {
     warehouses: Pick<Warehouse, 'id' | 'name'>[];
+    defaultWarehouseId: string;
     ingredients: (Pick<Ingredient, 'id' | 'name' | 'code'> & { base_unit?: { id: number; name: string; short_name: string } })[];
 };
 
@@ -36,11 +37,11 @@ function emptyItem(): ItemRow {
     return { ingredient_id: '', ingredient_batch_id: '', quantity: '' };
 }
 
-export default function IngredientWastagesCreate({ warehouses, ingredients }: Props) {
+export default function IngredientWastagesCreate({ warehouses, defaultWarehouseId, ingredients }: Props) {
     const [items, setItems] = useState<ItemRow[]>([emptyItem()]);
 
     const { data, setData, post, processing, errors } = useForm({
-        warehouse_id:  '',
+        warehouse_id:  defaultWarehouseId,
         wastage_date:  new Date().toISOString().slice(0, 10),
         reason:        'other' as WastageReason,
         remarks:       '',

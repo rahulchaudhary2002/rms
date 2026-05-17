@@ -25,6 +25,7 @@ type Paginated<T> = {
 
 type Props = {
     batches: Paginated<IngredientBatch>;
+    warehouses: Pick<Warehouse, 'id' | 'name'>[];
     filters: { search?: string; warehouse_id?: string; is_closed?: string; per_page?: string };
 };
 
@@ -32,7 +33,7 @@ function cleanLabel(label: string): string {
     return label.replaceAll('&laquo;', '').replaceAll('&raquo;', '').replaceAll('Previous', '').replaceAll('Next', '').trim();
 }
 
-export default function IngredientBatchesIndex({ batches, filters }: Props) {
+export default function IngredientBatchesIndex({ batches, warehouses, filters }: Props) {
     const [form, setForm] = useState({
         search:       filters.search       ?? '',
         warehouse_id: filters.warehouse_id ?? '',
@@ -109,6 +110,15 @@ export default function IngredientBatchesIndex({ batches, filters }: Props) {
                             </summary>
                             <div className="absolute right-0 z-20 mt-2 w-56 rounded-xl border border-border/20 bg-white p-4 shadow-xl dark:border-stone-700 dark:bg-stone-900">
                                 <div className="space-y-3">
+                                    {warehouses.length > 1 && (
+                                        <div>
+                                            <label className="mb-1 block text-[11px] font-bold uppercase tracking-wider text-muted-foreground">Warehouse</label>
+                                            <SearchableSelect value={form.warehouse_id} onChange={(e) => { const next = { ...form, warehouse_id: e.target.value }; setForm(next); applyFilters(next); }}>
+                                                <option value="">All</option>
+                                                {warehouses.map((w) => <option key={w.id} value={w.id}>{w.name}</option>)}
+                                            </SearchableSelect>
+                                        </div>
+                                    )}
                                     <div>
                                         <label className="mb-1 block text-[11px] font-bold uppercase tracking-wider text-muted-foreground">Status</label>
                                         <SearchableSelect value={form.is_closed} onChange={(e) => { const next = { ...form, is_closed: e.target.value }; setForm(next); applyFilters(next); }}>

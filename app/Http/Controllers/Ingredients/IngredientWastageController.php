@@ -8,6 +8,7 @@ use App\Http\Requests\Ingredients\IngredientWastage\StoreIngredientWastageReques
 use App\Http\Requests\Ingredients\IngredientWastage\UpdateIngredientWastageRequest;
 use App\Exceptions\InsufficientStockException;
 use App\Models\IngredientWastage;
+use App\Services\AccessControlService;
 use App\Services\IngredientWastageService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -18,20 +19,25 @@ class IngredientWastageController extends Controller
 {
     use ExtractsFilters;
 
-    public function __construct(private IngredientWastageService $wastageService) {}
+    public function __construct(
+        private IngredientWastageService $wastageService,
+        private AccessControlService $accessControl,
+    ) {}
 
     public function index(Request $request): Response
     {
         $filters = $this->extractFilters($request, ['search', 'warehouse_id', 'status', 'reason', 'per_page']);
+        $scope   = $this->accessControl->resolveSessionScope($request);
 
         return Inertia::render('ingredient-wastages/index',
-            $this->wastageService->getIndexData($filters));
+            $this->wastageService->getIndexData($filters, $scope));
     }
 
-    public function create(): Response
+    public function create(Request $request): Response
     {
+        $scope = $this->accessControl->resolveSessionScope($request);
         return Inertia::render('ingredient-wastages/create',
-            $this->wastageService->getCreateData());
+            $this->wastageService->getCreateData($scope));
     }
 
     public function store(StoreIngredientWastageRequest $request): RedirectResponse
@@ -48,10 +54,11 @@ class IngredientWastageController extends Controller
             $this->wastageService->getShowData($ingredientWastage));
     }
 
-    public function edit(IngredientWastage $ingredientWastage): Response
+    public function edit(Request $request, IngredientWastage $ingredientWastage): Response
     {
+        $scope = $this->accessControl->resolveSessionScope($request);
         return Inertia::render('ingredient-wastages/edit',
-            $this->wastageService->getEditData($ingredientWastage));
+            $this->wastageService->getEditData($ingredientWastage, $scope));
     }
 
     public function update(UpdateIngredientWastageRequest $request, IngredientWastage $ingredientWastage): RedirectResponse

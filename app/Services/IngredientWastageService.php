@@ -16,9 +16,12 @@ class IngredientWastageService
 
     public function __construct(private IngredientInventoryService $inventoryService) {}
 
-    public function getIndexData(array $filters): array
+    public function getIndexData(array $filters, array $scope = []): array
     {
+        $warehouseIds = $scope ? $this->warehouseIdsForScope($scope) : null;
+
         $query = IngredientWastage::with(['warehouse', 'createdBy'])
+            ->when($warehouseIds !== null, fn ($b) => $b->whereIn('warehouse_id', $warehouseIds))
             ->when($filters['search'] !== '', function ($b) use ($filters) {
                 $b->where('wastage_no', 'like', '%'.$filters['search'].'%');
             })
@@ -29,33 +32,48 @@ class IngredientWastageService
             ->orderByDesc('id');
 
         $wastages   = $query->paginate($this->perPage($query, $filters['per_page']))->withQueryString();
-        $warehouses = Warehouse::orderBy('name')->get(['id', 'name']);
+        $warehouses = $warehouseIds !== null
+            ? Warehouse::whereIn('id', $warehouseIds)->orderBy('name')->get(['id', 'name'])
+            : Warehouse::orderBy('name')->get(['id', 'name']);
 
         return compact('wastages', 'warehouses', 'filters');
     }
 
-    public function getCreateData(): array
+    public function getCreateData(array $scope = []): array
     {
-        $warehouses  = Warehouse::where('is_active', true)->orderBy('name')->get(['id', 'name']);
+        $warehouseIds     = $scope ? $this->warehouseIdsForScope($scope) : null;
+        $defaultWarehouseId = $scope ? $this->defaultWarehouseId($scope) : '';
+
+        $warehouses  = $this->scopedWarehouses($warehouseIds);
         $ingredients = Ingredient::with('baseUnit')
             ->where('is_active', true)
             ->orderBy('name')
             ->get(['id', 'name', 'code', 'base_unit_id']);
 
-        return compact('warehouses', 'ingredients');
+        return compact('warehouses', 'ingredients', 'defaultWarehouseId');
     }
 
-    public function getEditData(IngredientWastage $wastage): array
+    public function getEditData(IngredientWastage $wastage, array $scope = []): array
     {
         $wastage->load(['items.ingredient.baseUnit', 'items.batch', 'warehouse']);
 
-        $warehouses  = Warehouse::where('is_active', true)->orderBy('name')->get(['id', 'name']);
-        $ingredients = Ingredient::with('baseUnit')
+        $warehouseIds = $scope ? $this->warehouseIdsForScope($scope) : null;
+        $warehouses   = $this->scopedWarehouses($warehouseIds);
+        $ingredients  = Ingredient::with('baseUnit')
             ->where('is_active', true)
             ->orderBy('name')
             ->get(['id', 'name', 'code', 'base_unit_id']);
 
         return compact('wastage', 'warehouses', 'ingredients');
+    }
+
+    private function scopedWarehouses(?array $warehouseIds)
+    {
+        $q = Warehouse::where('is_active', true)->orderBy('name');
+        if ($warehouseIds !== null) {
+            $q->whereIn('id', $warehouseIds);
+        }
+        return $q->get(['id', 'name']);
     }
 
     public function getShowData(IngredientWastage $wastage): array

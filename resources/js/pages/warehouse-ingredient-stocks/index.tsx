@@ -25,6 +25,7 @@ type Paginated<T> = {
 
 type Props = {
     stocks: Paginated<WarehouseIngredientStock>;
+    warehouses: Pick<Warehouse, 'id' | 'name'>[];
     filters: { search?: string; warehouse_id?: string; per_page?: string };
 };
 
@@ -32,7 +33,7 @@ function cleanLabel(label: string): string {
     return label.replaceAll('&laquo;', '').replaceAll('&raquo;', '').replaceAll('Previous', '').replaceAll('Next', '').trim();
 }
 
-export default function WarehouseIngredientStocksIndex({ stocks, filters }: Props) {
+export default function WarehouseIngredientStocksIndex({ stocks, warehouses, filters }: Props) {
     const [form, setForm] = useState({
         search:       filters.search       ?? '',
         warehouse_id: filters.warehouse_id ?? '',
@@ -112,7 +113,7 @@ export default function WarehouseIngredientStocksIndex({ stocks, filters }: Prop
                                         <label className="mb-1 block text-[11px] font-bold uppercase tracking-wider text-muted-foreground">Warehouse</label>
                                         <SearchableSelect value={form.warehouse_id} onChange={(e) => { const next = { ...form, warehouse_id: e.target.value }; setForm(next); applyFilters(next); }}>
                                             <option value="">All Warehouses</option>
-                                            {[...new Map(stocks.data.filter(s => s.warehouse).map(s => [s.warehouse!.id, s.warehouse!])).values()].map((w) => (
+                                            {warehouses.map((w) => (
                                                 <option key={w.id} value={w.id}>{w.name}</option>
                                             ))}
                                         </SearchableSelect>

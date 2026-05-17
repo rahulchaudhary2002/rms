@@ -10,6 +10,7 @@ use App\Http\Requests\Ingredients\IngredientStockTransfer\StoreIngredientStockTr
 use App\Http\Requests\Ingredients\IngredientStockTransfer\UpdateIngredientStockTransferRequest;
 use App\Exceptions\InsufficientStockException;
 use App\Models\IngredientStockTransfer;
+use App\Services\AccessControlService;
 use App\Services\IngredientStockTransferService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -20,20 +21,25 @@ class IngredientStockTransferController extends Controller
 {
     use ExtractsFilters;
 
-    public function __construct(private IngredientStockTransferService $transferService) {}
+    public function __construct(
+        private IngredientStockTransferService $transferService,
+        private AccessControlService $accessControl,
+    ) {}
 
     public function index(Request $request): Response
     {
         $filters = $this->extractFilters($request, ['search', 'from_warehouse_id', 'to_warehouse_id', 'status', 'per_page']);
+        $scope   = $this->accessControl->resolveSessionScope($request);
 
         return Inertia::render('ingredient-stock-transfers/index',
-            $this->transferService->getIndexData($filters));
+            $this->transferService->getIndexData($filters, $scope));
     }
 
-    public function create(): Response
+    public function create(Request $request): Response
     {
+        $scope = $this->accessControl->resolveSessionScope($request);
         return Inertia::render('ingredient-stock-transfers/create',
-            $this->transferService->getCreateData());
+            $this->transferService->getCreateData($scope));
     }
 
     public function store(StoreIngredientStockTransferRequest $request): RedirectResponse
@@ -50,10 +56,11 @@ class IngredientStockTransferController extends Controller
             $this->transferService->getShowData($ingredientStockTransfer));
     }
 
-    public function edit(IngredientStockTransfer $ingredientStockTransfer): Response
+    public function edit(Request $request, IngredientStockTransfer $ingredientStockTransfer): Response
     {
+        $scope = $this->accessControl->resolveSessionScope($request);
         return Inertia::render('ingredient-stock-transfers/edit',
-            $this->transferService->getEditData($ingredientStockTransfer));
+            $this->transferService->getEditData($ingredientStockTransfer, $scope));
     }
 
     public function update(UpdateIngredientStockTransferRequest $request, IngredientStockTransfer $ingredientStockTransfer): RedirectResponse

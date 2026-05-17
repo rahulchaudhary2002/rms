@@ -7,6 +7,7 @@ use App\Http\Controllers\Controller;
 use App\Http\Requests\Ingredients\IngredientStockCount\StoreIngredientStockCountRequest;
 use App\Http\Requests\Ingredients\IngredientStockCount\UpdateIngredientStockCountRequest;
 use App\Models\IngredientStockCount;
+use App\Services\AccessControlService;
 use App\Services\IngredientStockCountService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -17,20 +18,25 @@ class IngredientStockCountController extends Controller
 {
     use ExtractsFilters;
 
-    public function __construct(private IngredientStockCountService $countService) {}
+    public function __construct(
+        private IngredientStockCountService $countService,
+        private AccessControlService $accessControl,
+    ) {}
 
     public function index(Request $request): Response
     {
         $filters = $this->extractFilters($request, ['search', 'warehouse_id', 'status', 'per_page']);
+        $scope   = $this->accessControl->resolveSessionScope($request);
 
         return Inertia::render('ingredient-stock-counts/index',
-            $this->countService->getIndexData($filters));
+            $this->countService->getIndexData($filters, $scope));
     }
 
     public function create(Request $request): Response
     {
+        $scope = $this->accessControl->resolveSessionScope($request);
         return Inertia::render('ingredient-stock-counts/create',
-            $this->countService->getCreateData($request->string('warehouse_id')->toString()));
+            $this->countService->getCreateData($request->string('warehouse_id')->toString(), $scope));
     }
 
     public function store(StoreIngredientStockCountRequest $request): RedirectResponse
@@ -47,10 +53,11 @@ class IngredientStockCountController extends Controller
             $this->countService->getShowData($ingredientStockCount));
     }
 
-    public function edit(IngredientStockCount $ingredientStockCount): Response
+    public function edit(Request $request, IngredientStockCount $ingredientStockCount): Response
     {
+        $scope = $this->accessControl->resolveSessionScope($request);
         return Inertia::render('ingredient-stock-counts/edit',
-            $this->countService->getEditData($ingredientStockCount));
+            $this->countService->getEditData($ingredientStockCount, $scope));
     }
 
     public function update(UpdateIngredientStockCountRequest $request, IngredientStockCount $ingredientStockCount): RedirectResponse

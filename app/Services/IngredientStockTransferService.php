@@ -17,9 +17,14 @@ class IngredientStockTransferService
 
     public function __construct(private IngredientInventoryService $inventoryService) {}
 
-    public function getIndexData(array $filters): array
+    public function getIndexData(array $filters, array $scope = []): array
     {
+        $warehouseIds = $scope ? $this->warehouseIdsForScope($scope) : null;
+
         $query = IngredientStockTransfer::with(['fromWarehouse', 'toWarehouse', 'requestedBy'])
+            ->when($warehouseIds !== null, fn ($b) => $b->where(
+                fn ($q) => $q->whereIn('from_warehouse_id', $warehouseIds)->orWhereIn('to_warehouse_id', $warehouseIds)
+            ))
             ->when($filters['search'] !== '', function ($b) use ($filters) {
                 $search = '%'.$filters['search'].'%';
                 $b->where('transfer_no', 'like', $search);
@@ -31,33 +36,51 @@ class IngredientStockTransferService
             ->orderByDesc('id');
 
         $transfers  = $query->paginate($this->perPage($query, $filters['per_page']))->withQueryString();
-        $warehouses = Warehouse::orderBy('name')->get(['id', 'name']);
+        $warehouses = $warehouseIds !== null
+            ? Warehouse::whereIn('id', $warehouseIds)->orderBy('name')->get(['id', 'name'])
+            : Warehouse::orderBy('name')->get(['id', 'name']);
 
         return compact('transfers', 'warehouses', 'filters');
     }
 
-    public function getCreateData(): array
+    public function getCreateData(array $scope = []): array
     {
-        $warehouses  = Warehouse::where('is_active', true)->orderBy('name')->get(['id', 'name']);
-        $ingredients = Ingredient::with('baseUnit')
+        $warehouseIds           = $scope ? $this->warehouseIdsForScope($scope) : null;
+        $defaultFromWarehouseId = $scope ? $this->defaultWarehouseId($scope) : '';
+
+        // From warehouses are scoped; to warehouses remain unrestricted so transfers can go anywhere
+        $fromWarehouses = $this->scopedWarehouses($warehouseIds);
+        $allWarehouses  = Warehouse::where('is_active', true)->orderBy('name')->get(['id', 'name']);
+        $ingredients    = Ingredient::with('baseUnit')
             ->where('is_active', true)
             ->orderBy('name')
             ->get(['id', 'name', 'code', 'base_unit_id']);
 
-        return compact('warehouses', 'ingredients');
+        return compact('fromWarehouses', 'allWarehouses', 'ingredients', 'defaultFromWarehouseId');
     }
 
-    public function getEditData(IngredientStockTransfer $transfer): array
+    public function getEditData(IngredientStockTransfer $transfer, array $scope = []): array
     {
         $transfer->load(['items.ingredient.baseUnit', 'items.batch', 'fromWarehouse', 'toWarehouse']);
 
-        $warehouses  = Warehouse::where('is_active', true)->orderBy('name')->get(['id', 'name']);
-        $ingredients = Ingredient::with('baseUnit')
+        $warehouseIds   = $scope ? $this->warehouseIdsForScope($scope) : null;
+        $fromWarehouses = $this->scopedWarehouses($warehouseIds);
+        $allWarehouses  = Warehouse::where('is_active', true)->orderBy('name')->get(['id', 'name']);
+        $ingredients    = Ingredient::with('baseUnit')
             ->where('is_active', true)
             ->orderBy('name')
             ->get(['id', 'name', 'code', 'base_unit_id']);
 
-        return compact('transfer', 'warehouses', 'ingredients');
+        return compact('transfer', 'fromWarehouses', 'allWarehouses', 'ingredients');
+    }
+
+    private function scopedWarehouses(?array $warehouseIds)
+    {
+        $q = Warehouse::where('is_active', true)->orderBy('name');
+        if ($warehouseIds !== null) {
+            $q->whereIn('id', $warehouseIds);
+        }
+        return $q->get(['id', 'name']);
     }
 
     public function getShowData(IngredientStockTransfer $transfer): array

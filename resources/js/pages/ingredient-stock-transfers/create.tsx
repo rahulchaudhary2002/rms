@@ -13,7 +13,9 @@ import {
 import type { Ingredient, Warehouse } from '@/types';
 
 type Props = {
-    warehouses: Pick<Warehouse, 'id' | 'name'>[];
+    fromWarehouses: Pick<Warehouse, 'id' | 'name'>[];
+    allWarehouses: Pick<Warehouse, 'id' | 'name'>[];
+    defaultFromWarehouseId: string;
     ingredients: (Pick<Ingredient, 'id' | 'name' | 'code'> & { base_unit?: { id: number; name: string; short_name: string } })[];
 };
 
@@ -28,11 +30,11 @@ function emptyItem(): ItemRow {
     return { ingredient_id: '', ingredient_batch_id: '', requested_quantity: '', remarks: '' };
 }
 
-export default function IngredientStockTransfersCreate({ warehouses, ingredients }: Props) {
+export default function IngredientStockTransfersCreate({ fromWarehouses, allWarehouses, defaultFromWarehouseId, ingredients }: Props) {
     const [items, setItems] = useState<ItemRow[]>([emptyItem()]);
 
     const { data, setData, post, processing, errors } = useForm({
-        from_warehouse_id: '',
+        from_warehouse_id: defaultFromWarehouseId,
         to_warehouse_id:   '',
         transfer_date:     new Date().toISOString().slice(0, 10),
         remarks:           '',
@@ -84,14 +86,14 @@ export default function IngredientStockTransfersCreate({ warehouses, ingredients
                         <FormField label="From Warehouse" error={errors.from_warehouse_id}>
                             <SearchableSelect value={data.from_warehouse_id} onChange={(e) => setData('from_warehouse_id', e.target.value)}>
                                 <option value="">Select source warehouse…</option>
-                                {warehouses.map((w) => <option key={w.id} value={w.id}>{w.name}</option>)}
+                                {fromWarehouses.map((w) => <option key={w.id} value={w.id}>{w.name}</option>)}
                             </SearchableSelect>
                         </FormField>
 
                         <FormField label="To Warehouse" error={errors.to_warehouse_id}>
                             <SearchableSelect value={data.to_warehouse_id} onChange={(e) => setData('to_warehouse_id', e.target.value)}>
                                 <option value="">Select destination warehouse…</option>
-                                {warehouses.filter((w) => String(w.id) !== data.from_warehouse_id).map((w) => (
+                                {allWarehouses.filter((w) => String(w.id) !== data.from_warehouse_id).map((w) => (
                                     <option key={w.id} value={w.id}>{w.name}</option>
                                 ))}
                             </SearchableSelect>

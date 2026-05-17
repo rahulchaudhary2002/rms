@@ -16,9 +16,12 @@ class IngredientStockAdjustmentService
 
     public function __construct(private IngredientInventoryService $inventoryService) {}
 
-    public function getIndexData(array $filters): array
+    public function getIndexData(array $filters, array $scope = []): array
     {
+        $warehouseIds = $scope ? $this->warehouseIdsForScope($scope) : null;
+
         $query = IngredientStockAdjustment::with(['warehouse', 'createdBy'])
+            ->when($warehouseIds !== null, fn ($b) => $b->whereIn('warehouse_id', $warehouseIds))
             ->when($filters['search'] !== '', fn ($b) => $b->where('adjustment_no', 'like', '%'.$filters['search'].'%'))
             ->when($filters['warehouse_id'] !== '', fn ($b) => $b->where('warehouse_id', $filters['warehouse_id']))
             ->when($filters['status'] !== '', fn ($b) => $b->where('status', $filters['status']))
@@ -26,38 +29,44 @@ class IngredientStockAdjustmentService
             ->orderByDesc('id');
 
         $adjustments = $query->paginate($this->perPage($query, $filters['per_page']))->withQueryString();
-        $warehouses  = Warehouse::orderBy('name')->get(['id', 'name']);
+        $warehouses  = $warehouseIds !== null
+            ? Warehouse::whereIn('id', $warehouseIds)->orderBy('name')->get(['id', 'name'])
+            : Warehouse::orderBy('name')->get(['id', 'name']);
 
         return compact('adjustments', 'warehouses', 'filters');
     }
 
-    public function getCreateData(string $warehouseId = ''): array
+    public function getCreateData(string $warehouseId = '', array $scope = []): array
     {
-        $warehouses  = Warehouse::where('is_active', true)->orderBy('name')->get(['id', 'name']);
+        $warehouseIds       = $scope ? $this->warehouseIdsForScope($scope) : null;
+        $defaultWarehouseId = $scope ? $this->defaultWarehouseId($scope) : '';
+        $resolvedId         = $warehouseId !== '' ? $warehouseId : $defaultWarehouseId;
+
+        $warehouses  = $this->scopedWarehouses($warehouseIds);
         $ingredients = Ingredient::with('baseUnit')
             ->where('is_active', true)
             ->orderBy('name')
             ->get(['id', 'name', 'code', 'base_unit_id']);
 
-        // Pre-load current stock for a selected warehouse so the UI can populate system_quantity
         $stockByIngredient = [];
-        if ($warehouseId !== '') {
-            $stockByIngredient = \App\Models\WarehouseIngredientStock::where('warehouse_id', $warehouseId)
+        if ($resolvedId !== '') {
+            $stockByIngredient = \App\Models\WarehouseIngredientStock::where('warehouse_id', $resolvedId)
                 ->get(['ingredient_id', 'quantity', 'average_cost'])
                 ->keyBy('ingredient_id')
                 ->map(fn ($s) => ['quantity' => $s->quantity, 'average_cost' => $s->average_cost])
                 ->all();
         }
 
-        return compact('warehouses', 'ingredients', 'stockByIngredient');
+        return compact('warehouses', 'ingredients', 'stockByIngredient', 'defaultWarehouseId');
     }
 
-    public function getEditData(IngredientStockAdjustment $adjustment): array
+    public function getEditData(IngredientStockAdjustment $adjustment, array $scope = []): array
     {
         $adjustment->load(['items.ingredient.baseUnit', 'items.batch', 'warehouse']);
 
-        $warehouses  = Warehouse::where('is_active', true)->orderBy('name')->get(['id', 'name']);
-        $ingredients = Ingredient::with('baseUnit')
+        $warehouseIds = $scope ? $this->warehouseIdsForScope($scope) : null;
+        $warehouses   = $this->scopedWarehouses($warehouseIds);
+        $ingredients  = Ingredient::with('baseUnit')
             ->where('is_active', true)
             ->orderBy('name')
             ->get(['id', 'name', 'code', 'base_unit_id']);
@@ -69,6 +78,15 @@ class IngredientStockAdjustmentService
             ->all();
 
         return compact('adjustment', 'warehouses', 'ingredients', 'stockByIngredient');
+    }
+
+    private function scopedWarehouses(?array $warehouseIds)
+    {
+        $q = Warehouse::where('is_active', true)->orderBy('name');
+        if ($warehouseIds !== null) {
+            $q->whereIn('id', $warehouseIds);
+        }
+        return $q->get(['id', 'name']);
     }
 
     public function getShowData(IngredientStockAdjustment $adjustment): array

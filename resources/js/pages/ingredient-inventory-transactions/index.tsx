@@ -10,7 +10,7 @@ import { TableCard, TableSearchInput } from '@/components/table-card';
 import { tablePerPageOptions } from '@/hooks/use-client-pagination';
 import { useDebouncedInertiaSearch } from '@/hooks/use-debounced-inertia-search';
 import { cn } from '@/lib/utils';
-import type { IngredientInventoryTransaction, TransactionType } from '@/types';
+import type { IngredientInventoryTransaction, TransactionType, Warehouse } from '@/types';
 
 const TX_LABELS: Record<TransactionType, string> = {
     opening_stock:      'Opening Stock',
@@ -55,6 +55,7 @@ type Paginated<T> = {
 
 type Props = {
     transactions: Paginated<IngredientInventoryTransaction>;
+    warehouses: Pick<Warehouse, 'id' | 'name'>[];
     filters: { search?: string; warehouse_id?: string; transaction_type?: string; per_page?: string };
 };
 
@@ -62,7 +63,7 @@ function cleanLabel(label: string): string {
     return label.replaceAll('&laquo;', '').replaceAll('&raquo;', '').replaceAll('Previous', '').replaceAll('Next', '').trim();
 }
 
-export default function IngredientInventoryTransactionsIndex({ transactions, filters }: Props) {
+export default function IngredientInventoryTransactionsIndex({ transactions, warehouses, filters }: Props) {
     const [form, setForm] = useState({
         search:           filters.search           ?? '',
         warehouse_id:     filters.warehouse_id     ?? '',
@@ -139,6 +140,15 @@ export default function IngredientInventoryTransactionsIndex({ transactions, fil
                             </summary>
                             <div className="absolute right-0 z-20 mt-2 w-64 rounded-xl border border-border/20 bg-white p-4 shadow-xl dark:border-stone-700 dark:bg-stone-900">
                                 <div className="space-y-3">
+                                    {warehouses.length > 1 && (
+                                        <div>
+                                            <label className="mb-1 block text-[11px] font-bold uppercase tracking-wider text-muted-foreground">Warehouse</label>
+                                            <SearchableSelect value={form.warehouse_id} onChange={(e) => { const next = { ...form, warehouse_id: e.target.value }; setForm(next); applyFilters(next); }}>
+                                                <option value="">All</option>
+                                                {warehouses.map((w) => <option key={w.id} value={w.id}>{w.name}</option>)}
+                                            </SearchableSelect>
+                                        </div>
+                                    )}
                                     <div>
                                         <label className="mb-1 block text-[11px] font-bold uppercase tracking-wider text-muted-foreground">Transaction Type</label>
                                         <SearchableSelect value={form.transaction_type} onChange={(e) => { const next = { ...form, transaction_type: e.target.value }; setForm(next); applyFilters(next); }}>

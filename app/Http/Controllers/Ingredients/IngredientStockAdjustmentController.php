@@ -8,6 +8,7 @@ use App\Http\Requests\Ingredients\IngredientStockAdjustment\StoreIngredientStock
 use App\Http\Requests\Ingredients\IngredientStockAdjustment\UpdateIngredientStockAdjustmentRequest;
 use App\Exceptions\InsufficientStockException;
 use App\Models\IngredientStockAdjustment;
+use App\Services\AccessControlService;
 use App\Services\IngredientStockAdjustmentService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -18,20 +19,25 @@ class IngredientStockAdjustmentController extends Controller
 {
     use ExtractsFilters;
 
-    public function __construct(private IngredientStockAdjustmentService $adjustmentService) {}
+    public function __construct(
+        private IngredientStockAdjustmentService $adjustmentService,
+        private AccessControlService $accessControl,
+    ) {}
 
     public function index(Request $request): Response
     {
         $filters = $this->extractFilters($request, ['search', 'warehouse_id', 'status', 'per_page']);
+        $scope   = $this->accessControl->resolveSessionScope($request);
 
         return Inertia::render('ingredient-stock-adjustments/index',
-            $this->adjustmentService->getIndexData($filters));
+            $this->adjustmentService->getIndexData($filters, $scope));
     }
 
     public function create(Request $request): Response
     {
+        $scope = $this->accessControl->resolveSessionScope($request);
         return Inertia::render('ingredient-stock-adjustments/create',
-            $this->adjustmentService->getCreateData($request->string('warehouse_id')->toString()));
+            $this->adjustmentService->getCreateData($request->string('warehouse_id')->toString(), $scope));
     }
 
     public function store(StoreIngredientStockAdjustmentRequest $request): RedirectResponse
@@ -48,10 +54,11 @@ class IngredientStockAdjustmentController extends Controller
             $this->adjustmentService->getShowData($ingredientStockAdjustment));
     }
 
-    public function edit(IngredientStockAdjustment $ingredientStockAdjustment): Response
+    public function edit(Request $request, IngredientStockAdjustment $ingredientStockAdjustment): Response
     {
+        $scope = $this->accessControl->resolveSessionScope($request);
         return Inertia::render('ingredient-stock-adjustments/edit',
-            $this->adjustmentService->getEditData($ingredientStockAdjustment));
+            $this->adjustmentService->getEditData($ingredientStockAdjustment, $scope));
     }
 
     public function update(UpdateIngredientStockAdjustmentRequest $request, IngredientStockAdjustment $ingredientStockAdjustment): RedirectResponse
