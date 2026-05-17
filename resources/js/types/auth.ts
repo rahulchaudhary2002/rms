@@ -493,3 +493,230 @@ export type TwoFactorSetupData = {
 export type TwoFactorSecretKey = {
     secretKey: string;
 };
+
+export type TransferStatus =
+    | 'draft'
+    | 'requested'
+    | 'approved'
+    | 'dispatched'
+    | 'partially_received'
+    | 'received'
+    | 'cancelled';
+
+export type IngredientStockTransferItem = {
+    id: number;
+    ingredient_stock_transfer_id: number;
+    ingredient_id: number;
+    ingredient_batch_id: number | null;
+    requested_quantity: string;
+    dispatched_quantity: string;
+    received_quantity: string;
+    unit_cost: string;
+    total_cost: string;
+    remarks: string | null;
+    ingredient?: Pick<Ingredient, 'id' | 'name' | 'code'> & { base_unit?: Pick<Unit, 'id' | 'name' | 'short_name'> };
+    batch?: { id: number; batch_no: string | null; expiry_date: string | null } | null;
+    created_at: string;
+    updated_at: string;
+};
+
+export type AdjustmentStatus = 'draft' | 'approved' | 'cancelled';
+
+export type IngredientStockAdjustmentItem = {
+    id: number;
+    ingredient_stock_adjustment_id: number;
+    ingredient_id: number;
+    ingredient_batch_id: number | null;
+    system_quantity: string;
+    actual_quantity: string;
+    difference_quantity: string;
+    unit_cost: string;
+    difference_value: string;
+    remarks: string | null;
+    ingredient?: Pick<Ingredient, 'id' | 'name' | 'code'> & { base_unit?: Pick<Unit, 'id' | 'name' | 'short_name'> };
+    batch?: { id: number; batch_no: string | null; expiry_date: string | null } | null;
+    created_at: string;
+    updated_at: string;
+};
+
+export type IngredientStockAdjustment = {
+    id: number;
+    adjustment_no: string;
+    warehouse_id: number;
+    adjustment_date: string;
+    status: AdjustmentStatus;
+    reason: string | null;
+    created_by: number | null;
+    approved_by: number | null;
+    approved_at: string | null;
+    warehouse?: Pick<Warehouse, 'id' | 'name'>;
+    items?: IngredientStockAdjustmentItem[];
+    createdBy?: Pick<User, 'id' | 'name'> | null;
+    approvedBy?: Pick<User, 'id' | 'name'> | null;
+    created_at: string;
+    updated_at: string;
+};
+
+export type WastageReason = 'expired' | 'damaged' | 'spoiled' | 'over_preparation' | 'staff_error' | 'other';
+
+export type WastageStatus = 'draft' | 'approved' | 'cancelled';
+
+export type IngredientWastageItem = {
+    id: number;
+    ingredient_wastage_id: number;
+    ingredient_id: number;
+    ingredient_batch_id: number | null;
+    quantity: string;
+    unit_cost: string;
+    total_cost: string;
+    ingredient?: Pick<Ingredient, 'id' | 'name' | 'code'> & { base_unit?: Pick<Unit, 'id' | 'name' | 'short_name'> };
+    batch?: { id: number; batch_no: string | null; expiry_date: string | null } | null;
+    created_at: string;
+    updated_at: string;
+};
+
+export type IngredientWastage = {
+    id: number;
+    wastage_no: string;
+    warehouse_id: number;
+    wastage_date: string;
+    reason: WastageReason;
+    status: WastageStatus;
+    remarks: string | null;
+    created_by: number | null;
+    approved_by: number | null;
+    approved_at: string | null;
+    warehouse?: Pick<Warehouse, 'id' | 'name'>;
+    items?: IngredientWastageItem[];
+    createdBy?: Pick<User, 'id' | 'name'> | null;
+    approvedBy?: Pick<User, 'id' | 'name'> | null;
+    created_at: string;
+    updated_at: string;
+};
+
+export type IngredientStockTransfer = {
+    id: number;
+    transfer_no: string;
+    from_warehouse_id: number;
+    to_warehouse_id: number;
+    transfer_date: string;
+    status: TransferStatus;
+    remarks: string | null;
+    requested_by: number | null;
+    approved_by: number | null;
+    dispatched_by: number | null;
+    received_by: number | null;
+    approved_at: string | null;
+    dispatched_at: string | null;
+    received_at: string | null;
+    from_warehouse?: Pick<Warehouse, 'id' | 'name'>;
+    to_warehouse?: Pick<Warehouse, 'id' | 'name'>;
+    items?: IngredientStockTransferItem[];
+    requested_by_user?: Pick<User, 'id' | 'name'> | null;
+    approved_by_user?: Pick<User, 'id' | 'name'> | null;
+    dispatched_by_user?: Pick<User, 'id' | 'name'> | null;
+    received_by_user?: Pick<User, 'id' | 'name'> | null;
+    created_at: string;
+    updated_at: string;
+};
+
+export type StockCountStatus = 'draft' | 'counting' | 'completed' | 'adjusted' | 'cancelled';
+
+export type IngredientStockCountItem = {
+    id: number;
+    ingredient_stock_count_id: number;
+    ingredient_id: number;
+    ingredient_batch_id: number | null;
+    system_quantity: string;
+    counted_quantity: string;
+    difference_quantity: string;
+    remarks: string | null;
+    ingredient?: Pick<Ingredient, 'id' | 'name' | 'code'> & { base_unit?: { id: number; name: string; short_name: string } };
+    batch?: { id: number; batch_no: string | null; expiry_date: string | null } | null;
+    created_at: string;
+    updated_at: string;
+};
+
+export type IngredientStockCount = {
+    id: number;
+    count_no: string;
+    warehouse_id: number;
+    count_date: string;
+    status: StockCountStatus;
+    remarks: string | null;
+    created_by: number | null;
+    completed_by: number | null;
+    completed_at: string | null;
+    warehouse?: Pick<Warehouse, 'id' | 'name'>;
+    items?: IngredientStockCountItem[];
+    createdBy?: Pick<User, 'id' | 'name'> | null;
+    completedBy?: Pick<User, 'id' | 'name'> | null;
+    created_at: string;
+    updated_at: string;
+};
+
+export type WarehouseIngredientStock = {
+    id: number;
+    warehouse_id: number;
+    ingredient_id: number;
+    quantity: string;
+    average_cost: string;
+    warehouse?: Pick<Warehouse, 'id' | 'name'>;
+    ingredient?: Pick<Ingredient, 'id' | 'name' | 'code'> & { base_unit?: { id: number; name: string; short_name: string } };
+    created_at: string;
+    updated_at: string;
+};
+
+export type IngredientBatch = {
+    id: number;
+    batch_no: string | null;
+    ingredient_id: number;
+    warehouse_id: number;
+    received_quantity: string;
+    available_quantity: string;
+    unit_cost: string;
+    total_cost: string;
+    expiry_date: string | null;
+    is_closed: boolean;
+    ingredient?: Pick<Ingredient, 'id' | 'name' | 'code'> & { base_unit?: { id: number; name: string; short_name: string } };
+    warehouse?: Pick<Warehouse, 'id' | 'name'>;
+    created_at: string;
+    updated_at: string;
+};
+
+export type TransactionType =
+    | 'opening_stock'
+    | 'purchase_receive'
+    | 'purchase_return'
+    | 'transfer_in'
+    | 'transfer_out'
+    | 'sale_consume'
+    | 'production_consume'
+    | 'wastage'
+    | 'adjustment_in'
+    | 'adjustment_out'
+    | 'stock_count_gain'
+    | 'stock_count_loss';
+
+export type IngredientInventoryTransaction = {
+    id: number;
+    ingredient_id: number;
+    warehouse_id: number;
+    ingredient_batch_id: number | null;
+    transaction_type: TransactionType;
+    quantity_in: string;
+    quantity_out: string;
+    balance_after: string;
+    unit_cost: string;
+    total_cost: string;
+    reference_type: string | null;
+    reference_id: number | null;
+    remarks: string | null;
+    created_by: number | null;
+    ingredient?: Pick<Ingredient, 'id' | 'name' | 'code'> & { base_unit?: { id: number; name: string; short_name: string } };
+    warehouse?: Pick<Warehouse, 'id' | 'name'>;
+    batch?: Pick<IngredientBatch, 'id' | 'batch_no'> | null;
+    createdBy?: Pick<User, 'id' | 'name'> | null;
+    created_at: string;
+    updated_at: string;
+};

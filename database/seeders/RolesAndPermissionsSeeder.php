@@ -47,6 +47,37 @@ class RolesAndPermissionsSeeder extends Seeder
         'manage',
     ];
 
+    private array $inventoryModules = [
+        'warehouse-ingredient-stocks',
+        'ingredient-batches',
+        'ingredient-stock-transfers',
+        'ingredient-wastages',
+        'ingredient-stock-adjustments',
+        'ingredient-stock-counts',
+    ];
+
+    private array $customInventoryPermissions = [
+        ['module' => 'inventory',                          'action' => 'view',                'name' => 'Inventory View'],
+        ['module' => 'inventory',                          'action' => 'manage',              'name' => 'Inventory Manage'],
+
+        ['module' => 'ingredient-inventory-transactions',  'action' => 'view',                'name' => 'Ingredient Inventory Transactions View'],
+        ['module' => 'ingredient-inventory-transactions',  'action' => 'export',              'name' => 'Ingredient Inventory Transactions Export'],
+
+        ['module' => 'ingredient-stock-transfers',         'action' => 'request',             'name' => 'Ingredient Stock Transfers Request'],
+        ['module' => 'ingredient-stock-transfers',         'action' => 'dispatch',            'name' => 'Ingredient Stock Transfers Dispatch'],
+        ['module' => 'ingredient-stock-transfers',         'action' => 'receive',             'name' => 'Ingredient Stock Transfers Receive'],
+        ['module' => 'ingredient-stock-transfers',         'action' => 'cancel',              'name' => 'Ingredient Stock Transfers Cancel'],
+
+        ['module' => 'ingredient-wastages',                'action' => 'cancel',              'name' => 'Ingredient Wastages Cancel'],
+
+        ['module' => 'ingredient-stock-adjustments',       'action' => 'cancel',              'name' => 'Ingredient Stock Adjustments Cancel'],
+
+        ['module' => 'ingredient-stock-counts',            'action' => 'start',               'name' => 'Ingredient Stock Counts Start'],
+        ['module' => 'ingredient-stock-counts',            'action' => 'complete',            'name' => 'Ingredient Stock Counts Complete'],
+        ['module' => 'ingredient-stock-counts',            'action' => 'generate-adjustment', 'name' => 'Ingredient Stock Counts Generate Adjustment'],
+        ['module' => 'ingredient-stock-counts',            'action' => 'cancel',              'name' => 'Ingredient Stock Counts Cancel'],
+    ];
+
     private array $systemRoles = [
         [
             'name'          => 'Admin',
@@ -117,8 +148,10 @@ class RolesAndPermissionsSeeder extends Seeder
     {
         DB::transaction(function () {
             $this->seedPermissions();
+            $this->seedInventoryPermissions();
             $this->seedRoles();
             $this->assignDefaultAdminPermissions();
+            $this->assignInventoryRolePermissions();
         });
     }
 
@@ -168,5 +201,119 @@ class RolesAndPermissionsSeeder extends Seeder
             ->pluck('id');
 
         $admin->permissions()->syncWithoutDetaching($permissions);
+    }
+
+    private function seedInventoryPermissions(): void
+    {
+        foreach ($this->inventoryModules as $module) {
+            foreach ($this->actions as $action) {
+                $slug = "{$module}-{$action}";
+                $name = ucwords(str_replace('-', ' ', $module)).' '.ucwords($action);
+
+                Permission::firstOrCreate(
+                    ['slug' => $slug],
+                    [
+                        'name'      => $name,
+                        'module'    => $module,
+                        'action'    => $action,
+                        'level'     => 'global',
+                        'is_system' => true,
+                        'is_active' => true,
+                    ]
+                );
+            }
+        }
+
+        foreach ($this->customInventoryPermissions as $permission) {
+            $slug = "{$permission['module']}-{$permission['action']}";
+
+            Permission::firstOrCreate(
+                ['slug' => $slug],
+                [
+                    'name'      => $permission['name'],
+                    'module'    => $permission['module'],
+                    'action'    => $permission['action'],
+                    'level'     => 'global',
+                    'is_system' => true,
+                    'is_active' => true,
+                ]
+            );
+        }
+    }
+
+    private function assignInventoryRolePermissions(): void
+    {
+        $this->assignRolePermissions('central-warehouse-manager', [
+            'inventory-view',
+            'warehouse-ingredient-stocks-view',
+            'warehouse-ingredient-stocks-export',
+            'ingredient-batches-view',
+            'ingredient-batches-create',
+            'ingredient-batches-update',
+            'ingredient-batches-export',
+            'ingredient-inventory-transactions-view',
+            'ingredient-inventory-transactions-export',
+            'ingredient-stock-transfers-view',
+            'ingredient-stock-transfers-create',
+            'ingredient-stock-transfers-update',
+            'ingredient-stock-transfers-request',
+            'ingredient-stock-transfers-dispatch',
+            'ingredient-stock-transfers-receive',
+            'ingredient-stock-transfers-cancel',
+            'ingredient-stock-transfers-export',
+            'ingredient-wastages-view',
+            'ingredient-wastages-create',
+            'ingredient-wastages-update',
+            'ingredient-wastages-cancel',
+            'ingredient-wastages-export',
+            'ingredient-stock-counts-view',
+            'ingredient-stock-counts-create',
+            'ingredient-stock-counts-update',
+            'ingredient-stock-counts-start',
+            'ingredient-stock-counts-complete',
+            'ingredient-stock-counts-generate-adjustment',
+            'ingredient-stock-counts-export',
+        ]);
+
+        $this->assignRolePermissions('outlet-manager', [
+            'inventory-view',
+            'warehouse-ingredient-stocks-view',
+            'ingredient-batches-view',
+            'ingredient-inventory-transactions-view',
+            'ingredient-stock-transfers-view',
+            'ingredient-stock-transfers-create',
+            'ingredient-stock-transfers-request',
+            'ingredient-stock-transfers-receive',
+            'ingredient-wastages-view',
+            'ingredient-wastages-create',
+            'ingredient-stock-adjustments-view',
+            'ingredient-stock-counts-view',
+            'ingredient-stock-counts-create',
+            'ingredient-stock-counts-start',
+            'ingredient-stock-counts-complete',
+        ]);
+
+        $this->assignRolePermissions('staff', [
+            'inventory-view',
+            'warehouse-ingredient-stocks-view',
+            'ingredient-batches-view',
+            'ingredient-stock-transfers-view',
+            'ingredient-wastages-view',
+            'ingredient-wastages-create',
+            'ingredient-stock-counts-view',
+        ]);
+    }
+
+    private function assignRolePermissions(string $roleSlug, array $permissionSlugs): void
+    {
+        $role = Role::where('slug', $roleSlug)->first();
+
+        if (! $role) {
+            return;
+        }
+
+        $ids = Permission::whereIn('slug', $permissionSlugs)->pluck('id');
+
+        $role->permissions()->syncWithoutDetaching($ids);
     }
 }

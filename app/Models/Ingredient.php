@@ -4,6 +4,7 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\SoftDeletes;
 use Spatie\Sluggable\HasSlug;
 use Spatie\Sluggable\SlugOptions;
@@ -85,5 +86,20 @@ class Ingredient extends Model
     public function defaultUsageUnit(): BelongsTo
     {
         return $this->belongsTo(Unit::class, 'default_usage_unit_id');
+    }
+
+    public function warehouseStocks(): HasMany
+    {
+        return $this->hasMany(WarehouseIngredientStock::class);
+    }
+
+    public function batches(): HasMany
+    {
+        return $this->hasMany(IngredientBatch::class);
+    }
+
+    public function inventoryTransactions(): HasMany
+    {
+        return $this->hasMany(IngredientInventoryTransaction::class);
     }
 }

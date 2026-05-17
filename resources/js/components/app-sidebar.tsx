@@ -32,6 +32,13 @@ import { index as addonsIndex } from '@/routes/addons';
 import { index as foodRecipesIndex } from '@/routes/recipes/food';
 import { index as addonRecipesIndex } from '@/routes/recipes/addons';
 import { index as variantsIndex } from '@/routes/variants';
+import { index as warehouseStocksIndex } from '@/routes/warehouse-ingredient-stocks';
+import { index as ingredientBatchesIndex } from '@/routes/ingredient-batches';
+import { index as inventoryTransactionsIndex } from '@/routes/ingredient-inventory-transactions';
+import { index as stockTransfersIndex } from '@/routes/ingredient-stock-transfers';
+import { index as wastagesIndex } from '@/routes/ingredient-wastages';
+import { index as stockAdjustmentsIndex } from '@/routes/ingredient-stock-adjustments';
+import { index as stockCountsIndex } from '@/routes/ingredient-stock-counts';
 import type { Auth } from '@/types';
 
 type ViewportMode = 'mobile' | 'medium' | 'large';
@@ -186,6 +193,28 @@ function buildDynamicGroups(auth: Auth): MenuGroup[] {
         if (can('ingredient-categories-view')) items.push({ title: 'Ingredient Categories', href: ingredientCategoriesIndex.url(), icon: 'category', activeMatch: [ingredientCategoriesIndex.url()] });
         if (can('ingredients-view')) items.push({ title: 'Ingredients', href: ingredientsIndex.url(), icon: 'nutrition', activeMatch: [ingredientsIndex.url()] });
         groups.push({ id: 'ingredients', label: 'Master Data', title: 'Ingredients', icon: 'nutrition', items });
+    }
+
+    if (canAny([
+        'inventory-view',
+        'inventory-manage',
+        'warehouse-ingredient-stocks-view',
+        'ingredient-batches-view',
+        'ingredient-inventory-transactions-view',
+        'ingredient-stock-transfers-view',
+        'ingredient-wastages-view',
+        'ingredient-stock-adjustments-view',
+        'ingredient-stock-counts-view',
+    ])) {
+        const items: MenuItem[] = [];
+        if (can('warehouse-ingredient-stocks-view')) items.push({ title: 'Warehouse Stocks', href: warehouseStocksIndex.url(), icon: 'warehouse', activeMatch: [warehouseStocksIndex.url()] });
+        if (can('ingredient-batches-view')) items.push({ title: 'Ingredient Batches', href: ingredientBatchesIndex.url(), icon: 'package_2', activeMatch: [ingredientBatchesIndex.url()] });
+        if (can('ingredient-inventory-transactions-view')) items.push({ title: 'Inventory Transactions', href: inventoryTransactionsIndex.url(), icon: 'format_list_bulleted', activeMatch: [inventoryTransactionsIndex.url()] });
+        if (can('ingredient-stock-transfers-view')) items.push({ title: 'Stock Transfers', href: stockTransfersIndex.url(), icon: 'sync_alt', activeMatch: [stockTransfersIndex.url()] });
+        if (can('ingredient-wastages-view')) items.push({ title: 'Wastages', href: wastagesIndex.url(), icon: 'delete_sweep', activeMatch: [wastagesIndex.url()] });
+        if (can('ingredient-stock-adjustments-view')) items.push({ title: 'Stock Adjustments', href: stockAdjustmentsIndex.url(), icon: 'difference', activeMatch: [stockAdjustmentsIndex.url()] });
+        if (can('ingredient-stock-counts-view')) items.push({ title: 'Stock Counts', href: stockCountsIndex.url(), icon: 'fact_check', activeMatch: [stockCountsIndex.url()] });
+        groups.push({ id: 'inventory', label: 'Inventory', title: 'Inventory', icon: 'inventory_2', items });
     }
 
     if (canAny(['outlets-view', 'outlet-departments-view', 'warehouses-view'])) {
