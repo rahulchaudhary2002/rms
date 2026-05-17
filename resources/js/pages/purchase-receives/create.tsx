@@ -2,7 +2,7 @@ import { Head, Link, useForm } from '@inertiajs/react';
 import { useState } from 'react';
 import { FormSection } from '@/components/form-section';
 import { PageHeader } from '@/components/page-header';
-import { QuickCreateSupplierModal, QuickCreateWarehouseModal } from '@/components/quick-create-modals';
+import { QuickCreateIngredientModal, QuickCreateSupplierModal, QuickCreateWarehouseModal } from '@/components/quick-create-modals';
 import { FormField } from '@/components/ui/form-field';
 import { Input } from '@/components/ui/input';
 import { SearchableSelect } from '@/components/ui/searchable-select';
@@ -39,6 +39,7 @@ type Props = {
     suppliers:      Pick<Supplier,      'id' | 'name'>[];
     warehouses:     Pick<Warehouse,     'id' | 'name'>[];
     ingredients:    (Pick<Ingredient,   'id' | 'name' | 'code'> & { base_unit?: Pick<Unit, 'id' | 'name' | 'short_name'> | null })[];
+    units:          Pick<Unit,          'id' | 'name' | 'short_name'>[];
     purchaseOrders: PurchaseOrderOption[];
     prefill?: PurchaseOrderPrefill | null;
 };
@@ -89,9 +90,9 @@ function itemsFromPurchaseOrder(order?: PurchaseOrderPrefill | null): ItemRow[] 
     })) ?? [];
 }
 
-export default function PurchaseReceivesCreate({ suppliers, warehouses, ingredients, purchaseOrders, prefill }: Props) {
+export default function PurchaseReceivesCreate({ suppliers, warehouses, ingredients, units, purchaseOrders, prefill }: Props) {
     const { can } = useCan();
-    const [modal, setModal] = useState<'supplier' | 'warehouse' | null>(null);
+    const [modal, setModal] = useState<'supplier' | 'warehouse' | 'ingredient' | null>(null);
     const prefillItems = itemsFromPurchaseOrder(prefill);
 
     const [items, setItems] = useState<ItemRow[]>(prefillItems.length ? prefillItems : [emptyItem()]);
@@ -252,6 +253,8 @@ export default function PurchaseReceivesCreate({ suppliers, warehouses, ingredie
                                                     <SearchableSelect
                                                         value={item.ingredient_id}
                                                         onChange={(e) => updateItem(index, 'ingredient_id', e.target.value)}
+                                                        onAddNew={can('ingredients-create') ? () => setModal('ingredient') : undefined}
+                                                        addNewLabel="Add Ingredient"
                                                     >
                                                         <option value="">Select ingredient…</option>
                                                         {ingredients.map((i) => <option key={i.id} value={i.id}>{i.name}{i.code ? ` (${i.code})` : ''}</option>)}
@@ -355,6 +358,7 @@ export default function PurchaseReceivesCreate({ suppliers, warehouses, ingredie
             </form>
             <QuickCreateSupplierModal open={modal === 'supplier'} onClose={() => setModal(null)} />
             <QuickCreateWarehouseModal open={modal === 'warehouse'} onClose={() => setModal(null)} />
+            <QuickCreateIngredientModal open={modal === 'ingredient'} onClose={() => setModal(null)} units={units} />
         </>
     );
 }

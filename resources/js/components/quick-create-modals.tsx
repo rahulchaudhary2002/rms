@@ -17,6 +17,7 @@ import { store as citiesStore } from '@/routes/cities';
 import { store as countriesStore } from '@/routes/countries';
 import { store as foodCategoriesStore } from '@/routes/food-categories';
 import { store as categoriesStore } from '@/routes/ingredient-categories';
+import { store as ingredientsStore } from '@/routes/ingredients';
 import { store as outletDepartmentsStore } from '@/routes/outlet-departments';
 import { store as outletsStore } from '@/routes/outlets';
 import { store as statesStore } from '@/routes/states';
@@ -724,6 +725,77 @@ export function QuickCreateIngredientCategoryModal({
                         submitLabel="Create Category"
                         onCancel={close}
                     />
+                </form>
+            </DialogContent>
+        </Dialog>
+    );
+}
+
+type UnitOption = { id: number | string; name: string; short_name: string };
+
+export function QuickCreateIngredientModal({
+    open,
+    onClose,
+    units = [],
+}: {
+    open: boolean;
+    onClose: () => void;
+    units?: UnitOption[];
+}) {
+    const { data, setData, post, processing, errors, reset } = useForm({
+        name: '',
+        code: '',
+        type: 'raw_material',
+        base_unit_id: '',
+        costing_method: 'fifo',
+        is_active: true,
+        _redirect: currentUrl(),
+    });
+
+    function close() { reset(); onClose(); }
+    function submit(e: React.FormEvent) {
+        e.preventDefault();
+        post(ingredientsStore.url(), { preserveScroll: true, preserveState: true, onSuccess: close });
+    }
+
+    return (
+        <Dialog open={open} onOpenChange={(o) => { if (!o) close(); }}>
+            <DialogContent className="max-w-md bg-card">
+                <DialogHeader><DialogTitle>Add Ingredient</DialogTitle></DialogHeader>
+                <form onSubmit={submit} className="space-y-4">
+                    <FormField label="Name" error={errors.name}>
+                        <Input value={data.name} onChange={(e) => setData('name', e.target.value)} placeholder="e.g. Tomato" />
+                    </FormField>
+                    <div className="grid grid-cols-2 gap-4">
+                        <FormField label="Code" error={errors.code}>
+                            <Input value={data.code} onChange={(e) => setData('code', e.target.value)} placeholder="e.g. ING-001" />
+                        </FormField>
+                        <FormField label="Base Unit" error={errors.base_unit_id}>
+                            <SearchableSelect value={data.base_unit_id} onChange={(e) => setData('base_unit_id', e.target.value)}>
+                                <option value="">Select unit…</option>
+                                {units.map((u) => <option key={u.id} value={u.id}>{u.name} ({u.short_name})</option>)}
+                            </SearchableSelect>
+                        </FormField>
+                    </div>
+                    <div className="grid grid-cols-2 gap-4">
+                        <FormField label="Type" error={errors.type}>
+                            <SearchableSelect value={data.type} onChange={(e) => setData('type', e.target.value)}>
+                                <option value="raw_material">Raw Material</option>
+                                <option value="ready_product">Ready Product</option>
+                                <option value="packaging">Packaging</option>
+                                <option value="consumable">Consumable</option>
+                            </SearchableSelect>
+                        </FormField>
+                        <FormField label="Costing Method" error={errors.costing_method}>
+                            <SearchableSelect value={data.costing_method} onChange={(e) => setData('costing_method', e.target.value)}>
+                                <option value="fifo">FIFO</option>
+                                <option value="lifo">LIFO</option>
+                                <option value="weighted_average">Weighted Avg</option>
+                                <option value="moving_average">Moving Avg</option>
+                            </SearchableSelect>
+                        </FormField>
+                    </div>
+                    <ModalActions processing={processing} submitLabel="Create Ingredient" onCancel={close} />
                 </form>
             </DialogContent>
         </Dialog>

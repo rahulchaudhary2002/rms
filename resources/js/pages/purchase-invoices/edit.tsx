@@ -2,7 +2,7 @@ import { Head, Link, useForm } from '@inertiajs/react';
 import { useState } from 'react';
 import { FormSection } from '@/components/form-section';
 import { PageHeader } from '@/components/page-header';
-import { QuickCreateSupplierModal } from '@/components/quick-create-modals';
+import { QuickCreateIngredientModal, QuickCreateSupplierModal } from '@/components/quick-create-modals';
 import { FormField } from '@/components/ui/form-field';
 import { Input } from '@/components/ui/input';
 import { SearchableSelect } from '@/components/ui/searchable-select';
@@ -21,6 +21,7 @@ type Props = {
     purchaseOrders:  Pick<PurchaseOrder,  'id' | 'purchase_order_no'>[];
     purchaseReceives: Pick<PurchaseReceive, 'id' | 'receive_no'>[];
     ingredients:     (Pick<Ingredient,    'id' | 'name' | 'code'> & { base_unit?: Pick<Unit, 'id' | 'name' | 'short_name'> | null })[];
+    units:           Pick<Unit,           'id' | 'name' | 'short_name'>[];
 };
 
 type ItemRow = {
@@ -48,9 +49,9 @@ function fmt(n: number): string {
     return n.toFixed(2);
 }
 
-export default function PurchaseInvoicesEdit({ invoice, suppliers, purchaseOrders, purchaseReceives, ingredients }: Props) {
+export default function PurchaseInvoicesEdit({ invoice, suppliers, purchaseOrders, purchaseReceives, ingredients, units }: Props) {
     const { can } = useCan();
-    const [modal, setModal] = useState<'supplier' | null>(null);
+    const [modal, setModal] = useState<'supplier' | 'ingredient' | null>(null);
     const initialItems: ItemRow[] = (invoice.items ?? []).map((it) => ({
         ingredient_id:   String(it.ingredient_id),
         unit_id:         String(it.unit_id),
@@ -195,6 +196,8 @@ export default function PurchaseInvoicesEdit({ invoice, suppliers, purchaseOrder
                                                 <SearchableSelect
                                                     value={item.ingredient_id}
                                                     onChange={(e) => updateItem(index, 'ingredient_id', e.target.value)}
+                                                    onAddNew={can('ingredients-create') ? () => setModal('ingredient') : undefined}
+                                                    addNewLabel="Add Ingredient"
                                                 >
                                                     <option value="">Select ingredient…</option>
                                                     {ingredients.map((i) => <option key={i.id} value={i.id}>{i.name}{i.code ? ` (${i.code})` : ''}</option>)}
@@ -327,6 +330,7 @@ export default function PurchaseInvoicesEdit({ invoice, suppliers, purchaseOrder
                     </div>
             </form>
             <QuickCreateSupplierModal open={modal === 'supplier'} onClose={() => setModal(null)} />
+            <QuickCreateIngredientModal open={modal === 'ingredient'} onClose={() => setModal(null)} units={units} />
         </>
     );
 }
