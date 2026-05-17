@@ -49,7 +49,7 @@ export default function IngredientStockAdjustmentsCreate({ warehouses, defaultWa
         setData('warehouse_id', warehouseId);
         if (warehouseId) {
             router.get(
-                adjustmentsCreate.url({ warehouse_id: warehouseId }),
+                adjustmentsCreate.url({ query: { warehouse_id: warehouseId } }),
                 {},
                 {
                     only: ['stockByIngredient'],

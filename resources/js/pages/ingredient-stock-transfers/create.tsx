@@ -50,7 +50,7 @@ export default function IngredientStockTransfersCreate({ fromWarehouses, allWare
         setData('from_warehouse_id', warehouseId);
         if (warehouseId) {
             router.get(
-                transfersCreate.url({ from_warehouse_id: warehouseId }),
+                transfersCreate.url({ query: { from_warehouse_id: warehouseId } }),
                 {},
                 {
                     only: ['stockByIngredient'],

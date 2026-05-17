@@ -57,7 +57,7 @@ export default function IngredientWastagesCreate({ warehouses, defaultWarehouseI
         setData('warehouse_id', warehouseId);
         if (warehouseId) {
             router.get(
-                wastagesCreate.url({ warehouse_id: warehouseId }),
+                wastagesCreate.url({ query: { warehouse_id: warehouseId } }),
                 {},
                 {
                     only: ['stockByIngredient'],

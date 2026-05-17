@@ -49,7 +49,7 @@ export default function IngredientStockCountsCreate({ warehouses, defaultWarehou
         setData('warehouse_id', warehouseId);
         if (warehouseId) {
             router.get(
-                countsCreate.url({ warehouse_id: warehouseId }),
+                countsCreate.url({ query: { warehouse_id: warehouseId } }),
                 {},
                 {
                     only: ['stockByIngredient'],
