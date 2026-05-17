@@ -158,7 +158,7 @@ export default function IngredientStockCountsCreate({ warehouses, ingredients, s
 
                                         <FormField label={`System Qty${unit ? ` (${unit})` : ''}`}>
                                             <Input
-                                                value={item.ingredient_id ? systemQty.toLocaleString() : '—'}
+                                                value={item.ingredient_id ? systemQty.toLocaleString() : '-'}
                                                 readOnly
                                                 className="cursor-default bg-muted/60 font-mono text-right"
                                             />
@@ -184,7 +184,7 @@ export default function IngredientStockCountsCreate({ warehouses, ingredients, s
                                                 diff < 0 ? 'border-red-200 bg-red-50 text-red-600 dark:border-red-800/40 dark:bg-red-900/10 dark:text-red-400' :
                                                 'border-border/20 bg-muted/40 text-muted-foreground dark:border-stone-700',
                                             )}>
-                                                {diff === null ? '—' : (diff > 0 ? '+' : '') + diff.toFixed(4)}
+                                                {diff === null ? '-' : (diff > 0 ? '+' : '') + diff.toFixed(4)}
                                             </div>
                                         </FormField>
 

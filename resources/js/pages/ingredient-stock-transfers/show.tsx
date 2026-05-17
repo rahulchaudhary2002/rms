@@ -347,14 +347,14 @@ export default function IngredientStockTransfersShow({ transfer }: Props) {
             {/* Action panels */}
             {activePanel === 'dispatch' && transfer.status === 'approved' && (
                 <div className="mb-6 rounded-xl border border-amber-200 bg-amber-50 p-6 dark:border-amber-800/40 dark:bg-amber-900/10">
-                    <h3 className="mb-4 text-sm font-bold text-amber-800 dark:text-amber-300">Dispatch Transfer — enter quantities to dispatch from {transfer.from_warehouse?.name}</h3>
+                    <h3 className="mb-4 text-sm font-bold text-amber-800 dark:text-amber-300">Dispatch Transfer - enter quantities to dispatch from {transfer.from_warehouse?.name}</h3>
                     <DispatchPanel transfer={transfer} />
                 </div>
             )}
 
             {activePanel === 'receive' && (transfer.status === 'dispatched' || transfer.status === 'partially_received') && (
                 <div className="mb-6 rounded-xl border border-emerald-200 bg-emerald-50 p-6 dark:border-emerald-800/40 dark:bg-emerald-900/10">
-                    <h3 className="mb-4 text-sm font-bold text-emerald-800 dark:text-emerald-300">Receive Stock — confirm quantities received into {transfer.to_warehouse?.name}</h3>
+                    <h3 className="mb-4 text-sm font-bold text-emerald-800 dark:text-emerald-300">Receive Stock - confirm quantities received into {transfer.to_warehouse?.name}</h3>
                     <ReceivePanel transfer={transfer} />
                 </div>
             )}

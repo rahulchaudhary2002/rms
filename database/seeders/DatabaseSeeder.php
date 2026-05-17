@@ -17,6 +17,10 @@ class DatabaseSeeder extends Seeder
             RolesAndPermissionsSeeder::class,
             UnitsAndConversionsSeeder::class,
             IngredientCategoriesSeeder::class,
+            OutletsSeeder::class,
+            OutletDepartmentsSeeder::class,
+            WarehousesSeeder::class,
+            IngredientsSeeder::class,
         ]);
     }
 }

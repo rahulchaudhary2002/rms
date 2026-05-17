@@ -226,7 +226,7 @@ export default function IngredientBatchesIndex({ batches, filters }: Props) {
                                                     {isExpiringSoon && !isExpired && <span className="ml-1 text-[10px] font-bold">SOON</span>}
                                                 </span>
                                             ) : (
-                                                <span className="text-muted-foreground dark:text-stone-500">—</span>
+                                                <span className="text-muted-foreground dark:text-stone-500">-</span>
                                             )}
                                         </td>
                                         <td className="px-6 py-4">

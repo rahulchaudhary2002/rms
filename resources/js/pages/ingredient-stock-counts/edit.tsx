@@ -109,7 +109,7 @@ export default function IngredientStockCountsEdit({ count, warehouses, ingredien
                     { label: count.count_no, href: countsShow.url(count.id) },
                     { label: isCounting ? 'Enter Counts' : 'Edit' },
                 ]}
-                title={isCounting ? `Enter Counts — ${count.count_no}` : `Edit ${count.count_no}`}
+                title={isCounting ? `Enter Counts - ${count.count_no}` : `Edit ${count.count_no}`}
                 description={isCounting ? 'Enter the physically counted quantities for each item.' : 'Update draft stock count details.'}
             />
 
@@ -178,7 +178,7 @@ export default function IngredientStockCountsEdit({ count, warehouses, ingredien
 
                                         <FormField label={`System Qty${unit ? ` (${unit})` : ''}`}>
                                             <Input
-                                                value={item.ingredient_id ? systemQty.toLocaleString() : '—'}
+                                                value={item.ingredient_id ? systemQty.toLocaleString() : '-'}
                                                 readOnly
                                                 className="cursor-default bg-muted/60 font-mono text-right"
                                             />
@@ -204,7 +204,7 @@ export default function IngredientStockCountsEdit({ count, warehouses, ingredien
                                                 diff < 0 ? 'border-red-200 bg-red-50 text-red-600 dark:border-red-800/40 dark:bg-red-900/10 dark:text-red-400' :
                                                 'border-border/20 bg-muted/40 text-muted-foreground dark:border-stone-700',
                                             )}>
-                                                {diff === null ? '—' : (diff > 0 ? '+' : '') + diff.toFixed(4)}
+                                                {diff === null ? '-' : (diff > 0 ? '+' : '') + diff.toFixed(4)}
                                             </div>
                                         </FormField>
 

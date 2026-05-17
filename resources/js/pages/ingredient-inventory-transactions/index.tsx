@@ -119,7 +119,7 @@ export default function IngredientInventoryTransactionsIndex({ transactions, fil
 
             <TableCard
                 title="Inventory Transactions"
-                description="Every stock movement — purchases, transfers, wastages, adjustments and counts."
+                description="Every stock movement - purchases, transfers, wastages, adjustments and counts."
                 toolbar={
                     <div className="flex flex-wrap items-center gap-3">
                         <TableSearchInput
@@ -237,14 +237,14 @@ export default function IngredientInventoryTransactionsIndex({ transactions, fil
                                             <span className="font-bold text-emerald-600 dark:text-emerald-400">
                                                 +{parseFloat(tx.quantity_in).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 4 })}
                                             </span>
-                                        ) : <span className="text-muted-foreground/40">—</span>}
+                                        ) : <span className="text-muted-foreground/40">-</span>}
                                     </td>
                                     <td className="px-6 py-4 text-right text-sm">
                                         {parseFloat(tx.quantity_out) > 0 ? (
                                             <span className="font-bold text-red-600 dark:text-red-400">
                                                 -{parseFloat(tx.quantity_out).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 4 })}
                                             </span>
-                                        ) : <span className="text-muted-foreground/40">—</span>}
+                                        ) : <span className="text-muted-foreground/40">-</span>}
                                     </td>
                                     <td className="px-6 py-4 text-right text-sm font-bold text-foreground dark:text-stone-100">
                                         {parseFloat(tx.balance_after).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 4 })}
