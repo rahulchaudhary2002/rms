@@ -37,7 +37,7 @@ class IngredientWastageController extends Controller
     {
         $scope = $this->accessControl->resolveSessionScope($request);
         return Inertia::render('ingredient-wastages/create',
-            $this->wastageService->getCreateData($scope));
+            $this->wastageService->getCreateData($request->string('warehouse_id', '')->toString(), $scope));
     }
 
     public function store(StoreIngredientWastageRequest $request): RedirectResponse

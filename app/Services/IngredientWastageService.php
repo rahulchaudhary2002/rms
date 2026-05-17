@@ -39,10 +39,11 @@ class IngredientWastageService
         return compact('wastages', 'warehouses', 'filters');
     }
 
-    public function getCreateData(array $scope = []): array
+    public function getCreateData(string $warehouseId = '', array $scope = []): array
     {
-        $warehouseIds     = $scope ? $this->warehouseIdsForScope($scope) : null;
+        $warehouseIds       = $scope ? $this->warehouseIdsForScope($scope) : null;
         $defaultWarehouseId = $scope ? $this->defaultWarehouseId($scope) : '';
+        $resolvedId         = $warehouseId !== '' ? $warehouseId : $defaultWarehouseId;
 
         $warehouses  = $this->scopedWarehouses($warehouseIds);
         $ingredients = Ingredient::with('baseUnit')
@@ -50,7 +51,16 @@ class IngredientWastageService
             ->orderBy('name')
             ->get(['id', 'name', 'code', 'base_unit_id']);
 
-        return compact('warehouses', 'ingredients', 'defaultWarehouseId');
+        $stockByIngredient = [];
+        if ($resolvedId !== '') {
+            $stockByIngredient = \App\Models\WarehouseIngredientStock::where('warehouse_id', $resolvedId)
+                ->get(['ingredient_id', 'quantity', 'average_cost'])
+                ->keyBy('ingredient_id')
+                ->map(fn ($s) => ['quantity' => $s->quantity, 'average_cost' => $s->average_cost])
+                ->all();
+        }
+
+        return compact('warehouses', 'ingredients', 'stockByIngredient', 'defaultWarehouseId');
     }
 
     public function getEditData(IngredientWastage $wastage, array $scope = []): array

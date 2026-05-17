@@ -43,10 +43,11 @@ class IngredientStockTransferService
         return compact('transfers', 'warehouses', 'filters');
     }
 
-    public function getCreateData(array $scope = []): array
+    public function getCreateData(string $fromWarehouseId = '', array $scope = []): array
     {
         $warehouseIds           = $scope ? $this->warehouseIdsForScope($scope) : null;
         $defaultFromWarehouseId = $scope ? $this->defaultWarehouseId($scope) : '';
+        $resolvedId             = $fromWarehouseId !== '' ? $fromWarehouseId : $defaultFromWarehouseId;
 
         // From warehouses are scoped; to warehouses remain unrestricted so transfers can go anywhere
         $fromWarehouses = $this->scopedWarehouses($warehouseIds);
@@ -56,7 +57,16 @@ class IngredientStockTransferService
             ->orderBy('name')
             ->get(['id', 'name', 'code', 'base_unit_id']);
 
-        return compact('fromWarehouses', 'allWarehouses', 'ingredients', 'defaultFromWarehouseId');
+        $stockByIngredient = [];
+        if ($resolvedId !== '') {
+            $stockByIngredient = \App\Models\WarehouseIngredientStock::where('warehouse_id', $resolvedId)
+                ->get(['ingredient_id', 'quantity', 'average_cost'])
+                ->keyBy('ingredient_id')
+                ->map(fn ($s) => ['quantity' => $s->quantity, 'average_cost' => $s->average_cost])
+                ->all();
+        }
+
+        return compact('fromWarehouses', 'allWarehouses', 'ingredients', 'stockByIngredient', 'defaultFromWarehouseId');
     }
 
     public function getEditData(IngredientStockTransfer $transfer, array $scope = []): array

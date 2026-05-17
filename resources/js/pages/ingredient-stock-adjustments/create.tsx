@@ -179,7 +179,7 @@ export default function IngredientStockAdjustmentsCreate({ warehouses, defaultWa
 
                                         <FormField label="Difference">
                                             <div className={cn(
-                                                'flex h-9 items-center justify-end rounded-md border px-3 font-mono text-sm font-bold',
+                                                'flex h-11 items-center justify-end rounded-lg border px-3 font-mono text-sm font-bold',
                                                 diff === null ? 'border-border/20 bg-muted/40 text-muted-foreground dark:border-stone-700' :
                                                 diff > 0 ? 'border-emerald-200 bg-emerald-50 text-emerald-700 dark:border-emerald-800/40 dark:bg-emerald-900/10 dark:text-emerald-400' :
                                                 diff < 0 ? 'border-red-200 bg-red-50 text-red-600 dark:border-red-800/40 dark:bg-red-900/10 dark:text-red-400' :

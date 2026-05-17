@@ -39,7 +39,7 @@ class IngredientStockTransferController extends Controller
     {
         $scope = $this->accessControl->resolveSessionScope($request);
         return Inertia::render('ingredient-stock-transfers/create',
-            $this->transferService->getCreateData($scope));
+            $this->transferService->getCreateData($request->string('from_warehouse_id', '')->toString(), $scope));
     }
 
     public function store(StoreIngredientStockTransferRequest $request): RedirectResponse

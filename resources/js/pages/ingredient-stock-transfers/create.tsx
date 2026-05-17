@@ -1,4 +1,4 @@
-import { Head, Link, useForm } from '@inertiajs/react';
+import { Head, Link, router, useForm } from '@inertiajs/react';
 import { useState } from 'react';
 import { FormSection } from '@/components/form-section';
 import { PageHeader } from '@/components/page-header';
@@ -8,15 +8,19 @@ import { SearchableSelect } from '@/components/ui/searchable-select';
 import { dashboard } from '@/routes';
 import {
     index as transfersIndex,
+    create as transfersCreate,
     store as transfersStore,
 } from '@/routes/ingredient-stock-transfers';
 import type { Ingredient, Warehouse } from '@/types';
+
+type StockEntry = { quantity: string; average_cost: string };
 
 type Props = {
     fromWarehouses: Pick<Warehouse, 'id' | 'name'>[];
     allWarehouses: Pick<Warehouse, 'id' | 'name'>[];
     defaultFromWarehouseId: string;
     ingredients: (Pick<Ingredient, 'id' | 'name' | 'code'> & { base_unit?: { id: number; name: string; short_name: string } })[];
+    stockByIngredient: Record<string, StockEntry>;
 };
 
 type ItemRow = {
@@ -30,8 +34,9 @@ function emptyItem(): ItemRow {
     return { ingredient_id: '', ingredient_batch_id: '', requested_quantity: '', remarks: '' };
 }
 
-export default function IngredientStockTransfersCreate({ fromWarehouses, allWarehouses, defaultFromWarehouseId, ingredients }: Props) {
+export default function IngredientStockTransfersCreate({ fromWarehouses, allWarehouses, defaultFromWarehouseId, ingredients, stockByIngredient }: Props) {
     const [items, setItems] = useState<ItemRow[]>([emptyItem()]);
+    const [currentStock, setCurrentStock] = useState<Record<string, StockEntry>>(stockByIngredient);
 
     const { data, setData, post, processing, errors } = useForm({
         from_warehouse_id: defaultFromWarehouseId,
@@ -40,6 +45,25 @@ export default function IngredientStockTransfersCreate({ fromWarehouses, allWare
         remarks:           '',
         items:             items,
     });
+
+    function handleFromWarehouseChange(warehouseId: string) {
+        setData('from_warehouse_id', warehouseId);
+        if (warehouseId) {
+            router.get(
+                transfersCreate.url({ from_warehouse_id: warehouseId }),
+                {},
+                {
+                    only: ['stockByIngredient'],
+                    preserveState: true,
+                    onSuccess: (page) => {
+                        setCurrentStock((page.props as { stockByIngredient: Record<string, StockEntry> }).stockByIngredient ?? {});
+                    },
+                }
+            );
+        } else {
+            setCurrentStock({});
+        }
+    }
 
     function updateItem(index: number, field: keyof ItemRow, value: string) {
         const next = items.map((row, i) => i === index ? { ...row, [field]: value } : row);
@@ -84,7 +108,7 @@ export default function IngredientStockTransfersCreate({ fromWarehouses, allWare
                 <FormSection title="Transfer Details" description="Select source and destination warehouses and the transfer date.">
                     <div className="grid grid-cols-1 gap-5 md:grid-cols-2">
                         <FormField label="From Warehouse" error={errors.from_warehouse_id}>
-                            <SearchableSelect value={data.from_warehouse_id} onChange={(e) => setData('from_warehouse_id', e.target.value)}>
+                            <SearchableSelect value={data.from_warehouse_id} onChange={(e) => handleFromWarehouseChange(e.target.value)}>
                                 <option value="">Select source warehouse…</option>
                                 {fromWarehouses.map((w) => <option key={w.id} value={w.id}>{w.name}</option>)}
                             </SearchableSelect>
@@ -111,45 +135,69 @@ export default function IngredientStockTransfersCreate({ fromWarehouses, allWare
 
                 <FormSection title="Items" description="Add ingredients and the quantity to transfer. All quantities must be in the ingredient's base unit.">
                     <div className="space-y-3">
-                        {items.map((item, index) => (
-                            <div key={index} className="grid grid-cols-1 gap-3 rounded-lg border border-border/30 bg-muted/30 p-4 md:grid-cols-[1fr_1fr_auto_1fr_auto] dark:border-stone-700 dark:bg-stone-900/30">
-                                <FormField label="Ingredient" error={(errors as Record<string, string>)[`items.${index}.ingredient_id`]}>
-                                    <SearchableSelect value={item.ingredient_id} onChange={(e) => updateItem(index, 'ingredient_id', e.target.value)}>
-                                        <option value="">Select ingredient…</option>
-                                        {ingredients.map((i) => <option key={i.id} value={i.id}>{i.name} ({i.code})</option>)}
-                                    </SearchableSelect>
-                                </FormField>
+                        {!data.from_warehouse_id && (
+                            <p className="rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-700 dark:border-amber-800/40 dark:bg-amber-900/10 dark:text-amber-300">
+                                Select a source warehouse first to load available stock quantities.
+                            </p>
+                        )}
 
-                                <FormField
-                                    label={`Quantity${item.ingredient_id && ingredientById[item.ingredient_id]?.base_unit ? ` (${ingredientById[item.ingredient_id]!.base_unit!.short_name})` : ''}`}
-                                    error={(errors as Record<string, string>)[`items.${index}.requested_quantity`]}
-                                >
-                                    <Input
-                                        type="number"
-                                        min="0.0001"
-                                        step="0.0001"
-                                        value={item.requested_quantity}
-                                        onChange={(e) => updateItem(index, 'requested_quantity', e.target.value)}
-                                        placeholder="0"
-                                    />
-                                </FormField>
+                        {items.map((item, index) => {
+                            const unit = item.ingredient_id ? ingredientById[item.ingredient_id]?.base_unit?.short_name : '';
+                            const availableQty = item.ingredient_id ? parseFloat(currentStock[item.ingredient_id]?.quantity ?? '0') : null;
 
-                                <FormField label="Remarks" error={(errors as Record<string, string>)[`items.${index}.remarks`]} className="md:col-span-2">
-                                    <Input value={item.remarks} onChange={(e) => updateItem(index, 'remarks', e.target.value)} placeholder="Optional item notes…" />
-                                </FormField>
+                            return (
+                                <div key={index} className="rounded-lg border border-border/30 bg-muted/30 p-4 dark:border-stone-700 dark:bg-stone-900/30">
+                                    <div className="grid grid-cols-1 gap-3 md:grid-cols-[2fr_1fr_1fr_auto]">
+                                        <FormField label="Ingredient" error={(errors as Record<string, string>)[`items.${index}.ingredient_id`]}>
+                                            <SearchableSelect value={item.ingredient_id} onChange={(e) => updateItem(index, 'ingredient_id', e.target.value)}>
+                                                <option value="">Select ingredient…</option>
+                                                {ingredients.map((i) => <option key={i.id} value={i.id}>{i.name} ({i.code})</option>)}
+                                            </SearchableSelect>
+                                        </FormField>
 
-                                <div className="flex items-end">
-                                    <button
-                                        type="button"
-                                        onClick={() => removeItem(index)}
-                                        disabled={items.length === 1}
-                                        className="flex h-9 w-9 items-center justify-center rounded-lg text-red-500 transition-colors hover:bg-red-50 disabled:cursor-not-allowed disabled:opacity-30 dark:hover:bg-red-900/20"
-                                    >
-                                        <span className="material-symbols-outlined text-[18px]">delete</span>
-                                    </button>
+                                        <FormField label={`Available${unit ? ` (${unit})` : ''}`}>
+                                            <Input
+                                                value={availableQty !== null ? availableQty.toLocaleString() : '-'}
+                                                readOnly
+                                                className="cursor-default bg-muted/60 font-mono text-right"
+                                            />
+                                        </FormField>
+
+                                        <FormField
+                                            label={`Quantity${unit ? ` (${unit})` : ''}`}
+                                            error={(errors as Record<string, string>)[`items.${index}.requested_quantity`]}
+                                        >
+                                            <Input
+                                                type="number"
+                                                min="0.0001"
+                                                step="0.0001"
+                                                value={item.requested_quantity}
+                                                onChange={(e) => updateItem(index, 'requested_quantity', e.target.value)}
+                                                placeholder="0"
+                                                className="font-mono text-right"
+                                            />
+                                        </FormField>
+
+                                        <div className="flex items-end">
+                                            <button
+                                                type="button"
+                                                onClick={() => removeItem(index)}
+                                                disabled={items.length === 1}
+                                                className="flex h-9 w-9 items-center justify-center rounded-lg text-red-500 transition-colors hover:bg-red-50 disabled:cursor-not-allowed disabled:opacity-30 dark:hover:bg-red-900/20"
+                                            >
+                                                <span className="material-symbols-outlined text-[18px]">delete</span>
+                                            </button>
+                                        </div>
+                                    </div>
+
+                                    <div className="mt-3">
+                                        <FormField label="Remarks (optional)" error={(errors as Record<string, string>)[`items.${index}.remarks`]}>
+                                            <Input value={item.remarks} onChange={(e) => updateItem(index, 'remarks', e.target.value)} placeholder="Optional item notes…" />
+                                        </FormField>
+                                    </div>
                                 </div>
-                            </div>
-                        ))}
+                            );
+                        })}
 
                         <button
                             type="button"
