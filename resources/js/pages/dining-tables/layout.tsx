@@ -3,7 +3,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { PageHeader } from '@/components/page-header';
 import { SearchableSelect } from '@/components/ui/searchable-select';
 import { dashboard } from '@/routes';
-import { index as diningTablesIndex } from '@/routes/dining-tables';
+import { index as diningTablesIndex, update as diningTablesUpdate } from '@/routes/dining-tables';
 import { update as updateLayout } from '@/routes/dining-table-layout';
 import { cn } from '@/lib/utils';
 
@@ -64,6 +64,12 @@ export default function DiningTableLayout({ outlets, diningAreas, tables, scoped
     const [selectedTableId, setSelectedTableId] = useState<number | null>(null);
     const [saving, setSaving] = useState(false);
     const [saveMsg, setSaveMsg] = useState<string | null>(null);
+
+    type EditForm = { name: string; code: string; capacity: string; shape: string; status: string; is_active: string };
+    const [editingTable, setEditingTable] = useState<LayoutTable | null>(null);
+    const [editForm, setEditForm] = useState<EditForm | null>(null);
+    const [editSaving, setEditSaving] = useState(false);
+    const [editErrors, setEditErrors] = useState<Partial<EditForm>>({});
     const [canvasScale, setCanvasScale] = useState(1);
     const canvasRef = useRef<HTMLDivElement>(null);
     const canvasWrapperRef = useRef<HTMLDivElement>(null);
@@ -219,6 +225,56 @@ export default function DiningTableLayout({ outlets, diningAreas, tables, scoped
         }
     }
 
+    function openEdit(table: LayoutTable) {
+        setEditingTable(table);
+        setEditForm({
+            name:      table.name,
+            code:      table.code ?? '',
+            capacity:  String(table.capacity),
+            shape:     table.shape,
+            status:    table.status,
+            is_active: table.is_active ? 'true' : 'false',
+        });
+        setEditErrors({});
+    }
+
+    function submitEdit(e: React.FormEvent) {
+        e.preventDefault();
+        if (!editingTable || !editForm) return;
+        setEditSaving(true);
+        setEditErrors({});
+
+        router.put(
+            diningTablesUpdate.url(editingTable.id),
+            {
+                _redirect:      window.location.href,
+                outlet_id:      editingTable.outlet_id,
+                dining_area_id: editingTable.dining_area_id,
+                name:           editForm.name,
+                code:           editForm.code || null,
+                capacity:       Number(editForm.capacity),
+                shape:          editForm.shape,
+                status:         editForm.status,
+                is_active:      editForm.is_active === 'true',
+                position_x:     Math.round(editingTable._x * 100) / 100,
+                position_y:     Math.round(editingTable._y * 100) / 100,
+                width:          Math.round(editingTable._width * 100) / 100,
+                height:         Math.round(editingTable._height * 100) / 100,
+                rotation:       Math.round(editingTable._rotation),
+                sort_order:     0,
+            },
+            {
+                preserveScroll: true,
+                onSuccess: () => {
+                    setEditingTable(null);
+                    setEditForm(null);
+                },
+                onError: (errors) => setEditErrors(errors as Partial<EditForm>),
+                onFinish: () => setEditSaving(false),
+            },
+        );
+    }
+
     return (
         <>
             <Head title="Dining Table Layout" />
@@ -361,6 +417,7 @@ export default function DiningTableLayout({ outlets, diningAreas, tables, scoped
                                                 }}
                                                 onPointerDown={(e) => onPointerDown(e, table.id)}
                                                 onClick={(e) => { e.stopPropagation(); setSelectedTableId(table.id); }}
+                                                onDoubleClick={(e) => { e.stopPropagation(); openEdit(table); }}
                                             >
                                                 <div
                                                     className={cn(
@@ -522,6 +579,111 @@ export default function DiningTableLayout({ outlets, diningAreas, tables, scoped
                     </div>
                 )}
             </div>
+
+            {/* Edit table modal */}
+            {editingTable && editForm && (
+                <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm" onClick={() => setEditingTable(null)}>
+                    <div className="w-full max-w-md rounded-2xl bg-white shadow-2xl dark:bg-stone-900" onClick={(e) => e.stopPropagation()}>
+                        <div className="flex items-center justify-between border-b border-border/20 px-6 py-4 dark:border-stone-700">
+                            <h2 className="text-base font-bold text-foreground dark:text-stone-100">Edit Table</h2>
+                            <button type="button" onClick={() => setEditingTable(null)} className="rounded-lg p-1 text-muted-foreground hover:bg-secondary">
+                                <span className="material-symbols-outlined text-[20px]">close</span>
+                            </button>
+                        </div>
+
+                        <form onSubmit={submitEdit} className="space-y-4 px-6 py-5">
+                            <div className="grid grid-cols-2 gap-4">
+                                <div className="col-span-2">
+                                    <label className="mb-1 block text-[11px] font-bold tracking-wider text-muted-foreground uppercase">Name</label>
+                                    <input
+                                        type="text"
+                                        value={editForm.name}
+                                        onChange={(e) => setEditForm((f) => f && ({ ...f, name: e.target.value }))}
+                                        className="w-full rounded-lg border border-border/40 bg-white px-3 py-2 text-sm text-foreground outline-none focus:border-primary dark:border-stone-600 dark:bg-stone-800 dark:text-stone-100"
+                                    />
+                                    {editErrors.name && <p className="mt-1 text-xs text-red-500">{editErrors.name}</p>}
+                                </div>
+
+                                <div>
+                                    <label className="mb-1 block text-[11px] font-bold tracking-wider text-muted-foreground uppercase">Code</label>
+                                    <input
+                                        type="text"
+                                        value={editForm.code}
+                                        onChange={(e) => setEditForm((f) => f && ({ ...f, code: e.target.value }))}
+                                        className="w-full rounded-lg border border-border/40 bg-white px-3 py-2 text-sm text-foreground outline-none focus:border-primary dark:border-stone-600 dark:bg-stone-800 dark:text-stone-100"
+                                        placeholder="e.g. T-01"
+                                    />
+                                </div>
+
+                                <div>
+                                    <label className="mb-1 block text-[11px] font-bold tracking-wider text-muted-foreground uppercase">Capacity</label>
+                                    <input
+                                        type="number"
+                                        min="1"
+                                        value={editForm.capacity}
+                                        onChange={(e) => setEditForm((f) => f && ({ ...f, capacity: e.target.value }))}
+                                        className="w-full rounded-lg border border-border/40 bg-white px-3 py-2 text-sm text-foreground outline-none focus:border-primary dark:border-stone-600 dark:bg-stone-800 dark:text-stone-100"
+                                    />
+                                </div>
+
+                                <div>
+                                    <label className="mb-1 block text-[11px] font-bold tracking-wider text-muted-foreground uppercase">Shape</label>
+                                    <select
+                                        value={editForm.shape}
+                                        onChange={(e) => setEditForm((f) => f && ({ ...f, shape: e.target.value }))}
+                                        className="w-full rounded-lg border border-border/40 bg-white px-3 py-2 text-sm text-foreground outline-none focus:border-primary dark:border-stone-600 dark:bg-stone-800 dark:text-stone-100"
+                                    >
+                                        <option value="rectangle">Rectangle</option>
+                                        <option value="square">Square</option>
+                                        <option value="circle">Circle</option>
+                                        <option value="oval">Oval</option>
+                                    </select>
+                                </div>
+
+                                <div>
+                                    <label className="mb-1 block text-[11px] font-bold tracking-wider text-muted-foreground uppercase">Status</label>
+                                    <select
+                                        value={editForm.status}
+                                        onChange={(e) => setEditForm((f) => f && ({ ...f, status: e.target.value }))}
+                                        className="w-full rounded-lg border border-border/40 bg-white px-3 py-2 text-sm text-foreground outline-none focus:border-primary dark:border-stone-600 dark:bg-stone-800 dark:text-stone-100"
+                                    >
+                                        <option value="available">Available</option>
+                                        <option value="occupied">Occupied</option>
+                                        <option value="reserved">Reserved</option>
+                                        <option value="cleaning">Cleaning</option>
+                                        <option value="inactive">Inactive</option>
+                                    </select>
+                                </div>
+
+                                <div>
+                                    <label className="mb-1 block text-[11px] font-bold tracking-wider text-muted-foreground uppercase">Active</label>
+                                    <select
+                                        value={editForm.is_active}
+                                        onChange={(e) => setEditForm((f) => f && ({ ...f, is_active: e.target.value }))}
+                                        className="w-full rounded-lg border border-border/40 bg-white px-3 py-2 text-sm text-foreground outline-none focus:border-primary dark:border-stone-600 dark:bg-stone-800 dark:text-stone-100"
+                                    >
+                                        <option value="true">Active</option>
+                                        <option value="false">Inactive</option>
+                                    </select>
+                                </div>
+                            </div>
+
+                            <div className="flex items-center justify-end gap-3 border-t border-border/20 pt-4 dark:border-stone-700">
+                                <button type="button" onClick={() => setEditingTable(null)} className="rounded-lg px-5 py-2 text-sm font-semibold text-muted-foreground hover:bg-secondary">
+                                    Cancel
+                                </button>
+                                <button
+                                    type="submit"
+                                    disabled={editSaving}
+                                    className="rounded-lg bg-primary px-6 py-2 text-sm font-bold text-white shadow-sm transition-all hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-60"
+                                >
+                                    {editSaving ? 'Saving…' : 'Save Changes'}
+                                </button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+            )}
         </>
     );
 }

@@ -61,7 +61,7 @@ class DiningTableController extends Controller
     {
         $this->diningTableService->updateDiningTable($diningTable, $request->validated());
 
-        return redirect()->route('dining-tables.index')
+        return redirect($request->input('_redirect', route('dining-tables.index')))
             ->with('success', 'Dining table updated successfully.');
     }
 
