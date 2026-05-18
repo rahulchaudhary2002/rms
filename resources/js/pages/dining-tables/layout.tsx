@@ -57,24 +57,6 @@ const STATUS_COLORS: Record<string, { bg: string; border: string; text: string }
     inactive:  { bg: 'bg-stone-50 dark:bg-stone-800',    border: 'border-stone-300 dark:border-stone-600', text: 'text-stone-500 dark:text-stone-400' },
 };
 
-function TableShape({ shape, width, height, color }: { shape: string; width: number; height: number; color: { bg: string; border: string; text: string } }) {
-    if (shape === 'circle' || shape === 'oval') {
-        return (
-            <div
-                className={cn('border-2 flex items-center justify-center', color.bg, color.border)}
-                style={{ width, height, borderRadius: shape === 'circle' ? '50%' : '50% / 40%' }}
-            />
-        );
-    }
-    const radius = shape === 'square' ? '8px' : '6px';
-    return (
-        <div
-            className={cn('border-2', color.bg, color.border)}
-            style={{ width, height, borderRadius: radius }}
-        />
-    );
-}
-
 export default function DiningTableLayout({ outlets, diningAreas, tables, scopedOutletId }: Props) {
     const [selectedOutletId, setSelectedOutletId] = useState(scopedOutletId ?? '');
     const [selectedAreaId, setSelectedAreaId] = useState('');
@@ -85,6 +67,8 @@ export default function DiningTableLayout({ outlets, diningAreas, tables, scoped
     const [canvasScale, setCanvasScale] = useState(1);
     const canvasRef = useRef<HTMLDivElement>(null);
     const canvasWrapperRef = useRef<HTMLDivElement>(null);
+    const canvasColumnRef = useRef<HTMLDivElement>(null);
+    const measureRef = useRef<HTMLDivElement>(null);
     const dragging = useRef<{ id: number; startX: number; startY: number; origX: number; origY: number } | null>(null);
 
     const filteredAreas = useMemo(() => {
@@ -113,25 +97,20 @@ export default function DiningTableLayout({ outlets, diningAreas, tables, scoped
     }, [selectedAreaId, tables]);
 
     useEffect(() => {
-        const wrapper = canvasWrapperRef.current;
-        if (!wrapper || !selectedArea) return;
+        if (!selectedArea) return;
 
-        const updateScale = () => {
-            const availW = wrapper.clientWidth;
-            const availH = window.innerHeight * 0.65;
-            const scaleW = availW / selectedArea.layout_width;
-            const scaleH = availH / selectedArea.layout_height;
-            setCanvasScale(Math.min(scaleW, scaleH, 1));
+        const measure = () => {
+            const el = measureRef.current;
+            if (!el) return;
+            const w = el.offsetWidth;
+            if (w === 0) return;
+            const h = window.innerHeight * 0.65;
+            setCanvasScale(Math.min(w / selectedArea.layout_width, h / selectedArea.layout_height, 1));
         };
 
-        updateScale();
-        const ro = new ResizeObserver(updateScale);
-        ro.observe(wrapper);
-        window.addEventListener('resize', updateScale);
-        return () => {
-            ro.disconnect();
-            window.removeEventListener('resize', updateScale);
-        };
+        measure();
+        window.addEventListener('resize', measure);
+        return () => window.removeEventListener('resize', measure);
     }, [selectedArea]);
 
     const handleOutletChange = (outletId: string) => {
@@ -315,7 +294,8 @@ export default function DiningTableLayout({ outlets, diningAreas, tables, scoped
 
             <div className="flex gap-6 pb-6">
                 {/* Canvas */}
-                <div className="min-w-0 flex-1">
+                <div ref={canvasColumnRef} className="min-w-0 flex-1">
+                    <div ref={measureRef} style={{ width: '100%', height: 0 }} />
                     {!selectedAreaId ? (
                         <div className="flex min-h-[400px] items-center justify-center rounded-xl border-2 border-dashed border-border/30 bg-muted/30 dark:border-stone-700 dark:bg-stone-900/30">
                             <div className="text-center">
