@@ -37,6 +37,16 @@ class RolesAndPermissionsSeeder extends Seeder
         'settings',
     ];
 
+    private array $diningModules = [
+        'dining-areas',
+        'dining-tables',
+    ];
+
+    private array $customDiningPermissions = [
+        ['module' => 'dining-table-layout', 'action' => 'view',   'name' => 'Dining Table Layout View'],
+        ['module' => 'dining-table-layout', 'action' => 'update', 'name' => 'Dining Table Layout Update'],
+    ];
+
     private array $actions = [
         'view',
         'create',
@@ -168,6 +178,7 @@ class RolesAndPermissionsSeeder extends Seeder
             $this->seedPermissions();
             $this->seedInventoryPermissions();
             $this->seedPurchasePermissions();
+            $this->seedDiningPermissions();
             $this->seedRoles();
             $this->assignDefaultAdminPermissions();
             $this->assignInventoryRolePermissions();
@@ -284,6 +295,46 @@ class RolesAndPermissionsSeeder extends Seeder
         }
 
         foreach ($this->customInventoryPermissions as $permission) {
+            $slug = "{$permission['module']}-{$permission['action']}";
+
+            Permission::firstOrCreate(
+                ['slug' => $slug],
+                [
+                    'name'      => $permission['name'],
+                    'module'    => $permission['module'],
+                    'action'    => $permission['action'],
+                    'level'     => 'global',
+                    'is_system' => true,
+                    'is_active' => true,
+                ]
+            );
+        }
+    }
+
+    private function seedDiningPermissions(): void
+    {
+        $diningActions = ['view', 'create', 'update', 'delete'];
+
+        foreach ($this->diningModules as $module) {
+            foreach ($diningActions as $action) {
+                $slug = "{$module}-{$action}";
+                $name = ucwords(str_replace('-', ' ', $module)).' '.ucwords($action);
+
+                Permission::firstOrCreate(
+                    ['slug' => $slug],
+                    [
+                        'name'      => $name,
+                        'module'    => $module,
+                        'action'    => $action,
+                        'level'     => 'global',
+                        'is_system' => true,
+                        'is_active' => true,
+                    ]
+                );
+            }
+        }
+
+        foreach ($this->customDiningPermissions as $permission) {
             $slug = "{$permission['module']}-{$permission['action']}";
 
             Permission::firstOrCreate(

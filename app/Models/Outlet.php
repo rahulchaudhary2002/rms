@@ -18,4 +18,14 @@ class Outlet extends Model
     {
         return $this->hasMany(OutletDepartment::class);
     }
+
+    public function diningAreas(): HasMany
+    {
+        return $this->hasMany(DiningArea::class);
+    }
+
+    public function diningTables(): HasMany
+    {
+        return $this->hasMany(DiningTable::class);
+    }
 }

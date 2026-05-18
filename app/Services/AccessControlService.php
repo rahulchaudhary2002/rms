@@ -34,6 +34,10 @@ class AccessControlService
         ?int $departmentId = null,
         ?int $warehouseId = null
     ): bool {
+        if ($this->isSuperAdmin($user)) {
+            return true;
+        }
+
         $permission = $this->findPermission($permissionSlug);
 
         if (! $permission) {
@@ -45,10 +49,6 @@ class AccessControlService
         }
 
         if ($this->hasAllowOverride($user, $permission->id, $scopeType, $outletId, $departmentId, $warehouseId)) {
-            return true;
-        }
-
-        if ($this->isSuperAdmin($user)) {
             return true;
         }
 

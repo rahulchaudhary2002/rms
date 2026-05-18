@@ -48,3 +48,4 @@ require __DIR__.'/ingredient-stock-outs.php';
 require __DIR__.'/ingredient-stock-adjustments.php';
 require __DIR__.'/ingredient-stock-counts.php';
 require __DIR__.'/purchase.php';
+require __DIR__.'/dining.php';

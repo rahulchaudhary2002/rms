@@ -46,6 +46,9 @@ import { index as purchaseReceivesIndex } from '@/routes/purchase-receives';
 import { index as purchaseInvoicesIndex } from '@/routes/purchase-invoices';
 import { index as supplierPaymentsIndex } from '@/routes/supplier-payments';
 import { index as purchaseReturnsIndex } from '@/routes/purchase-returns';
+import { index as diningAreasIndex } from '@/routes/dining-areas';
+import { index as diningTablesIndex } from '@/routes/dining-tables';
+import { index as diningTableLayoutIndex } from '@/routes/dining-table-layout';
 import type { Auth } from '@/types';
 
 type ViewportMode = 'mobile' | 'medium' | 'large';
@@ -250,6 +253,14 @@ function buildDynamicGroups(auth: Auth): MenuGroup[] {
         if (can('supplier-payments-view')) items.push({ title: 'Supplier Payments', href: supplierPaymentsIndex.url(), icon: 'payments',          activeMatch: [supplierPaymentsIndex.url()] });
         if (can('purchase-returns-view'))  items.push({ title: 'Purchase Returns',  href: purchaseReturnsIndex.url(),  icon: 'assignment_return', activeMatch: [purchaseReturnsIndex.url()] });
         groups.push({ id: 'purchase', label: 'Inventory', title: 'Purchase', icon: 'local_shipping', items });
+    }
+
+    if (canAny(['dining-areas-view', 'dining-tables-view', 'dining-table-layout-view'])) {
+        const items: MenuItem[] = [];
+        if (can('dining-areas-view'))       items.push({ title: 'Dining Areas',  href: diningAreasIndex.url(),       icon: 'table_restaurant', activeMatch: [diningAreasIndex.url()] });
+        if (can('dining-tables-view'))      items.push({ title: 'Dining Tables', href: diningTablesIndex.url(),      icon: 'chair',            activeMatch: [diningTablesIndex.url()] });
+        if (can('dining-table-layout-view')) items.push({ title: 'Table Layout', href: diningTableLayoutIndex.url(), icon: 'grid_view',         activeMatch: [diningTableLayoutIndex.url()] });
+        groups.push({ id: 'dining', label: 'Restaurant', title: 'Dining', icon: 'restaurant', items });
     }
 
     if (canAny(['users-manage', 'roles-view', 'permissions-view', 'access-control-manage'])) {

@@ -20,6 +20,10 @@ class CheckPermission
             return $this->deny($request);
         }
 
+        if ($user->is_superadmin) {
+            return $next($request);
+        }
+
         [$scopeType, $outletId, $departmentId, $warehouseId] = $this->resolveScope($request);
 
         if (! $this->accessControl->userHasPermission($user, $permission, $scopeType, $outletId, $departmentId, $warehouseId)) {
